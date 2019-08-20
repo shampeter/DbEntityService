@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Collections.Generic;
+using AXAXL.DbEntity.Interfaces;
 using System.Text;
 using System.Dynamic;
 using AXAXL.DbEntity.EntityGraph;
@@ -135,6 +136,47 @@ namespace AXAXL.DbEntity.EntityGraph
 				);
 			var lambda = Expression.Lambda<Action<object, object>>(block, new [] { entityInput, valueInput });
 
+			return lambda;
+		}
+		public static Expression<Func<object, IEnumerator<ITrackable>>> CreateGetEnumeratorFunc(this NodeProperty property)
+		{
+			var enumeratorMethod = SearchMethodOnType(property.PropertyType, "GetEnumerator");
+			Debug.Assert(enumeratorMethod != null, $"Failed to locate 'GetEnumerator' method on {property.PropertyName} of {property.Owner.Name}");
+			var input = Expression.Parameter(typeof(object), "entity");
+			var block = Expression.Block(
+				Expression.Convert(
+					Expression.Call(
+						Expression.Property(
+							Expression.Convert(input, property.Owner.NodeType),
+							property.PropertyName
+						),
+						enumeratorMethod
+					),
+					typeof(IEnumerator<ITrackable>)
+				)
+			);
+			var lambda = Expression.Lambda<Func<object, IEnumerator<ITrackable>>>(block, new[] { input });
+			return lambda;
+		}
+		public static Expression<Action<object, object>> CreateRemoveItemAction(this NodeProperty property)
+		{
+			var removeMethod = SearchMethodOnType(property.PropertyType, "Remove");
+			var entityInput = Expression.Parameter(typeof(object), "entity");
+			var elementToBeRemoved = Expression.Parameter(typeof(object), "toBeRemoved");
+			var block = Expression.Block(
+					Expression.Call(
+						Expression.Property(
+							Expression.Convert(entityInput, property.Owner.NodeType),
+							property.PropertyName
+						),
+						removeMethod,
+						Expression.Convert(
+							elementToBeRemoved,
+							GetMethodParameterType(property.PropertyType).FirstOrDefault()
+						)
+					)
+				);
+			var lambda = Expression.Lambda<Action<object, object>>(block, new[] { entityInput, elementToBeRemoved });
 			return lambda;
 		}
 		private static Type[] GetMethodParameterType(Type type, bool onlyFirstArgument = true)

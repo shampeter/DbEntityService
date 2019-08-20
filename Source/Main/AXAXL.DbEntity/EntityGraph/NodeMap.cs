@@ -90,6 +90,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					.HandleForeignKeyAttribute(property)
 					.HandleInversePropertyAttribute(property)
 					.CompileScript()
+					.CompileDelegateForHandlingCollection()
 					;
 				
 				if (property.IsPrimaryKey())

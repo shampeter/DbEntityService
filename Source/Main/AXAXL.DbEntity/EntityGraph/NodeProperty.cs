@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Extensions.Logging;
+using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
@@ -53,6 +54,8 @@ namespace AXAXL.DbEntity.EntityGraph
 		public (NodePropertyUpdateScriptTypes ScriptType, string Script, string[] Namespaces) UpdateScript { get; set; }
 		public Action<dynamic> ActionInjection { get; set; }
 		public Func<dynamic> FuncInjection { get; set; }
+		public Func<object, IEnumerator<ITrackable>> GetEnumeratorFunc { get; set; }
+		public Action<object, object> GetRemoveItemMethodAction { get; set; }
 		public bool IsEdge { get; set; }
 		public Type GetTypeReferencedByEdge()
 		{
@@ -84,6 +87,15 @@ namespace AXAXL.DbEntity.EntityGraph
 				string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
 				this.UpdateScript.Script
 				);
+		}
+		public NodeProperty CompileDelegateForHandlingCollection()
+		{
+			if (this.PropertyCategory == PropertyCategories.Collection)
+			{
+				this.GetEnumeratorFunc = this.CreateGetEnumeratorFunc().Compile();
+				this.GetRemoveItemMethodAction = this.CreateRemoveItemAction().Compile();
+			}
+			return this;
 		}
 		public NodeProperty CompileScript()
 		{
