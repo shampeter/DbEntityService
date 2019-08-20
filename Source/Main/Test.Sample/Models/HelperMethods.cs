@@ -35,7 +35,7 @@ namespace Test.Sample.Models
 			}
 			return result;
 		}
-		// TODO: Need to figure this out later.
+		// TODO: Need to figure out how to get the session user Id.  This is left for security service design where we may use JWT to carry user's claims round a user sessin.
 		public static string CurrentUserId => "Testing";
 	}
 }
