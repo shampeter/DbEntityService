@@ -4,11 +4,11 @@ using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Services;
 using AXAXL.DbEntity.MSSql;
 using AXAXL.DbEntity.EntityGraph;
-using Entity.Example.Models;
+using Test.Sample.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Entity.Example
+namespace Test.Sample
 {
 	class Program
     {
@@ -43,7 +43,7 @@ namespace Entity.Example
 			var service = serviceProvider.GetService<IDbService>();
 			service.Config(o => {
 				o
-				.AddOrUpdateConnection("SQL_Connection", @"Server=gp01.cyberia0083.org,1433; Database=ORMPOCDB; User Id=sa; Password=tit@ns8in")
+				.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
 				.SetAsDefaultConnection("SQL_Connection")
 				;
 			});
@@ -88,8 +88,7 @@ namespace Entity.Example
 			map.BuildNodes();
 
 			var driver = serviceProvider.GetService<IDatabaseDriver>();
-			//var connectionString = @"Server=localhost,1433; Database=ScaffoldPOCDB; User Id=sa; Password=tit@ns8in";
-			var connectionString = @"Server=gp01.cyberia0083.org,1433; Database=ORMPOCDB; User Id=sa; Password=tit@ns8in";
+			var connectionString = @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1";
 			var lookups = driver.Select<TLookups>(connectionString, map.GetNode(typeof(TLookups)), (t) => t.LookupsPkey == 20 && t.LookupsGroupPkey == 1);
 			foreach(var lookup in lookups)
 			{

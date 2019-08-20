@@ -12,4 +12,12 @@
     <PackageReference Include="system.data.sqlclient" Version="4.6.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AXAXL.DbEntity\AXAXL.DbEntity.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Scripts\" />
+  </ItemGroup>
+
 </Project>

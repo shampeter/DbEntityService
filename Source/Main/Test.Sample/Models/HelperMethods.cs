@@ -11,7 +11,7 @@ namespace Test.Sample.Models
 		public static int NextSequence(int argType, int argRange)
 		{
 			int result;
-			var connectionString = @"Server=gp01.cyberia0083.org,1433; Database=ORMPOCDB; User Id=sa; Password=tit@ns8in";
+			var connectionString = @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1";
 
 			using (var connection = new SqlConnection(connectionString))
 			{
