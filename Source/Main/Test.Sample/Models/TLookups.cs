@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Entity.Example.Models
+namespace Test.Sample.Models
 {
-	[Table("t_lookups_group")]
-    public partial class TLookupsGroup
+	[Table("t_lookups")]
+    public partial class TLookups
     {
-        public TLookupsGroup()
+        public TLookups()
         {
-            TLookups = new HashSet<TLookups>();
         }
-
         [Key]
-        [Column("lookups_group_pkey")]
+        [Column("lookups_pkey")]
         [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int LookupsPkey { get; set; }
+        [Column("lookups_group_pkey")]
         public int LookupsGroupPkey { get; set; }
 
         [Column("description")]
@@ -26,7 +26,8 @@ namespace Entity.Example.Models
 		[DatabaseGenerated(DatabaseGeneratedOption.Computed)]
 		public byte[] Version { get; set; }
 
-        [InverseProperty("LookupsGroupPkeyNavigation")]
-        public virtual ICollection<TLookups> TLookups { get; set; }
+        [ForeignKey("LookupsGroupPkey")]
+        [InverseProperty("TLookups")]
+        public virtual TLookupsGroup LookupsGroupPkeyNavigation { get; set; }
     }
 }

@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
 
-namespace Entity.Example.Models
+namespace Test.Sample.Models
 {
 	[Table("t_ceded_contract_layer")]
     public partial class TCededContractLayer

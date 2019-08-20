@@ -4,7 +4,7 @@ using System.Text;
 using System.Data.SqlClient;
 using System.Data;
 
-namespace Entity.Example.Models
+namespace Test.Sample.Models
 {
 	public class HelperMethods
 	{

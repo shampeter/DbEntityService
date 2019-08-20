@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Annotation;
 
-namespace Entity.Example.Models
+namespace Test.Sample.Models
 {
 	[Table("t_ceded_contract")]
     public class TCededContract : ITrackable
