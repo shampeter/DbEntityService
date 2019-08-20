@@ -1,0 +1,111 @@
+﻿using System;
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Text;
+using System.Linq;
+using System.Linq.Expressions;
+using Microsoft.Extensions.Logging;
+using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.EntityGraph;
+using AXAXL.DbEntity.Extensions;
+
+namespace AXAXL.DbEntity.Services
+{
+	public class Director
+	{
+		private IDatabaseDriver Driver { get; set; }
+		private INodeMap NodeMap { get; set; }
+		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
+		private ILogger Log { get; set; }
+		private IDbServiceOption ServiceOption { get; set; }
+		//private ISet<string> PathWalked { get; set; }
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion)
+		{
+			this.NodeMap = nodeMap;
+			this.Driver = driver;
+			this.Log = log;
+			this.Exclusion = exclusion ?? new Dictionary<Node, NodeProperty[]>();
+			this.ServiceOption = serviceOption;
+			//this.PathWalked = new HashSet<string>();
+		}
+		// TODO: Need to double check the build logic
+		public T Build<T>(T entity, bool isMovingTowardsParent, bool isMovingTowardsChild) where T : class, new()
+		{
+			Node node = this.NodeMap.GetNode(entity.GetType());
+
+			if (isMovingTowardsChild)
+			{
+				foreach (var eachParentToChild in node.AllChildEdgeNames())
+				{
+					var edge = node.GetEdgeToChildren(eachParentToChild);
+
+/* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
+ 					var edgeSignature = this.GetEdgeSignature(edge);
+					// child path has been walked.
+					if (this.PathWalked.Contains(edgeSignature)) continue;
+					// if not, remember this path in order to prevent going in cycles.
+					this.PathWalked.Add(edgeSignature);
+*/
+					// child path excluded
+					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
+
+					var readers = edge.ParentPrimaryKeyReaders;
+					IDictionary<string, object> childKeys = new Dictionary<string, object>();
+					for (int i = 0; i < readers.Length && i < edge.ChildNodeForeignKeys.Length; i++)
+					{
+						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, readers[i](entity));
+					}
+					var connection = this.GetConnectionString(edge.ChildNode);
+					var children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys);
+					edge.ChildAddingAction(entity, children);
+
+					foreach (var eachChild in children)
+					{
+						edge.ParentSettingAction(eachChild, entity);
+						this.Build(eachChild, true, true);
+					}
+				}
+			}
+			if (isMovingTowardsParent)
+			{
+				foreach (var eachChildToParent in node.AllParentEdgeNames())
+				{
+					var edge = node.GetEdgeToParent(eachChildToParent);
+
+/* Doesn't work this way because the same path can be walked by diffent node of different record.					
+ 					var edgeSignature = this.GetEdgeSignature(edge);
+					if (this.PathWalked.Contains(edgeSignature)) continue;
+					this.PathWalked.Add(edgeSignature);
+*/
+					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ParentReferenceOnChildNode)) continue;
+
+					var readers = edge.ChildForeignKeyReaders;
+					IDictionary<string, object> parentKeys = new Dictionary<string, object>();
+					for (int i = 0; i < readers.Length && i < edge.ParentNodePrimaryKeys.Length; i++)
+					{
+						parentKeys.Add(edge.ParentNodePrimaryKeys[i].PropertyName, readers[i](entity));
+					}
+					var connection = this.GetConnectionString(edge.ParentNode);
+					var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys).FirstOrDefault();
+					edge.ParentSettingAction(entity, parent);
+					edge.ChildAddingAction(parent, new[] { entity });
+					this.Build(parent, true, false);
+				}
+			}
+			return entity;
+		}
+		private string GetEdgeSignature(NodeEdge edge)
+		{
+			return $"{edge.ParentNode.FullName}.{edge.ChildReferenceOnParentNode?.PropertyName},{edge.ChildNode.FullName}.{edge.ParentReferenceOnChildNode?.PropertyName}";
+		}
+		private string GetConnectionString(Node node)
+		{
+			return string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
+		}
+		[Conditional("DEBUG")]
+		private void LogExpression(Expression expression)
+		{
+			this.Log.LogDebug(expression.ToMarkDown());
+		}
+	}
+}

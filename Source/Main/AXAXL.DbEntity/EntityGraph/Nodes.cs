@@ -1,0 +1,281 @@
+using System;
+using System.Text;
+using System.Linq;
+using System.Diagnostics;
+using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
+
+namespace AXAXL.DbEntity.EntityGraph
+{
+	public class Node
+	{
+		internal const string C_NODE_PROPERTY_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |";
+		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
+		internal static readonly string[] C_NODE_PROPERTY_HEADING = new string[]{"Owner", "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script"};
+		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
+		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
+		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
+		private ILogger Log { get; set; }
+		private string _name;
+		private string _fullName;
+		public Node(Type nodeType, ILogger log)
+		{
+			this.PrimaryKeys = new Dictionary<string, NodeProperty>();
+			this.DataColumns = new Dictionary<string, NodeProperty>();
+			this.EdgeToChildren = new Dictionary<string, NodeEdge>();
+			this.EdgeToParent = new Dictionary<string, NodeEdge>();
+			this.Log = log;
+			this.NodeType = nodeType;
+		}
+		public string Name
+		{
+			get
+			{
+				if (this._name == null)
+				{
+					this._name = this.NodeType.Name;
+				}
+				return this._name;
+			}
+		}
+		public string FullName
+		{
+			get
+			{
+				if (this._fullName == null)
+				{
+					this._fullName = this.NodeType.FullName;
+				}
+				return this._fullName;
+			}
+		}
+		public Type NodeType { get; set; }
+		public string DbTableName { get; set; }
+		public string DbSchemaName { get; set; }
+		public String DbConnectionName { get; set; }
+		public IDictionary<string, NodeProperty> PrimaryKeys { get; set; }
+		public IDictionary<string, NodeProperty> DataColumns { get; set; }
+		public NodeProperty ConcurrencyControl { get; set; }
+		protected IDictionary<string, NodeEdge> EdgeToChildren { get; set; }
+		protected IDictionary<string, NodeEdge> EdgeToParent { get; set; }
+		public bool IsPropertyOnNode(string propertyName)
+		{
+			return 
+				this.PrimaryKeys.ContainsKey(propertyName) || 
+				this.DataColumns.ContainsKey(propertyName) || 
+				(this.ConcurrencyControl != null && this.ConcurrencyControl.PropertyName.Equals(propertyName, StringComparison.CurrentCultureIgnoreCase))
+				;
+		}
+		public NodeProperty GetPropertyFromNode(string propertyName)
+		{
+			Debug.Assert(this.IsPropertyOnNode(propertyName) == true, $"Cannot find property named '{propertyName}' on {this.NodeType.Name}");
+			
+			NodeProperty property = null;
+			bool found =
+				this.PrimaryKeys.TryGetValue(propertyName, out property) ||
+				this.DataColumns.TryGetValue(propertyName, out property);
+			return found ? property : this.ConcurrencyControl;
+		}
+		public bool ContainsEdgeToChildren(NodeProperty property)
+		{
+			return this.ContainsEdgeToChildren(property.PropertyName);
+		}
+		public bool ContainsEdgeToChildren(string propertyName)
+		{
+			return this.EdgeToChildren.ContainsKey(propertyName);
+		}
+		public bool ContainsEdgeToParent(NodeProperty property)
+		{
+			return this.ContainsEdgeToParent(property.PropertyName);
+		}
+		public bool ContainsEdgeToParent(string propertyName)
+		{
+			return this.EdgeToParent.ContainsKey(propertyName);
+		}
+		public NodeEdge GetEdgeToChildren(NodeProperty property)
+		{
+			return this.GetEdgeToChildren(property.PropertyName);
+		}
+		public NodeEdge GetEdgeToChildren(string propertyName)
+		{
+			return this.EdgeToChildren[propertyName];
+		}
+		public NodeEdge GetEdgeToParent(NodeProperty property)
+		{
+			return this.GetEdgeToParent(property.PropertyName);
+		}
+		public NodeEdge GetEdgeToParent(string propertyName)
+		{
+			return this.EdgeToParent[propertyName];
+		}
+		public void AddEdgeOnParentToChild(NodeProperty property, NodeEdge edge, bool overwrite = true, bool throwExceptionIfAlreadyExisted = false)
+		{
+			this.AddEdgeOnParentToChild(property.PropertyName, edge, overwrite, throwExceptionIfAlreadyExisted);
+		}
+		public void AddEdgeOnParentToChild(string property, NodeEdge edge, bool overwrite = true, bool throwExceptionIfAlreadyExisted = false)
+		{
+			var existed = this.ContainsEdgeToChildren(property);
+			if (existed)
+			{
+				if (!overwrite && throwExceptionIfAlreadyExisted)
+				{
+					throw new ArgumentException($"Edge to child on {property} already exists");
+				}
+			}
+			if (! existed || overwrite)
+			{
+				this.EdgeToChildren[property] = edge;
+			}
+		}
+		public void AddEdgeOnChildToParent(NodeProperty property, NodeEdge edge, bool overwrite = true, bool throwExceptionIfAlreadyExisted = false)
+		{
+			this.AddEdgeOnChildToParent(property.PropertyName, edge, overwrite, throwExceptionIfAlreadyExisted);
+		}
+		public void AddEdgeOnChildToParent(string property, NodeEdge edge, bool overwrite = true, bool throwExceptionIfAlreadyExisted = false)
+		{
+			var existed = this.ContainsEdgeToParent(property);
+			if (existed)
+			{
+				if (!overwrite && throwExceptionIfAlreadyExisted)
+				{
+					throw new ArgumentException($"Edge to parent on {property} already exists");
+				}
+			}
+			if (!existed || overwrite)
+			{
+				this.EdgeToParent[property] = edge;
+			}
+		}
+		public Node LocateEdges()
+		{
+			// case 1: InversePropertyAttribute found on property of type object or collection.
+			// case 2: ForeignKeyAttribute found on property of type object or collection.
+			// case 3: ForeignKeyAttribute found on value-typed property and the Name property of ForeignKeyAttribute identify the edge.
+			foreach (var eachColumn in this.DataColumns.Values)
+			{
+				var foreignKeyRef = eachColumn.ForeignKeyReference;
+				var inversePropRef = eachColumn.InversePropertyReference;
+				var edgeColumn = eachColumn;
+				var foreignKeyColumn = eachColumn;
+				var edge = new NodeEdge(this.Log);
+				if (!string.IsNullOrEmpty(foreignKeyRef))
+				{
+					switch (eachColumn.PropertyCategory)
+					{
+						case PropertyCategories.Value:
+							edgeColumn = this.GetPropertyFromNode(foreignKeyRef);
+							break;
+						case PropertyCategories.ObjectReference:
+							foreignKeyColumn = this.GetPropertyFromNode(foreignKeyRef);
+							break;
+						case PropertyCategories.Collection:
+							foreignKeyColumn = null;
+							break;
+					}
+					edgeColumn.IsEdge = true;
+
+					if (edgeColumn.PropertyCategory == PropertyCategories.Collection)
+					{
+						if (this.ContainsEdgeToChildren(eachColumn) == false)
+						{
+							edge.ParentNode = this;
+							edge.ParentNodePrimaryKeys = this.PrimaryKeys.Values.ToArray();
+							edge.ChildReferenceOnParentNode = edgeColumn;
+							this.EdgeToChildren.Add(edgeColumn.PropertyName, edge);
+						}
+					}
+					else
+					{
+						if (this.ContainsEdgeToParent(edgeColumn) == false)
+						{
+							edge.ChildNode = this;
+							edge.ParentReferenceOnChildNode = edgeColumn;
+							edge.ChildNodeForeignKeys = new NodeProperty[] { foreignKeyColumn };
+							this.EdgeToParent.Add(edgeColumn.PropertyName, edge);
+						}
+					}
+				}
+				if (!string.IsNullOrEmpty(inversePropRef))
+				{
+					Debug.Assert(eachColumn.PropertyCategory != PropertyCategories.Value, $"InversePropertyAttribute cannot apply to property '{eachColumn.PropertyName}' which is of value type.");
+					eachColumn.IsEdge = true;
+					if (eachColumn.PropertyCategory == PropertyCategories.Collection)
+					{
+						if (this.ContainsEdgeToChildren(eachColumn) == false)
+						{
+							edge.ParentNode = this;
+							edge.ParentNodePrimaryKeys = this.PrimaryKeys.Values.ToArray();
+							edge.ChildReferenceOnParentNode = edgeColumn;
+							this.EdgeToChildren.Add(edgeColumn.PropertyName, edge);
+						}
+					}
+					else
+					{
+						if (this.ContainsEdgeToParent(eachColumn) == false)
+						{
+							edge.ChildNode = this;
+							edge.ParentReferenceOnChildNode = eachColumn;
+							this.EdgeToParent.Add(eachColumn.PropertyName, edge);
+						}
+					}
+				}
+			}
+			return this;
+		}
+		public string GetDbColumnNameFromPropertyName(string propertyName)
+		{
+			var dbColumnName = this.PrimaryKeys.ContainsKey(propertyName) ?
+										this.PrimaryKeys[propertyName].DbColumnName :
+										this.DataColumns.ContainsKey(propertyName) ?
+											this.DataColumns[propertyName].DbColumnName :
+											this.ConcurrencyControl != null && propertyName.Equals(this.ConcurrencyControl.PropertyName) ?
+												this.ConcurrencyControl.DbColumnName :
+												string.Empty;
+			return dbColumnName;
+		}
+		public string ToMarkDown()
+		{
+			var buffer = new StringBuilder();
+			var NL = Environment.NewLine;
+			buffer
+				.Append($"## CLASS __{this.NodeType.Name}__ as TABLE __{this.DbTableName}__").Append(NL)
+				.Append(NL)
+				.Append("__Primary Keys__").Append(NL)
+				.Append(NL)
+				.Append(String.Format(C_NODE_PROPERTY_TEMPLATE, C_NODE_PROPERTY_HEADING)).Append(NL)
+				.Append(C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
+				.Append(this.PrimaryKeys.ToMarkDown()).Append(NL)
+				.Append(NL)
+				.Append("__Data Columns__").Append(NL)
+				.Append(NL)
+				.Append(String.Format(C_NODE_PROPERTY_TEMPLATE, C_NODE_PROPERTY_HEADING)).Append(NL)
+				.Append(C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
+				.Append(this.DataColumns.ToMarkDown()).Append(NL)
+				.Append(NL)
+				.Append("__Edge To Child__").Append(NL)
+				.Append(NL)
+				.Append(string.Format(C_NODE_EDGE_TEMPLATE, C_NODE_EDGE_HEADING)).Append(NL)
+				.Append(C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
+				.Append(this.EdgeToChildren.ToMarkDown()).Append(NL)
+				.Append(NL)
+				.Append("__Edge To Parent__").Append(NL)
+				.Append(NL)
+				.Append(string.Format(C_NODE_EDGE_TEMPLATE, C_NODE_EDGE_HEADING)).Append(NL)
+				.Append(C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
+				.Append(this.EdgeToParent.ToMarkDown()).Append(NL)
+				.Append(NL)
+				.Append(@"---").Append(NL)
+				.Append(NL)
+			;
+			return buffer.ToString();
+		}
+		public string[] AllChildEdgeNames()
+		{
+			return this.EdgeToChildren.Keys.ToArray();
+		}
+		public string[] AllParentEdgeNames()
+		{
+			return this.EdgeToParent.Keys.ToArray();
+		}
+	}
+}

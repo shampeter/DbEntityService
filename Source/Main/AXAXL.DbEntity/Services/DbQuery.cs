@@ -1,0 +1,94 @@
+﻿using System;
+using System.Reflection;
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.EntityGraph;
+
+namespace AXAXL.DbEntity.Services
+{
+	public class DbQuery<T> : IQuery<T> where T : class, new()
+	{
+		private IDbServiceOption ServiceOption { get; set; }
+		private ILogger Log { get; set; }
+		private INodeMap NodeMap { get; set; }
+		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
+		private IDatabaseDriver Driver { get; set; }
+		private Expression<Func<T, bool>> WhereClause { get; set; }
+		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
+		{
+			this.ServiceOption = serviceOption;
+			this.Log = log;
+			this.NodeMap = nodeMap;
+			this.Exclusion = new Dictionary<Node, NodeProperty[]>();
+			this.Driver = driver;
+		}
+		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
+		{
+			var node = this.NodeMap.GetNode(typeof(T));
+			var excludedProperties = this.IdentifyMembers<T>(node, exclusions);
+			if (excludedProperties.Length > 0)
+			{
+				this.Exclusion.Add(node, excludedProperties);
+			}
+			return this;
+		}
+
+		public IQuery<T> Exclude<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class, new()
+		{
+			var node = this.NodeMap.GetNode(typeof(TObject));
+			var excludedProperties = this.IdentifyMembers<TObject>(node, exclusions);
+			if (excludedProperties.Length > 0)
+			{
+				this.Exclusion.Add(node, excludedProperties);
+			}
+			return this;
+		}
+
+		public T[] ToArray()
+		{
+			return this.ExecuteQuery(typeof(T)).ToArray();
+		}
+
+		public IList<T> ToList()
+		{
+			return this.ExecuteQuery(typeof(T)).ToList();
+		}
+
+		public IQuery<T> Where(Expression<Func<T, bool>> whereClause)
+		{
+			this.WhereClause = whereClause;
+			return this;
+		}
+		private IEnumerable<T> ExecuteQuery(Type entityType)
+		{
+			var node = this.NodeMap.GetNode(entityType);
+			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
+			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
+			var queryResult = this.Driver.Select(connection, node, this.WhereClause);
+			foreach(var eachEntity in queryResult)
+			{
+				director.Build<T>(eachEntity, true, true);
+			}
+			return queryResult;
+		}
+		private NodeProperty[] IdentifyMembers<TEntity>(Node node, params Expression<Func<TEntity, dynamic>>[] memberExpressions) where TEntity : class, new()
+		{
+			if (memberExpressions == null || memberExpressions.Length <= 0) return new NodeProperty[0];
+			return memberExpressions.Select(e => this.IdentifyMember<TEntity>(node, e)).ToArray();
+		}
+		private NodeProperty IdentifyMember<TEntity>(Node node, Expression<Func<TEntity, dynamic>> memberExpression) where TEntity : class, new()
+		{
+			var member = memberExpression.Body as MemberExpression;
+			Debug.Assert(member != null);
+			var property = member.Member as PropertyInfo;
+			Debug.Assert(property != null);
+
+			return node.GetPropertyFromNode(property.Name);
+		}
+	}
+}
