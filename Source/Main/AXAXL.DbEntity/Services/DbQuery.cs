@@ -18,6 +18,7 @@ namespace AXAXL.DbEntity.Services
 		private INodeMap NodeMap { get; set; }
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
 		private IDatabaseDriver Driver { get; set; }
+		private int TimeoutDurationInSeconds { get; set; }
 		private Expression<Func<T, bool>> WhereClause { get; set; }
 		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
@@ -26,6 +27,8 @@ namespace AXAXL.DbEntity.Services
 			this.NodeMap = nodeMap;
 			this.Exclusion = new Dictionary<Node, NodeProperty[]>();
 			this.Driver = driver;
+			// According to https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2, default Sql server query timeout is 30 seconds.
+			this.TimeoutDurationInSeconds = 30;
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
@@ -49,6 +52,12 @@ namespace AXAXL.DbEntity.Services
 			return this;
 		}
 
+
+		public IQuery<T> SetTimeout(int timeoutDurationInSeconds = 30)
+		{
+			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
+			return this;
+		}
 		public T[] ToArray()
 		{
 			return this.ExecuteQuery(typeof(T)).ToArray();
@@ -69,7 +78,7 @@ namespace AXAXL.DbEntity.Services
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
-			var queryResult = this.Driver.Select(connection, node, this.WhereClause);
+			var queryResult = this.Driver.Select(connection, node, this.WhereClause, this.TimeoutDurationInSeconds);
 			foreach(var eachEntity in queryResult)
 			{
 				director.Build<T>(eachEntity, true, true);
@@ -79,16 +88,7 @@ namespace AXAXL.DbEntity.Services
 		private NodeProperty[] IdentifyMembers<TEntity>(Node node, params Expression<Func<TEntity, dynamic>>[] memberExpressions) where TEntity : class, new()
 		{
 			if (memberExpressions == null || memberExpressions.Length <= 0) return new NodeProperty[0];
-			return memberExpressions.Select(e => this.IdentifyMember<TEntity>(node, e)).ToArray();
-		}
-		private NodeProperty IdentifyMember<TEntity>(Node node, Expression<Func<TEntity, dynamic>> memberExpression) where TEntity : class, new()
-		{
-			var member = memberExpression.Body as MemberExpression;
-			Debug.Assert(member != null);
-			var property = member.Member as PropertyInfo;
-			Debug.Assert(property != null);
-
-			return node.GetPropertyFromNode(property.Name);
+			return memberExpressions.Select(e => node.IdentifyMember<TEntity>(e)).ToArray();
 		}
 	}
 }

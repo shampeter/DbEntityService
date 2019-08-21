@@ -22,7 +22,7 @@ namespace AXAXL.DbEntity.MSSql
 			this.log = factory.CreateLogger<MSSqlDriver>();
 			this.sqlGenerator = sqlGenerator;
 		}
-		public IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters) where T : class, new()
+		public IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 			Debug.Assert(
@@ -47,9 +47,9 @@ namespace AXAXL.DbEntity.MSSql
 					.ToArray();
 			cmd.Parameters.AddRange(parameterWithValue);
 
-			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd);
+			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
-		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause) where T : class, new()
+		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
@@ -60,10 +60,10 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				cmd.Parameters.Add(parameter());
 			}
-			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd);
+			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<dynamic> Select(string connectionString, string rawQuery, IDictionary<string, object> parameters)
+		public IEnumerable<dynamic> Select(string connectionString, string rawQuery, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30)
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
@@ -95,7 +95,7 @@ namespace AXAXL.DbEntity.MSSql
 			return result;
 		}
 
-		public T Delete<T>(string connectionString, T entity, Node node) where T: class, ITrackable, new()
+		public T Delete<T>(string connectionString, T entity, Node node) where T: class, ITrackable
 		{
 			var pKeyAndVersion = this.sqlGenerator.ExtractPrimaryKeyAndConcurrencyControlColumns(node);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, pKeyAndVersion);
@@ -131,7 +131,7 @@ namespace AXAXL.DbEntity.MSSql
 			return entity;
 		}
 
-		public T Insert<T>(string connectionString, T entity, Node node) where T : class, ITrackable, new()
+		public T Insert<T>(string connectionString, T entity, Node node) where T : class, ITrackable
 		{
 			var resultCount = 0;
 			var tableName = this.sqlGenerator.FormatTableName(node);
@@ -187,7 +187,7 @@ namespace AXAXL.DbEntity.MSSql
 			return entity;
 		}
 
-		public T Update<T>(string connectionString, T entity, Node node) where T : class, ITrackable, new()
+		public T Update<T>(string connectionString, T entity, Node node) where T : class, ITrackable
 		{
 			var resultCount = 0;
 			var tableName = this.sqlGenerator.FormatTableName(node);
@@ -267,12 +267,13 @@ namespace AXAXL.DbEntity.MSSql
 			return parameterName.StartsWith('@') ? parameterName : "@" + parameterName;
 		}
 
-		private IEnumerable<T> ExecuteQuery<T>(string connectionString, Func<SqlDataReader, dynamic> fetcher, SqlCommand cmd) where T : class, new()
+		private IEnumerable<T> ExecuteQuery<T>(string connectionString, Func<SqlDataReader, dynamic> fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			var resultSet = new List<T>();
 			using (var connection = new SqlConnection(connectionString))
 			{
 				connection.Open();
+				cmd.CommandTimeout = timeoutDurationInSeconds;
 				cmd.Connection = connection;
 				using (var reader = cmd.ExecuteReader())
 				{

@@ -18,14 +18,18 @@ namespace AXAXL.DbEntity.Services
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
 		private ILogger Log { get; set; }
 		private IDbServiceOption ServiceOption { get; set; }
+		private int TimeoutDurationInSeconds { get; set; }
+		private IList<ITrackable> DeleteQueue { get; set; }
 		//private ISet<string> PathWalked { get; set; }
-		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion)
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, int timeoutDurationInSeconds = 30)
 		{
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
 			this.Log = log;
 			this.Exclusion = exclusion ?? new Dictionary<Node, NodeProperty[]>();
 			this.ServiceOption = serviceOption;
+			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
+			this.DeleteQueue = new List<ITrackable>();
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
@@ -56,7 +60,7 @@ namespace AXAXL.DbEntity.Services
 						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, readers[i](entity));
 					}
 					var connection = this.GetConnectionString(edge.ChildNode);
-					var children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys);
+					var children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, this.TimeoutDurationInSeconds);
 					edge.ChildAddingAction(entity, children);
 
 					foreach (var eachChild in children)
@@ -86,13 +90,69 @@ namespace AXAXL.DbEntity.Services
 						parentKeys.Add(edge.ParentNodePrimaryKeys[i].PropertyName, readers[i](entity));
 					}
 					var connection = this.GetConnectionString(edge.ParentNode);
-					var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys).FirstOrDefault();
+					var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys, this.TimeoutDurationInSeconds).FirstOrDefault();
 					edge.ParentSettingAction(entity, parent);
 					edge.ChildAddingAction(parent, new[] { entity });
 					this.Build(parent, true, false);
 				}
 			}
 			return entity;
+		}
+
+		// TODO: Complete the save implementation.
+		public int Save(ITrackable entity)
+		{
+			var node = this.NodeMap.GetNode(entity.GetType());
+			Debug.Assert(node != null, $"Failed to locate node for entity of type '{entity.GetType().FullName}'");
+			var connectionString = this.GetConnectionString(node);
+			Debug.Assert(string.IsNullOrEmpty(connectionString) == false);
+
+			var childEdges = node.AllChildEdgeNames().Select(p => node.GetEdgeToChildren(p)).ToArray();
+			var recordCount = 0;
+			switch (entity.EntityStatus)
+			{
+				case EntityStatusEnum.New:
+					this.Driver.Insert<ITrackable>(connectionString, entity, node);
+					recordCount++;
+					this.PopulateChildForeignKeys(entity, node, childEdges);
+					break;
+				case EntityStatusEnum.Updated:
+					this.Driver.Update<ITrackable>(connectionString, entity, node);
+					recordCount++;
+					break;
+				case EntityStatusEnum.Deleted:
+					this.DeleteQueue.Add(entity);
+					break;
+			}
+			foreach(var edge in childEdges)
+			{
+				var iterator = edge.ChildReferenceOnParentNode.GetEnumeratorFunc(entity);
+
+				while (iterator.MoveNext())
+				{
+					var child = iterator.Current;
+					this.Save(child);
+				}
+			}
+			return -1;
+		}
+		private void PopulateChildForeignKeys(ITrackable parent, Node node, NodeEdge[] edges)
+		{
+			foreach (var edge in edges)
+			{
+				var primaryKeys = edge.ParentPrimaryKeyReaders.Select(r => r(parent)).ToArray();
+				var foreignKeyWriters = edge.ChildForeignKeyWriter;
+				var iterator = edge.ChildReferenceOnParentNode.GetEnumeratorFunc(parent);
+
+				while (iterator.MoveNext())
+				{
+					var child = iterator.Current;
+					for (int i = 0; i < primaryKeys.Length && i < foreignKeyWriters.Length; i++)
+					{
+						foreignKeyWriters[i](child, primaryKeys[i]);
+					}
+				}
+			}
 		}
 		private string GetEdgeSignature(NodeEdge edge)
 		{

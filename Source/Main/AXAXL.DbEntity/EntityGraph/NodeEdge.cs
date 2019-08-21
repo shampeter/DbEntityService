@@ -20,6 +20,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public NodeProperty ChildReferenceOnParentNode { get; set; }
 		public Action<object, IEnumerable<object>> ChildAddingAction { get; set; }
 		public Action<object, object> ParentSettingAction { get; set; }
+		public Action<object, object>[] ChildForeignKeyWriter { get; set; }
 		public Func<object, dynamic>[] ParentPrimaryKeyReaders { get; set; }
 		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
 		public Node ChildNode { get; set; }
@@ -74,6 +75,24 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return this;
 		}
+		public NodeEdge CompileForeignKeySettingAction()
+		{
+			Expression<Action<object, object>>[] lambda = null;
+			if (this.ChildNodeForeignKeys != null && this.ChildNodeForeignKeys.Length > 0)
+			{
+				lambda = this.ChildNodeForeignKeys.Select(p => p.CreateObjectAssignmentAction()).ToArray();
+			}
+			else
+			{
+				this.Log.LogDebug("Creating empty parent setting action because there is no parent reference.");
+				lambda = this.ChildNodeForeignKeys.Select(p => this.CreateEmptyObjectAssignmentAction()).ToArray();
+			}
+			this.LogExpression("Foreign Key Setting Action", lambda);
+
+			this.ChildForeignKeyWriter = lambda.Select(l => l.Compile()).ToArray();
+
+			return this;
+		}
 		public NodeEdge CompileParentPrimaryKeyReaders()
 		{
 			this.ParentPrimaryKeyReaders =
@@ -124,9 +143,12 @@ namespace AXAXL.DbEntity.EntityGraph
 			);
 		}
 		[Conditional("DEBUG")]
-		private void LogExpression(string message, Expression expression)
+		private void LogExpression(string message, params Expression[] expressions)
 		{
-			this.Log.LogDebug("{1}{0}{2}", Environment.NewLine, message, expression.ToMarkDown());
+			foreach (var expression in expressions)
+			{
+				this.Log.LogDebug("{1}{0}{2}", Environment.NewLine, message, expression.ToMarkDown());
+			}
 		}
 	}
 }

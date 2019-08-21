@@ -179,6 +179,15 @@ namespace AXAXL.DbEntity.EntityGraph
 			var lambda = Expression.Lambda<Action<object, object>>(block, new[] { entityInput, elementToBeRemoved });
 			return lambda;
 		}
+		public static NodeProperty IdentifyMember<TEntity>(this Node node, Expression<Func<TEntity, dynamic>> memberExpression) where TEntity : class
+		{
+			var member = memberExpression.Body as MemberExpression;
+			Debug.Assert(member != null);
+			var property = member.Member as PropertyInfo;
+			Debug.Assert(property != null);
+
+			return node.GetPropertyFromNode(property.Name);
+		}
 		private static Type[] GetMethodParameterType(Type type, bool onlyFirstArgument = true)
 		{
 			return type.IsGenericType ? (onlyFirstArgument ? new Type[]{ type.GenericTypeArguments.FirstOrDefault() } : type.GenericTypeArguments) : new Type[] { typeof(object) };
