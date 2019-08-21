@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
@@ -27,7 +28,11 @@ namespace AXAXL.DbEntity.Services
 			config(this.ServiceOption);
 			return this;
 		}
-
+		public bool Bootstrap(params Assembly[] assemblies)
+		{
+			this.NodeMap.BuildNodes(assemblies);
+			return true;
+		}
 		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)
 		{
 			Debug.Assert(string.IsNullOrEmpty(rawQuery) == false);
@@ -42,9 +47,9 @@ namespace AXAXL.DbEntity.Services
 			return new DbQuery<T>(this.Log, this.ServiceOption, this.NodeMap, this.Driver);
 		}
 
-		T IDbService.Persist<T>(T entity)
+		public IPersist Persist()
 		{
-			throw new NotImplementedException();
+			return new Persist(this.Log, this.ServiceOption, this.NodeMap, this.Driver);
 		}
 	}
 }

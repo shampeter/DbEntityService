@@ -18,6 +18,8 @@ namespace AXAXL.DbEntity.Services
 		private ILogger Log { get; set; }
 		private INodeMap NodeMap { get; set; }
 		public IList<ITrackable> Changes { get; private set; }
+		private bool isolationChanged;
+		private bool scopeOptionChanged;
 		internal ChangeSet(ILogger log, INodeMap nodeMap)
 		{
 			this.Log = log;
@@ -25,6 +27,9 @@ namespace AXAXL.DbEntity.Services
 			this.Isolation = IsolationLevel.ReadCommitted;
 			this.ScopeOption = TransactionScopeOption.Required;
 			this.Changes = new List<ITrackable>();
+			this.isolationChanged = false;
+			this.scopeOptionChanged = false;
+
 		}
 		public IChangeSet Exclude<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class
 		{
@@ -39,14 +44,7 @@ namespace AXAXL.DbEntity.Services
 			return this;
 		}
 
-		public IChangeSet Save(ITrackable entity)
-		{
-			Debug.Assert(entity != null);
-			this.Changes.Add(entity);
-			return this;
-		}
-
-		public IChangeSet Save(IEnumerable<ITrackable> entities)
+		public IChangeSet Save(params ITrackable[] entities)
 		{
 			Debug.Assert(entities != null);
 			foreach (var eachEntity in entities)
@@ -60,13 +58,20 @@ namespace AXAXL.DbEntity.Services
 		public IChangeSet SetIsolationLevel(IsolationLevel isolationLevel)
 		{
 			this.Isolation = isolationLevel;
+			this.isolationChanged = true;
 			return this;
 		}
 
 		public IChangeSet SetTransactionScopeOption(TransactionScopeOption option)
 		{
 			this.ScopeOption = option;
+			this.scopeOptionChanged = true;
 			return this;
 		}
+		public bool IsTransactionScopeOptionChanged => this.scopeOptionChanged;
+
+		public bool IsIsolationLevelChanged => this.isolationChanged;
+
+
 	}
 }

@@ -38,15 +38,16 @@ namespace Test.Sample
 				.AddSingleton<IDbService, DbService>()
 				.BuildServiceProvider()
 				;
-			var map = serviceProvider.GetService<INodeMap>();
-			map.BuildNodes();
+			//var map = serviceProvider.GetService<INodeMap>();
 			var service = serviceProvider.GetService<IDbService>();
-			service.Config(o => {
-				o
-				.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
-				.SetAsDefaultConnection("SQL_Connection")
-				;
-			});
+			service
+				.Config(o => {
+					o
+					.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
+					.SetAsDefaultConnection("SQL_Connection")
+					;
+					})
+				.Bootstrap();
 			var contracts = service.Query<TCededContract>()
 				.Where(c => c.CededContractNum == 1000)
 				.ToArray();
@@ -69,6 +70,7 @@ namespace Test.Sample
 					layer.Limit
 					);
 			}
+
 		}
 		static void SqlDriverTest()
 		{

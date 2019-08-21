@@ -19,25 +19,31 @@ namespace AXAXL.DbEntity.Services
 		private INodeMap NodeMap { get; set; }
 		private IDatabaseDriver Driver { get; set; }
 		private List<IChangeSet> ChangeSets { get; set; }
-		public Persist(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
+		private TransactionScopeOption scopeOption;
+		private IsolationLevel isolation;
+		internal Persist(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
 			this.ServiceOption = serviceOption;
 			this.Log = log;
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
 			this.ChangeSets = new List<IChangeSet>();
+			this.scopeOption = TransactionScopeOption.RequiresNew;
+			this.isolation = IsolationLevel.ReadCommitted;
 		}
 		public int Commit()
 		{
 			var rowCount = 0;
-			var rootOption = new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted };
+			var rootOption = new TransactionOptions { IsolationLevel = this.isolation };
 
-			using (var rootTransaction = new TransactionScope(TransactionScopeOption.RequiresNew, rootOption))
+			using (var rootTransaction = new TransactionScope(this.scopeOption, rootOption))
 			{
 				foreach(var changeSet in this.ChangeSets)
 				{
-					var option = new TransactionOptions { IsolationLevel = changeSet.Isolation };
-					using (var changeSetTransaction = new TransactionScope(changeSet.ScopeOption, option))
+					var isolation = changeSet.IsIsolationLevelChanged == true ? changeSet.Isolation : this.isolation;
+					var scope = changeSet.IsTransactionScopeOptionChanged == true ? changeSet.ScopeOption : this.scopeOption;
+					var option = new TransactionOptions { IsolationLevel = isolation };
+					using (var changeSetTransaction = new TransactionScope(scope, option))
 					{
 						foreach(var eachEntity in changeSet.Changes)
 						{
@@ -58,6 +64,18 @@ namespace AXAXL.DbEntity.Services
 			set = submitChangeSet(set);
 			this.ChangeSets.Add(set);
 
+			return this;
+		}
+
+		public IPersist SetRootTransactionSCopeOption(TransactionScopeOption scopeOption)
+		{
+			this.scopeOption = scopeOption;
+			return this;
+		}
+
+		public IPersist SetRootIsolationLevel(IsolationLevel isolation)
+		{
+			this.isolation = isolation;
 			return this;
 		}
 	}
