@@ -17,49 +17,48 @@ namespace AXAXL.DbEntity.Services
 		private IDbServiceOption ServiceOption { get; set; }
 		private ILogger Log { get; set; }
 		private INodeMap NodeMap { get; set; }
-		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
 		private IDatabaseDriver Driver { get; set; }
-		private IList<(ITrackable[] Entities, TransactionScopeOption ScopeOption, IsolationLevel Level)> ChangeSets { get; set; }
+		private List<IChangeSet> ChangeSets { get; set; }
 		public Persist(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
 			this.ServiceOption = serviceOption;
 			this.Log = log;
 			this.NodeMap = nodeMap;
-			this.Exclusion = new Dictionary<Node, NodeProperty[]>();
 			this.Driver = driver;
-			this.ChangeSets = new List<(ITrackable[] Entities, TransactionScopeOption ScopeOption, IsolationLevel Level)>();
+			this.ChangeSets = new List<IChangeSet>();
 		}
 		public int Commit()
 		{
-			throw new NotImplementedException();
-		}
+			var rowCount = 0;
+			var rootOption = new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted };
 
-		public IPersist Save(ITrackable entity, TransactionScopeOption transactionScopeOption = TransactionScopeOption.Required, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
-		{
-			this.ChangeSets.Add((new[] { entity }, transactionScopeOption, isolationLevel));
-			return this;
-		}
-
-		public IPersist Save(IEnumerable<ITrackable> entities, TransactionScopeOption transactionScopeOption = TransactionScopeOption.Required, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
-		{
-			this.ChangeSets.Add((entities.ToArray(), transactionScopeOption, isolationLevel));
-			return this;
-		}
-
-		public IPersist Exclude<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class, new()
-		{
-			var node = this.NodeMap.GetNode(typeof(TObject));
-			var excludedProperties = this.IdentifyMembers<TObject>(node, exclusions);
-			if (excludedProperties.Length > 0)
+			using (var rootTransaction = new TransactionScope(TransactionScopeOption.RequiresNew, rootOption))
 			{
-				this.Exclusion.Add(node, excludedProperties);
+				foreach(var changeSet in this.ChangeSets)
+				{
+					var option = new TransactionOptions { IsolationLevel = changeSet.Isolation };
+					using (var changeSetTransaction = new TransactionScope(changeSet.ScopeOption, option))
+					{
+						foreach(var eachEntity in changeSet.Changes)
+						{
+							var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion);
+							rowCount += director.Save(eachEntity);
+						}
+					}
+				}
+				rootTransaction.Complete();
 			}
-			return this;
+
+			return rowCount;
 		}
-		private NodeProperty[] IdentifyMembers<TEntity>(Node node, params Expression<Func<TEntity, dynamic>>[] memberExpressions) where TEntity : class
+
+		public IPersist Submit(Func<IChangeSet, IChangeSet> submitChangeSet)
 		{
-			if (memberExpressions == null || memberExpressions.Length <= 0) return new NodeProperty[0];
-			return memberExpressions.Select(e => node.IdentifyMember<TEntity>(e)).ToArray();
+			IChangeSet set = new ChangeSet(this.Log, this.NodeMap);
+			set = submitChangeSet(set);
+			this.ChangeSets.Add(set);
+
+			return this;
 		}
 	}
 }

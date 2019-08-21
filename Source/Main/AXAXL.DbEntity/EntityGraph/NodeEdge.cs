@@ -19,6 +19,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public NodeProperty[] ParentNodePrimaryKeys { get; set; }
 		public NodeProperty ChildReferenceOnParentNode { get; set; }
 		public Action<object, IEnumerable<object>> ChildAddingAction { get; set; }
+		public Action<object, object> ChildRemovingAction { get; set; }
 		public Action<object, object> ParentSettingAction { get; set; }
 		public Action<object, object>[] ChildForeignKeyWriter { get; set; }
 		public Func<object, dynamic>[] ParentPrimaryKeyReaders { get; set; }
@@ -53,6 +54,25 @@ namespace AXAXL.DbEntity.EntityGraph
 			this.LogExpression("Child Adding Action", lambda);
 
 			this.ChildAddingAction = lambda.Compile();
+
+			return this;
+		}
+		public NodeEdge CompileChildRemoveAction()
+		{
+			Expression<Action<object, object>> lambda = null;
+
+			if (this.ChildReferenceOnParentNode != null)
+			{
+				lambda = this.ChildReferenceOnParentNode.CreateCollectionRemovingAction();
+			}
+			else
+			{
+				this.Log.LogDebug("Creating empty child adding action because there is no child set reference.");
+				lambda = this.CreateEmptyObjectAssignmentAction();
+			}
+			this.LogExpression("Child Remove Action", lambda);
+
+			this.ChildRemovingAction = lambda.Compile();
 
 			return this;
 		}

@@ -33,7 +33,7 @@ namespace AXAXL.DbEntity.Services
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
 			var node = this.NodeMap.GetNode(typeof(T));
-			var excludedProperties = this.IdentifyMembers<T>(node, exclusions);
+			var excludedProperties = node.IdentifyMembers<T>(exclusions);
 			if (excludedProperties.Length > 0)
 			{
 				this.Exclusion.Add(node, excludedProperties);
@@ -44,7 +44,7 @@ namespace AXAXL.DbEntity.Services
 		public IQuery<T> Exclude<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class, new()
 		{
 			var node = this.NodeMap.GetNode(typeof(TObject));
-			var excludedProperties = this.IdentifyMembers<TObject>(node, exclusions);
+			var excludedProperties = node.IdentifyMembers<TObject>(exclusions);
 			if (excludedProperties.Length > 0)
 			{
 				this.Exclusion.Add(node, excludedProperties);
@@ -84,11 +84,6 @@ namespace AXAXL.DbEntity.Services
 				director.Build<T>(eachEntity, true, true);
 			}
 			return queryResult;
-		}
-		private NodeProperty[] IdentifyMembers<TEntity>(Node node, params Expression<Func<TEntity, dynamic>>[] memberExpressions) where TEntity : class, new()
-		{
-			if (memberExpressions == null || memberExpressions.Length <= 0) return new NodeProperty[0];
-			return memberExpressions.Select(e => node.IdentifyMember<TEntity>(e)).ToArray();
 		}
 	}
 }

@@ -107,6 +107,39 @@ namespace AXAXL.DbEntity.EntityGraph
 			var lambda = Expression.Lambda<Action<object, IEnumerable<object>>>(block, new[] { entityInput, childSetInput });
 			return lambda;
 		}
+		public static Expression<Action<object, object>> CreateCollectionRemovingAction(this NodeProperty aCollection)
+		{
+			Debug.Assert(aCollection != null);
+			var childRefPropertyType = aCollection.PropertyType;
+			var removeMethodParameterType = GetMethodParameterType(childRefPropertyType);
+			Debug.Assert(removeMethodParameterType.Length == 1);
+			var removeMethod = SearchMethodOnType(childRefPropertyType, @"Remove", removeMethodParameterType[0]);
+			Debug.Assert(removeMethod != null, $"No Remove({removeMethodParameterType[0].Name}) method can be found on '{aCollection.PropertyName}' of '{aCollection.Owner.Name}'");
+
+			var entityInput = Expression.Parameter(typeof(object), "entity");
+			var childInput = Expression.Parameter(typeof(object), "child");
+			var property = Expression.Parameter(childRefPropertyType, "collection");
+			var breakLabel = Expression.Label(typeof(void));
+
+			var block = Expression.Block(
+				new[] { property },
+				// property = entity.childreference
+				Expression.Assign(
+					property,
+					Expression.Property(
+						Expression.Convert(entityInput, aCollection.Owner.NodeType),
+						aCollection.PropertyName
+					)),
+				// property.Clear()
+				Expression.Call(
+					property,
+					removeMethod,
+					Expression.Convert(childInput, removeMethodParameterType[0])
+				)
+			);
+			var lambda = Expression.Lambda<Action<object, object>>(block, new[] { entityInput, childInput });
+			return lambda;
+		}
 		public static Expression<Action<object, object>> CreateEmptyObjectAssignmentAction(this NodeEdge edge)
 		{
 			var label = Expression.Label(typeof(void), "return");
@@ -187,6 +220,11 @@ namespace AXAXL.DbEntity.EntityGraph
 			Debug.Assert(property != null);
 
 			return node.GetPropertyFromNode(property.Name);
+		}
+		public static NodeProperty[] IdentifyMembers<TEntity>(this Node node, params Expression<Func<TEntity, dynamic>>[] memberExpressions) where TEntity : class
+		{
+			if (memberExpressions == null || memberExpressions.Length <= 0) return new NodeProperty[0];
+			return memberExpressions.Select(e => node.IdentifyMember<TEntity>(e)).ToArray();
 		}
 		private static Type[] GetMethodParameterType(Type type, bool onlyFirstArgument = true)
 		{

@@ -19,7 +19,7 @@ namespace AXAXL.DbEntity.Services
 		private ILogger Log { get; set; }
 		private IDbServiceOption ServiceOption { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
-		private IList<ITrackable> DeleteQueue { get; set; }
+		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity)> DeleteQueue { get; set; }
 		//private ISet<string> PathWalked { get; set; }
 		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, int timeoutDurationInSeconds = 30)
 		{
@@ -29,7 +29,7 @@ namespace AXAXL.DbEntity.Services
 			this.Exclusion = exclusion ?? new Dictionary<Node, NodeProperty[]>();
 			this.ServiceOption = serviceOption;
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
-			this.DeleteQueue = new List<ITrackable>();
+			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity)>();
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
@@ -99,8 +99,25 @@ namespace AXAXL.DbEntity.Services
 			return entity;
 		}
 
-		// TODO: Complete the save implementation.
 		public int Save(ITrackable entity)
+		{
+			var rowCount = this.Save(entity, null, null);
+
+			if (this.DeleteQueue.Count > 0)
+			{
+				var reverseOrderQueue = this.DeleteQueue.ToArray().Reverse();
+				foreach(var eachDeleted in reverseOrderQueue)
+				{
+					var connectionString = this.GetConnectionString(eachDeleted.Edge.ChildNode);
+					this.Driver.Delete<ITrackable>(connectionString, eachDeleted.ChildEntity, eachDeleted.Edge.ChildNode);
+					eachDeleted.Edge.ChildRemovingAction(eachDeleted.ParentEntity, eachDeleted.ChildEntity);
+				}
+			}
+
+			return rowCount;
+		}
+
+		private int Save(ITrackable entity, NodeEdge edge, ITrackable parent)
 		{
 			var node = this.NodeMap.GetNode(entity.GetType());
 			Debug.Assert(node != null, $"Failed to locate node for entity of type '{entity.GetType().FullName}'");
@@ -121,17 +138,27 @@ namespace AXAXL.DbEntity.Services
 					recordCount++;
 					break;
 				case EntityStatusEnum.Deleted:
-					this.DeleteQueue.Add(entity);
+					recordCount++;
+					this.DeleteQueue.Add((parent, edge, entity));
 					break;
 			}
-			foreach(var edge in childEdges)
+			foreach(var childEdge in childEdges)
 			{
-				var iterator = edge.ChildReferenceOnParentNode.GetEnumeratorFunc(entity);
+				// Skip child set if indicated in exclusion list.
+				if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(childEdge.ChildReferenceOnParentNode)) continue;
+
+				var iterator = childEdge.ChildReferenceOnParentNode.GetEnumeratorFunc(entity);
 
 				while (iterator.MoveNext())
 				{
 					var child = iterator.Current;
-					this.Save(child);
+					// if parent is new, children has to be new.  Same as delete.  If parent is deleted, so much be child.
+					// TODO: Figure out how to stop Cascading Delete.
+					if (entity.EntityStatus == EntityStatusEnum.New || entity.EntityStatus == EntityStatusEnum.Deleted)
+					{
+						child.EntityStatus = entity.EntityStatus;
+					}
+					this.Save(child, childEdge, entity);
 				}
 			}
 			return -1;
