@@ -9,26 +9,22 @@ using AXAXL.DbEntity.EntityGraph;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
-// TODO: Figure out how to build shortcut to just call, like, AddDbEntityService((c) => c.Addconnection ...)
 	public static class DbEntityServiceExtensions
 	{
-		//public static IServiceCollection AddDbEntityService(this IServiceCollection service, Action<IDbServcieOption> config)
-		//{
-		//	service
-		//		.AddSingleton<IDatabaseDriver, MSSqlDriver>()
-		//		.AddSingleton<INodeMap, NodeMap>()
-		//		.AddSingleton<IMSSqlGenerator, MSSqlGenerator>()
-		//		.AddSingleton<IDbService, DbService>()
-		//}
+		public static IServiceCollection AddSqlDbEntityService(this IServiceCollection service, Action<IDbServiceOption> config)
+		{
+			service
+				.AddSingleton<IDatabaseDriver, MSSqlDriver>()
+				.AddSingleton<INodeMap, NodeMap>()
+				.AddSingleton<IMSSqlGenerator, MSSqlGenerator>()
+				.AddSingleton<IDbService, DbService>()
+				.AddSingleton<IDbServiceOption, DbServiceOption>((provider) => {
+					var option = new DbServiceOption();
+					config?.Invoke(option);
+					return option;
+				})
+			;
+			return service;
+		}
 	}
-	//public class DbServiceProvider : IServiceProvider
-	//{
-	//	public object GetService(Type serviceType)
-	//	{
-	//		if (typeof(IDbService).IsAssignableFrom(serviceType))
-	//		{
-	//			return new DbService();
-	//		}
-	//	}
-	//}
 }

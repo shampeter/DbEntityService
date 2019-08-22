@@ -32,22 +32,17 @@ namespace Test.Sample
 						.AddConsole()
 						.SetMinimumLevel(LogLevel.Debug)
 				)
-				.AddSingleton<IDatabaseDriver, MSSqlDriver>()
-				.AddSingleton<INodeMap, NodeMap>()
-				.AddSingleton<IMSSqlGenerator, MSSqlGenerator>()
-				.AddSingleton<IDbService, DbService>()
+				.AddSqlDbEntityService(
+					option => option
+								.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
+								.SetAsDefaultConnection("SQL_Connection")
+				)
 				.BuildServiceProvider()
 				;
 			//var map = serviceProvider.GetService<INodeMap>();
-			var service = serviceProvider.GetService<IDbService>();
-			service
-				.Config(o => {
-					o
-					.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
-					.SetAsDefaultConnection("SQL_Connection")
-					;
-					})
-				.Bootstrap();
+			var service = serviceProvider
+								.GetService<IDbService>()
+								.Bootstrap();
 			var contracts = service.Query<TCededContract>()
 				.Where(c => c.CededContractNum == 1000)
 				.ToArray();

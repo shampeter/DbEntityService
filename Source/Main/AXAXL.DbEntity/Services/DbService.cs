@@ -16,22 +16,17 @@ namespace AXAXL.DbEntity.Services
 		protected IDatabaseDriver Driver { get; set; }
 		private ILogger Log { get; set; }
 		private INodeMap NodeMap { get; set; }
-		public DbService(ILoggerFactory factory, IDatabaseDriver dbDriver, INodeMap nodeMap)
+		public DbService(ILoggerFactory factory, IDatabaseDriver dbDriver, INodeMap nodeMap, IDbServiceOption serviceOption)
 		{
 			this.Log = factory.CreateLogger<DbService>();
-			this.ServiceOption = new DbServiceOption();
+			this.ServiceOption = serviceOption;
 			this.Driver = dbDriver;
 			this.NodeMap = nodeMap;
 		}
-		public IDbService Config(Action<IDbServiceOption> config)
-		{
-			config(this.ServiceOption);
-			return this;
-		}
-		public bool Bootstrap(params Assembly[] assemblies)
+		public IDbService Bootstrap(params Assembly[] assemblies)
 		{
 			this.NodeMap.BuildNodes(assemblies);
-			return true;
+			return this;
 		}
 		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)
 		{
