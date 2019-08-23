@@ -59,7 +59,7 @@ To run plain query and fetch result by the service, the code can look like this.
 var service = serviceProvider
 			.GetService<IDbService>();
 var someTable = service.FromRawSql(
-			@"select t.some_field_1, t.some_field_2, t.some_field_3 from some_table t where t.some_key = '@SomeKey'",
+			@"select t.some_field_1, t.some_field_2, t.some_field_3 from some_table t where t.some_key = @SomeKey",
 			new Dictionary<string, object>{ ["@SomeKey"] = 123 }
 			).ToArray();
 ```
