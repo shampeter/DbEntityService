@@ -60,8 +60,10 @@ namespace AXAXL.DbEntity.Services
 
 		public IPersist Submit(Func<IChangeSet, IChangeSet> submitChangeSet)
 		{
+			Debug.Assert(submitChangeSet != null);
+
 			IChangeSet set = new ChangeSet(this.Log, this.NodeMap);
-			set = submitChangeSet(set);
+			set = submitChangeSet.Invoke(set);
 			this.ChangeSets.Add(set);
 
 			return this;
