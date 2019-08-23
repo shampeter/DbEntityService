@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Collections.Generic;
 using AXAXL.DbEntity.Interfaces;
+using System.Transactions;
 
 namespace AXAXL.DbEntity.Services
 {
@@ -8,9 +9,22 @@ namespace AXAXL.DbEntity.Services
 	{
 		private IDictionary<string, string> ConnectionMap { get; set; }
 		private string DefaultConnectionName { get; set; }
+
+		public bool IsRootDefaultTransactionScopeChanged { get; private set; }
+
+		public bool IsRootDefaultIsolationLevelChanged { get; private set; }
+
+		public TransactionScopeOption RootDefaultTransactionScope { get; private set; }
+
+		public IsolationLevel RootDefaultIsolation { get; private set; }
+
 		public DbServiceOption()
 		{
 			this.ConnectionMap = new Dictionary<string, string>();
+			this.RootDefaultTransactionScope = TransactionScopeOption.RequiresNew;
+			this.RootDefaultIsolation = IsolationLevel.ReadCommitted;
+			this.IsRootDefaultIsolationLevelChanged = false;
+			this.IsRootDefaultIsolationLevelChanged = false;
 		}
 		public IDbServiceOption AddOrUpdateConnection(string connectionName, string connectionString)
 		{
@@ -44,6 +58,18 @@ namespace AXAXL.DbEntity.Services
 			Debug.Assert(this.ConnectionMap.ContainsKey(connectionName) == true, $"No connection setup by name '{connectionName}' found");
 
 			return this.ConnectionMap[connectionName];
+		}
+
+		public IDbServiceOption SetRootDefaultTransactionScope(TransactionScopeOption scope)
+		{
+			this.RootDefaultTransactionScope = scope;
+			return this;
+		}
+
+		public IDbServiceOption SetRootDefaultIsolation(IsolationLevel isolation)
+		{
+			this.RootDefaultIsolation = isolation;
+			return this;
 		}
 	}
 }

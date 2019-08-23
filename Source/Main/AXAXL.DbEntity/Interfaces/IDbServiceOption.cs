@@ -36,5 +36,7 @@ namespace AXAXL.DbEntity.Interfaces
 		IDbServiceOption SetRootDefaultIsolation(IsolationLevel isolation);
 		bool IsRootDefaultTransactionScopeChanged { get; }
 		bool IsRootDefaultIsolationLevelChanged { get; }
+		TransactionScopeOption RootDefaultTransactionScope { get; }
+		IsolationLevel RootDefaultIsolation { get; }
 	}
 }
