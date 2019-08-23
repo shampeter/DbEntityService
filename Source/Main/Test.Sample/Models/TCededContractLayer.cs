@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
+using AXAXL.DbEntity.Interfaces;
 
 namespace Test.Sample.Models
 {
 	[Table("t_ceded_contract_layer")]
-    public partial class TCededContractLayer
+    public partial class TCededContractLayer : ITrackable
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -56,5 +57,7 @@ namespace Test.Sample.Models
 
         [ForeignKey("LayerTypeFkey")]
         public virtual TLookups LayerType { get; set; }
-    }
+
+		public EntityStatusEnum EntityStatus { get; set; }
+	}
 }

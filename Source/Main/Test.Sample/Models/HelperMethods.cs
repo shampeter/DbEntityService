@@ -10,6 +10,9 @@ namespace Test.Sample.Models
 	{
 		public static int NextSequence(int argType, int argRange)
 		{
+			/*
+			 * TODO: THIS IS TEMPORARY CODE FOR TESTING ONLY.  A FORMAL DESIGN ON GETTING SPU_GUID WILL BE DELIVERED LATER.
+			 */
 			int result;
 			var connectionString = @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1";
 

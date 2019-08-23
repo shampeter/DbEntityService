@@ -46,5 +46,5 @@ namespace Test.Sample.Models
 
         [ForeignKey("CompanyTypeFkey")]
         public virtual TLookups CompanyTypeFkeyNavigation { get; set; }
-    }
+	}
 }
