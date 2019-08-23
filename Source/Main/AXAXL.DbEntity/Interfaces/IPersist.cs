@@ -15,14 +15,14 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns>Returns itself for chaining method calls</returns>
 		IPersist Submit(Func<IChangeSet, IChangeSet> submitChangeSet);
 		/// <summary>
-		/// Setup transaction scope option for the root transaction.  If none is specified by this method, transaction will be defaulted as RequiredNew.
+		/// Setup transaction scope option for the root transaction.  If none is specified by this method, transaction will be defaulted from <see cref="IDbServiceOption"/>.
 		/// Change set will use this as default if none is specified.
 		/// </summary>
 		/// <param name="scopeOption">Transaction scope option</param>
 		/// <returns>Returns itself for chaining method calls</returns>
 		IPersist SetRootTransactionSCopeOption(TransactionScopeOption scopeOption);
 		/// <summary>
-		/// Setup root transaction isolation level. If none is specified by this method, isolation level will be defaulted as ReadCommitted.
+		/// Setup root transaction isolation level. If none is specified by this method, isolation level will be defaulted from <see cref="IDbServiceOption"/>.
 		/// Change set will use this as default if none is specified.
 		/// </summary>
 		/// <param name="isolation">Isolation level</param>

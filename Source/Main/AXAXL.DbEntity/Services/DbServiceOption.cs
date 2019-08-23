@@ -9,13 +9,7 @@ namespace AXAXL.DbEntity.Services
 	{
 		private IDictionary<string, string> ConnectionMap { get; set; }
 		private string DefaultConnectionName { get; set; }
-
-		public bool IsRootDefaultTransactionScopeChanged { get; private set; }
-
-		public bool IsRootDefaultIsolationLevelChanged { get; private set; }
-
 		public TransactionScopeOption RootDefaultTransactionScope { get; private set; }
-
 		public IsolationLevel RootDefaultIsolation { get; private set; }
 
 		public DbServiceOption()
@@ -23,8 +17,6 @@ namespace AXAXL.DbEntity.Services
 			this.ConnectionMap = new Dictionary<string, string>();
 			this.RootDefaultTransactionScope = TransactionScopeOption.RequiresNew;
 			this.RootDefaultIsolation = IsolationLevel.ReadCommitted;
-			this.IsRootDefaultIsolationLevelChanged = false;
-			this.IsRootDefaultIsolationLevelChanged = false;
 		}
 		public IDbServiceOption AddOrUpdateConnection(string connectionName, string connectionString)
 		{

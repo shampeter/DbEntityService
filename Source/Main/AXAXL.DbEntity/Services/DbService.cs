@@ -44,7 +44,12 @@ namespace AXAXL.DbEntity.Services
 
 		public IPersist Persist()
 		{
-			return new Persist(this.Log, this.ServiceOption, this.NodeMap, this.Driver);
+			var unitOfWork = new Persist(this.Log, this.ServiceOption, this.NodeMap, this.Driver);
+			unitOfWork
+				.SetRootTransactionSCopeOption(this.ServiceOption.RootDefaultTransactionScope)
+				.SetRootIsolationLevel(this.ServiceOption.RootDefaultIsolation)
+				;
+			return unitOfWork;
 		}
 	}
 }

@@ -32,10 +32,18 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="connectionName">Name for identifying a connection string as assigned in <see cref="AddOrUpdateConnection(string, string)"/></param>
 		/// <returns>Database connection string.</returns>
 		string GetConnectionString(string connectionName);
+		/// <summary>
+		/// Assign the default root transaction scope for <see cref="IPersist"/>.  If this method is not used to setup default, RequiredNew will be used.
+		/// </summary>
+		/// <param name="scope">Transaction scope option.  See <see cref="TransactionScopeOption"/></param>
+		/// <returns>Return itself to enable method chaining.</returns>
 		IDbServiceOption SetRootDefaultTransactionScope(TransactionScopeOption scope);
+		/// <summary>
+		/// Assign default isolation level for <see cref="IPersist"/>.  If this method is not called to setup default, ReadCommitted will be used.
+		/// </summary>
+		/// <param name="isolation">Isolation level. see <see cref="IsolationLevel"/></param>
+		/// <returns>Return itself to enable method chaining.</returns>
 		IDbServiceOption SetRootDefaultIsolation(IsolationLevel isolation);
-		bool IsRootDefaultTransactionScopeChanged { get; }
-		bool IsRootDefaultIsolationLevelChanged { get; }
 		TransactionScopeOption RootDefaultTransactionScope { get; }
 		IsolationLevel RootDefaultIsolation { get; }
 	}
