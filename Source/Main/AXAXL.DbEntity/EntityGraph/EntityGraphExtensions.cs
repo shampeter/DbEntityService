@@ -194,6 +194,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public static Expression<Action<object, object>> CreateRemoveItemAction(this NodeProperty property)
 		{
 			var removeMethod = SearchMethodOnType(property.PropertyType, "Remove");
+			Debug.Assert(removeMethod != null, $"Failed to locate Remove method from {property.PropertyName} of {property.Owner.Name}");
 			var entityInput = Expression.Parameter(typeof(object), "entity");
 			var elementToBeRemoved = Expression.Parameter(typeof(object), "toBeRemoved");
 			var block = Expression.Block(

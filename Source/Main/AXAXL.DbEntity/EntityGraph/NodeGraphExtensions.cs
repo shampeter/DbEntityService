@@ -159,7 +159,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal static PropertyCategories GetPropertyTypeClassification(this PropertyInfo argProperty)
 		{
 			var classification = PropertyCategories.Value;
-			if (argProperty.PropertyType.IsValueType == false)
+			if (argProperty.PropertyType.IsValueType == false && typeof(string).IsAssignableFrom(argProperty.PropertyType) == false)
 			{
 				if (argProperty.IsPropertyACollection() == true)
 				{

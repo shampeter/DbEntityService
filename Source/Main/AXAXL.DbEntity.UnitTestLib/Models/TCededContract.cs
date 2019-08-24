@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Annotation;
 
-namespace Test.Sample.Models
+namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	[Table("t_ceded_contract")]
     public class TCededContract : ITrackable
@@ -13,6 +13,7 @@ namespace Test.Sample.Models
         public TCededContract()
         {
             CededContractLayers = new List<TCededContractLayer>();
+			CededContractDocs = new List<TCededContractDoc>();
         }
 
 		[Key]
@@ -66,6 +67,8 @@ namespace Test.Sample.Models
 		[InverseProperty(nameof(TCededContractLayer.CededContract))]
 		public IList<TCededContractLayer> CededContractLayers { get; set; }
 
+		[ForeignKey(nameof(TCededContractDoc.OwnerGuid))]
+		public IList<TCededContractDoc> CededContractDocs { get; set; }
 		public EntityStatusEnum EntityStatus { get; set; }
     }
 }

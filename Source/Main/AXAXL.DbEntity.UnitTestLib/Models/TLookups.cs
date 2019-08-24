@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Test.Sample.Models
+namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	[Table("t_lookups")]
     public partial class TLookups

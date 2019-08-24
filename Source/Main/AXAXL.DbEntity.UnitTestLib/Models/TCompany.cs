@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
 
-namespace Test.Sample.Models
+namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	[Table("t_company")]
     public partial class TCompany
