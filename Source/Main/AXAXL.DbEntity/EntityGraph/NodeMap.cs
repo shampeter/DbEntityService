@@ -49,6 +49,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				}
 			}
 			this.BuildNodeEdges();
+			this.PrintInMarkDown();
 		}
 		public bool ContainsNode(Type type)
 		{
@@ -58,10 +59,11 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			return this.ContainsNode(type) ? this._nodeMap[type] : null;
 		}
-		public String ToMarkDown()
+		[Conditional("DEBUG")]
+		public void PrintInMarkDown()
 		{
 			var NL = Environment.NewLine;
-			return @"# ALL NODES" + NL + NL + string.Join(NL, this._nodeMap.Values.Select(p => p.ToMarkDown()).ToArray());
+			this.log.LogDebug(@"# ALL NODES" + NL + NL + string.Join(NL, this._nodeMap.Values.Select(p => p.ToMarkDown()).ToArray()));
 		}
 		public Node BuildNode(Type type)
 		{

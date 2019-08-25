@@ -128,11 +128,15 @@ namespace AXAXL.DbEntity.MSSql
 				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
 				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
 				var entityProperty = Expression.Property(outputParameter, column.PropertyName);
-				var dbReaderMethod = Expression.Invoke(
+				Expression dbReaderMethod = Expression.Invoke(
 					SqlTypeToReaderMap[dbType],
 					inputParameter,
 					Expression.Constant(i)
 				);
+				if (column.IsPropertyANullable() == true)
+				{
+					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
+				}
 				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
 				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
 

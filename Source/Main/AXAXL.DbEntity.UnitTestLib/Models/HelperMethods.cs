@@ -4,7 +4,7 @@ using System.Text;
 using System.Data.SqlClient;
 using System.Data;
 
-namespace Test.Sample.Models
+namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	public class HelperMethods
 	{

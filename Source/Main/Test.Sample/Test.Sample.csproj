@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AXAXL.DbEntity.UnitTestLib\AXAXL.DbEntity.UnitTestLib.csproj" />
     <ProjectReference Include="..\AXAXL.DbEntity\AXAXL.DbEntity.csproj" />
   </ItemGroup>
 

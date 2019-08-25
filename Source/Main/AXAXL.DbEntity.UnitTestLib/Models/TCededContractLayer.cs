@@ -5,11 +5,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
 using AXAXL.DbEntity.Interfaces;
 
-namespace Test.Sample.Models
+namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	[Table("t_ceded_contract_layer")]
     public partial class TCededContractLayer : ITrackable
     {
+		public TCededContractLayer()
+		{
+			this.CededContractLayerDocs = new List<TCededContractLayerDoc>();
+		}
+
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("ceded_contract_layer_pkey")]
@@ -22,13 +27,13 @@ namespace Test.Sample.Models
         public string Description { get; set; }
 
         [Column("attachment_point", TypeName = "money")]
-        public decimal AttachmentPoint { get; set; }
+        public decimal? AttachmentPoint { get; set; }
 
         [Column("layer_type_fkey")]
-        public int LayerTypeFkey { get; set; }
+        public int? LayerTypeFkey { get; set; }
 
         [Column("limit", TypeName = "money")]
-        public decimal Limit { get; set; }
+        public decimal? Limit { get; set; }
 
 		[ValueInjection(FunctionScript = "() => DateTime.Now", When = InjectionOptions.WhenInserted)]
 		[Column("added_dt")]
@@ -58,6 +63,8 @@ namespace Test.Sample.Models
         [ForeignKey("LayerTypeFkey")]
         public virtual TLookups LayerType { get; set; }
 
+		[ForeignKey(nameof(TCededContractLayerDoc.OwnerGuid))]
+		public IList<TCededContractLayerDoc> CededContractLayerDocs { get; set; }
 		public EntityStatusEnum EntityStatus { get; set; }
 	}
 }
