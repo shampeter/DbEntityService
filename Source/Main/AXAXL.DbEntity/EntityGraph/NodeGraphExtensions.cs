@@ -95,6 +95,10 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return node;
 		}
+		internal static bool IsPropertyANullable(this NodeProperty node)
+		{
+			return Nullable.GetUnderlyingType(node.PropertyType) != null;
+		}
 		internal static bool EqualsIgnoreCase(this string source, string target)
 		{
 			return source.Equals(target, StringComparison.CurrentCultureIgnoreCase);
