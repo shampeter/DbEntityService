@@ -61,10 +61,10 @@ Features completion check list
 
 ## Appendix - Graphics - Harvey Balls
 
-| Harvey Ball                                   | Meaning |
-|:---------------------------------------------:|---------|
-| <span style="font-size: 60px;">&#9675;</span> | 0%      |
-| <span style="font-size: 35px;">&#9684;</span> | 25%     |
-| <span style="font-size: 35px;">&#9681;</span> | 50%     |
-| <span style="font-size: 35px;">&#9685;</span> | 75%     |
-| <span style="font-size: 60px;">&#9679;</span> | 100%    |
+| Harvey Ball                                   | Meaning | |
+|:---------------------------------------------:|---------|---|
+| <span style="font-size: 60px;">&#9675;</span> | 0%      |![empty](harvey-empty.png | width=80)   |
+| <span style="font-size: 35px;">&#9684;</span> | 25%     |![empty](harvey-quarter.png)   |
+| <span style="font-size: 35px;">&#9681;</span> | 50%     |![empty](harvey-half.png)   |
+| <span style="font-size: 35px;">&#9685;</span> | 75%     |   |
+| <span style="font-size: 60px;">&#9679;</span> | 100%    |![empty](harvey-full.png)   |
