@@ -11,5 +11,8 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 		[Constant("Contract")]
 		[Column("owner_type", Order = 2)]
 		public string OwnerType { get; set; }
+
+		[InverseProperty(nameof(TCededContract.CededContractDocs))]
+		public TCededContract CededContract { get; set; }
 	}
 }

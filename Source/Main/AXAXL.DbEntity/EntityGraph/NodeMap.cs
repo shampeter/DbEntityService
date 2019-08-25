@@ -154,6 +154,7 @@ namespace AXAXL.DbEntity.EntityGraph
 			foreach(var eachEdge in allUniqueEdges)
 			{
 				eachEdge
+					.SortKeysByOrder()
 					.CompileChildAddingAction()
 					.CompileParentSettingAction()
 					.CompileParentPrimaryKeyReaders()
@@ -182,7 +183,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			var foreignKeyReference = edgeProperty.ForeignKeyReference;
 			// No foreign key defined. Skip.
-			if (string.IsNullOrEmpty(foreignKeyReference) || edgeProperty.PropertyCategory == PropertyCategories.Collection) return;
+			if (foreignKeyReference == null || edgeProperty.PropertyCategory == PropertyCategories.Collection) return;
 
 			var edge = node.GetEdgeToParent(edgeProperty);
 

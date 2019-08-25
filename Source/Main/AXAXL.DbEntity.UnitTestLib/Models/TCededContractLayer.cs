@@ -63,8 +63,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         [ForeignKey("LayerTypeFkey")]
         public virtual TLookups LayerType { get; set; }
 
-		private const string C_FOREIGN_KEY_NAMES = nameof(TCededContractLayerDoc.OwnerGuid) + "," + nameof(TCededContractLayerDoc.OwnerType);
-		[ForeignKey(C_FOREIGN_KEY_NAMES)]
+		[InverseProperty(nameof(TCededContractLayerDoc.CededContractLayer))]
 		public IList<TCededContractLayerDoc> CededContractLayerDocs { get; set; }
 		public EntityStatusEnum EntityStatus { get; set; }
 	}

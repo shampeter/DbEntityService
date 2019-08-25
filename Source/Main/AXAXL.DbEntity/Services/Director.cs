@@ -55,9 +55,16 @@ namespace AXAXL.DbEntity.Services
 
 					var readers = edge.ParentPrimaryKeyReaders;
 					IDictionary<string, object> childKeys = new Dictionary<string, object>();
-					for (int i = 0; i < readers.Length && i < edge.ChildNodeForeignKeys.Length; i++)
+					int i;
+					for (i = 0; i < readers.Length && i < edge.ChildNodeForeignKeys.Length; i++)
 					{
-						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, readers[i](entity));
+						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, readers[i].Invoke(entity));
+					}
+					while (i < edge.ChildNodeForeignKeys.Length)
+					{
+						Debug.Assert(edge.ChildNodeForeignKeys[i].IsConstant == true, $"Found foreign key {edge.ChildNodeForeignKeys[i].PropertyName} on {edge.ChildNode.Name} has no given value from parent and it's not a constant.");
+						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, edge.ChildNodeForeignKeys[i].ConstantValue);
+						i++;
 					}
 					var connection = this.GetConnectionString(edge.ChildNode);
 					var children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, this.TimeoutDurationInSeconds);

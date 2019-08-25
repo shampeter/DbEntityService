@@ -68,8 +68,11 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 		public IList<TCededContractLayer> CededContractLayers { get; set; }
 
 		private const string C_FOREIGN_KEY_NAMES = nameof(TCededContractDoc.OwnerGuid) + "," + nameof(TCededContractDoc.OwnerType);
+
 		[ForeignKey(C_FOREIGN_KEY_NAMES)]
+		[InverseProperty(nameof(TCededContractLayer.CededContract))]
 		public IList<TCededContractDoc> CededContractDocs { get; set; }
+
 		public EntityStatusEnum EntityStatus { get; set; }
     }
 }

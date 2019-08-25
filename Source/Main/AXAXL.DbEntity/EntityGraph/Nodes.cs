@@ -165,17 +165,17 @@ namespace AXAXL.DbEntity.EntityGraph
 				var foreignKeyRef = eachColumn.ForeignKeyReference;
 				var inversePropRef = eachColumn.InversePropertyReference;
 				var edgeColumn = eachColumn;
-				var foreignKeyColumn = eachColumn;
+				var foreignKeyColumn = new[] { eachColumn };
 				var edge = new NodeEdge(this.Log);
-				if (!string.IsNullOrEmpty(foreignKeyRef))
+				if (foreignKeyRef != null)
 				{
 					switch (eachColumn.PropertyCategory)
 					{
 						case PropertyCategories.Value:
-							edgeColumn = this.GetPropertyFromNode(foreignKeyRef);
+							edgeColumn = this.GetPropertyFromNode(foreignKeyRef[0]);
 							break;
 						case PropertyCategories.ObjectReference:
-							foreignKeyColumn = this.GetPropertyFromNode(foreignKeyRef);
+							foreignKeyColumn = this.GetPropertiesFromNode(foreignKeyRef);
 							break;
 						case PropertyCategories.Collection:
 							foreignKeyColumn = null;
@@ -199,8 +199,16 @@ namespace AXAXL.DbEntity.EntityGraph
 						{
 							edge.ChildNode = this;
 							edge.ParentReferenceOnChildNode = edgeColumn;
-							edge.ChildNodeForeignKeys = new NodeProperty[] { foreignKeyColumn };
+							edge.ChildNodeForeignKeys = foreignKeyColumn;
 							this.EdgeToParent.Add(edgeColumn.PropertyName, edge);
+						}
+						else
+						{
+							edge = this.GetEdgeToParent(edgeColumn);
+							if (edge.ChildNodeForeignKeys.Contains(foreignKeyColumn[0]) == false)
+							{
+								edge.ChildNodeForeignKeys = edge.ChildNodeForeignKeys.Append(foreignKeyColumn[0]).ToArray();
+							}
 						}
 					}
 				}
@@ -218,7 +226,7 @@ namespace AXAXL.DbEntity.EntityGraph
 							this.EdgeToChildren.Add(edgeColumn.PropertyName, edge);
 						}
 					}
-					else
+					else if (eachColumn.PropertyCategory == PropertyCategories.ObjectReference)
 					{
 						if (this.ContainsEdgeToParent(eachColumn) == false)
 						{

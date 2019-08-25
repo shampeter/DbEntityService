@@ -38,6 +38,20 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return this;
 		}
+		public NodeEdge SortKeysByOrder()
+		{
+			Debug.Assert(this.ParentNodePrimaryKeys != null);
+			Debug.Assert(this.ChildNodeForeignKeys != null);
+			if (this.ParentNodePrimaryKeys.Length > 1)
+			{
+				this.ParentNodePrimaryKeys = this.ParentNodePrimaryKeys.OrderBy(p => p.Order).ToArray();
+			}
+			if (this.ChildNodeForeignKeys.Length > 1)
+			{
+				this.ChildNodeForeignKeys = this.ChildNodeForeignKeys.OrderBy(p => p.Order).ToArray();
+			}
+			return this;
+		}
 		public NodeEdge CompileChildAddingAction()
 		{
 			Expression<Action<object, IEnumerable<object>>> lambda = null;

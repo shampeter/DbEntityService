@@ -178,7 +178,7 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(columns != null && columns.Length > 0 && columns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
 			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : parameterPrefix;
 
-			return columns.ToDictionary(
+			return columns.Where(c => c.IsConstant == false).ToDictionary(
 				key => key.PropertyName, 
 				value =>
 				{
@@ -224,8 +224,19 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(whereColumns != null && whereColumns.Length > 0 && whereColumns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
 			var whereClause = string.Join(
 				" AND ",
-				whereColumns.Select(p => $"{p.DbColumnName} = @{parameterPrefix ?? string.Empty}{p.PropertyName}")
-				);
+				whereColumns.Select(
+					p => {
+						string condition = null;
+						if (p.IsConstant)
+						{
+							condition = $"{p.DbColumnName} = " + this.FormatConstantValueAsParameterValue(node, p);
+						}
+						else
+						{
+							condition = $"{p.DbColumnName} = @{parameterPrefix ?? string.Empty}{p.PropertyName}";
+						}
+						return condition;
+					}));
 			return string.IsNullOrEmpty(whereClause) ? string.Empty : @" WHERE " + whereClause;
 		}
 
