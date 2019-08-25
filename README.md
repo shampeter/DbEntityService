@@ -63,7 +63,7 @@ Features completion check list
 
 | Harvey Ball                                   | Meaning | |
 |:---------------------------------------------:|---------|---|
-| <span style="font-size: 60px;">&#9675;</span> | 0%      |![empty](harvey-empty.png | width=80)   |
+| <span style="font-size: 60px;">&#9675;</span> | 0%      |![empty](harvey-empty.png =80x80)   |
 | <span style="font-size: 35px;">&#9684;</span> | 25%     |![empty](harvey-quarter.png)   |
 | <span style="font-size: 35px;">&#9681;</span> | 50%     |![empty](harvey-half.png)   |
 | <span style="font-size: 35px;">&#9685;</span> | 75%     |   |
