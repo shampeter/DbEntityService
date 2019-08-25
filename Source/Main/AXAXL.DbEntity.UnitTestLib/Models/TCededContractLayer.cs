@@ -27,13 +27,13 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         public string Description { get; set; }
 
         [Column("attachment_point", TypeName = "money")]
-        public decimal AttachmentPoint { get; set; }
+        public decimal? AttachmentPoint { get; set; }
 
         [Column("layer_type_fkey")]
-        public int LayerTypeFkey { get; set; }
+        public int? LayerTypeFkey { get; set; }
 
         [Column("limit", TypeName = "money")]
-        public decimal Limit { get; set; }
+        public decimal? Limit { get; set; }
 
 		[ValueInjection(FunctionScript = "() => DateTime.Now", When = InjectionOptions.WhenInserted)]
 		[Column("added_dt")]

@@ -27,7 +27,7 @@ namespace AXAXL.DbEntity.UnitTests
 				)
 				.AddSqlDbEntityService(
 					option => option
-								.AddOrUpdateConnection("SQL_Connection", @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1")
+								.AddOrUpdateConnection("SQL_Connection", @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnitTestDb; Integrated Security=true")
 								.SetAsDefaultConnection("SQL_Connection")
 				)
 				.BuildServiceProvider()

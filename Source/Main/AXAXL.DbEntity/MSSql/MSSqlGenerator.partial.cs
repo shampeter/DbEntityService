@@ -58,7 +58,20 @@ namespace AXAXL.DbEntity.MSSql
 			[typeof(Int16)] = SqlDbType.SmallInt,
 			[typeof(Byte)] = SqlDbType.TinyInt,
 			[typeof(Guid)] = SqlDbType.UniqueIdentifier,
-			[typeof(String)] = SqlDbType.VarChar
+			[typeof(String)] = SqlDbType.VarChar,
+			// Nullables
+			[typeof(Int64?)] = SqlDbType.BigInt,
+			[typeof(Boolean?)] = SqlDbType.Bit,
+			[typeof(DateTime?)] = SqlDbType.DateTime,
+			[typeof(DateTimeOffset?)] = SqlDbType.DateTimeOffset,
+			[typeof(Decimal?)] = SqlDbType.Decimal,
+			[typeof(Double?)] = SqlDbType.Float,
+			[typeof(Int32?)] = SqlDbType.Int,
+			[typeof(Single?)] = SqlDbType.Real,
+			[typeof(Int16?)] = SqlDbType.SmallInt,
+			[typeof(Byte?)] = SqlDbType.TinyInt,
+			[typeof(Guid?)] = SqlDbType.UniqueIdentifier
+
 			// [typeof(String)] = SqlDbType.Char,
 			// [typeof(Char[])] = SqlDbType.Char,
 			// [typeof(DateTime)] = SqlDbType.Date,

@@ -29,7 +29,7 @@ namespace Test.Sample
 				)
 				.AddSqlDbEntityService(
 					option => option
-								.AddOrUpdateConnection("SQL_Connection", @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnityTestDb; Integrated Security=true")
+								.AddOrUpdateConnection("SQL_Connection", @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnitTestDb; Integrated Security=true")
 								.SetAsDefaultConnection("SQL_Connection")
 				)
 				.BuildServiceProvider()
@@ -39,7 +39,7 @@ namespace Test.Sample
 								.GetService<IDbService>()
 								.Bootstrap();
 			var contracts = service.Query<TCededContract>()
-				.Where(c => c.CededContractNum == 1000)
+				.Where(c => c.CededContractNum == 100)
 				.ToArray();
 			Console.WriteLine("Returned {0} contracts", contracts.Length);
 			var contract = contracts.FirstOrDefault();

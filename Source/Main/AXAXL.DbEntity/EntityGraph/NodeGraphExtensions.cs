@@ -146,30 +146,34 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			return foreignKey;
 		}
-		internal static bool IsEntity(this Type argTarget)
+		internal static bool IsEntity(this Type target)
 		{
-			return argTarget.GetCustomAttribute<TableAttribute>() != null;
+			return target.GetCustomAttribute<TableAttribute>() != null;
 		}
-		internal static bool IsPropertyACollection(this PropertyInfo argProperty)
+		internal static bool IsPropertyACollection(this PropertyInfo property)
 		{
-			var isArray = argProperty.PropertyType.IsArray;
-			var isCollection = typeof(IEnumerable).IsAssignableFrom(argProperty.PropertyType);
+			var propertyType = property.PropertyType;
+			var isArray = propertyType.IsArray && propertyType.GetElementType().IsEntity();
+			var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType) && propertyType.IsGenericType && propertyType.GetGenericArguments().First().IsEntity();
 			return isArray || isCollection;
 		}
-		internal static PropertyCategories GetPropertyTypeClassification(this PropertyInfo argProperty)
+		internal static bool IsPropertyAnEntityReference(this PropertyInfo property)
+		{
+			return property.PropertyType.IsEntity();
+		}
+		internal static PropertyCategories GetPropertyTypeClassification(this PropertyInfo property)
 		{
 			var classification = PropertyCategories.Value;
-			if (argProperty.PropertyType.IsValueType == false && typeof(string).IsAssignableFrom(argProperty.PropertyType) == false)
+
+			if (property.IsPropertyACollection() == true)
 			{
-				if (argProperty.IsPropertyACollection() == true)
-				{
-					classification = PropertyCategories.Collection;
-				}
-				else
-				{
-					classification = PropertyCategories.ObjectReference;
-				}
+				classification = PropertyCategories.Collection;
 			}
+			else if (property.IsPropertyAnEntityReference() == true)
+			{
+				classification = PropertyCategories.ObjectReference;
+			}
+
 			return classification;
 		}
 		internal static NodePropertyUpdateOptions DetermineColumnUpdateOption(this Attribute argAttr)
