@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.ComponentModel.DataAnnotations.Schema;
+using AXAXL.DbEntity.Annotation;
 
 namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	public class TCededContractDoc : TDoc
 	{
-		public TCededContractDoc() : base()
-		{
-			this.OwnerType = @"Contract";
-		}
+		[Constant("Contract")]
+		[Column("owner_type", Order = 2)]
+		public string OwnerType { get; set; }
 	}
 }

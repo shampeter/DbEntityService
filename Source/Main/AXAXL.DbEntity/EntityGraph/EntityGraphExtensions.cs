@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Collections;
 using System.Collections.Generic;
 using AXAXL.DbEntity.Interfaces;
 using System.Text;
@@ -238,6 +239,41 @@ namespace AXAXL.DbEntity.EntityGraph
 			var methodInfo = type.GetRuntimeMethod(methodName, types) ?? type.GetInterfaces().Select(i => i.GetRuntimeMethod(methodName, types)).Where(i => i != null).FirstOrDefault();
 			return methodInfo;
 		}
+		internal static bool IsPropertyANullable(this PropertyInfo property)
+		{
+			return Nullable.GetUnderlyingType(property.PropertyType) != null;
+		}
+		internal static bool EqualsIgnoreCase(this string source, string target)
+		{
+			return source.Equals(target, StringComparison.CurrentCultureIgnoreCase);
+		}
+		internal static bool IsPropertyACollection(this PropertyInfo property)
+		{
+			var propertyType = property.PropertyType;
+			var isArray = propertyType.IsArray && propertyType.GetElementType().IsEntity();
+			var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType) && propertyType.IsGenericType && propertyType.GetGenericArguments().First().IsEntity();
+			return isArray || isCollection;
+		}
+		internal static bool IsPropertyAnEntityReference(this PropertyInfo property)
+		{
+			return property.PropertyType.IsEntity();
+		}
+		internal static PropertyCategories GetPropertyTypeClassification(this PropertyInfo property)
+		{
+			var classification = PropertyCategories.Value;
+
+			if (property.IsPropertyACollection() == true)
+			{
+				classification = PropertyCategories.Collection;
+			}
+			else if (property.IsPropertyAnEntityReference() == true)
+			{
+				classification = PropertyCategories.ObjectReference;
+			}
+
+			return classification;
+		}
+
 		/* Tested original POC code for loop child set and adding it to parent's child collection.
 		private static Action<object, IEnumerable<object>> ChildSetFeedAction(Type type)
 		{

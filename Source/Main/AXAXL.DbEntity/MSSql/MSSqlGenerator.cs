@@ -33,7 +33,20 @@ namespace AXAXL.DbEntity.MSSql
 			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsert, out outputColumns, out insertColumns);
 
 			var columns = string.Join(", ", insertColumns.Select(p => p.DbColumnName));
-			var values = string.Join(", ", insertColumns.Select(p => $"@{p.PropertyName}"));
+			var values = string.Join(
+								", ", 
+								insertColumns.Select(
+									p =>
+									{
+										if (p.IsConstant)
+										{
+											return this.FormatConstantValueAsParameterValue(node, p);
+										}
+										else
+										{
+											return $"@{p.PropertyName}";
+										}
+								}));
 
 			return (columns, values, insertColumns);
 		}
@@ -133,7 +146,7 @@ namespace AXAXL.DbEntity.MSSql
 					inputParameter,
 					Expression.Constant(i)
 				);
-				if (column.IsPropertyANullable() == true)
+				if (column.IsNullable == true)
 				{
 					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
 				}
@@ -278,6 +291,16 @@ namespace AXAXL.DbEntity.MSSql
 									.ToArray();
 		}
 
+		private string FormatConstantValueAsParameterValue(Node node, NodeProperty property)
+		{
+			Debug.Assert(property.IsConstant, $"{property.PropertyName} of {node.Name} is not marked as constant");
+			var constantValue = property.ConstantValue;
+			if (property.PropertyType.IsAssignableFrom(typeof(string)) || property.PropertyType.IsAssignableFrom(typeof(DateTime)))
+			{
+				constantValue = $"'{constantValue}'";
+			}
+			return constantValue;
+		}
 		#endregion
 	}
 }

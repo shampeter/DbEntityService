@@ -48,7 +48,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public PropertyCategories PropertyCategory { get; set; }
 		public string DbColumnName { get; set; }
 		public string DbColumnType { get; set; }
-		public string ForeignKeyReference { get; set; }
+		public string[] ForeignKeyReference { get; set; }
 		public string InversePropertyReference { get; set; }
 		public NodePropertyUpdateOptions UpdateOption { get; set; }
 		public (NodePropertyUpdateScriptTypes ScriptType, string Script, string[] Namespaces) UpdateScript { get; set; }
@@ -57,6 +57,10 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Func<object, IEnumerator<ITrackable>> GetEnumeratorFunc { get; set; }
 		public Action<object, object> GetRemoveItemMethodAction { get; set; }
 		public bool IsEdge { get; set; }
+		public bool IsNullable { get; set; }
+		public string ConstantValue { get; set; }
+		public int Order { get; set; }
+		public bool IsConstant => this.PropertyCategory == PropertyCategories.Value && string.IsNullOrEmpty(this.ConstantValue) == false;
 		public Type GetTypeReferencedByEdge()
 		{
 			if (! this.IsEdge) throw new InvalidOperationException($"Invalid operation. '{this.PropertyName}' is not an edge.");

@@ -16,9 +16,6 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 		[Column("doc_guid")]
 		public int DocGuid { get; set; }
 
-		[Column("owner_type", Order = 2)]
-		public string OwnerType { get; set; }
-
 		[Column("owner_guid", Order = 1)]
 		public int OwnerGuid { get; set; }
 

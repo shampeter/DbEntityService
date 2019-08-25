@@ -11,7 +11,7 @@ namespace AXAXL.DbEntity.EntityGraph
 	{
 		internal const string C_NODE_PROPERTY_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |";
 		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
-		internal static readonly string[] C_NODE_PROPERTY_HEADING = new string[]{"Owner", "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script"};
+		internal static readonly string[] C_NODE_PROPERTY_HEADING = new string[] { "Owner", "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script" };
 		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
 		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
 		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
@@ -60,21 +60,30 @@ namespace AXAXL.DbEntity.EntityGraph
 		protected IDictionary<string, NodeEdge> EdgeToParent { get; set; }
 		public bool IsPropertyOnNode(string propertyName)
 		{
-			return 
-				this.PrimaryKeys.ContainsKey(propertyName) || 
-				this.DataColumns.ContainsKey(propertyName) || 
+			return
+				this.PrimaryKeys.ContainsKey(propertyName) ||
+				this.DataColumns.ContainsKey(propertyName) ||
 				(this.ConcurrencyControl != null && this.ConcurrencyControl.PropertyName.Equals(propertyName, StringComparison.CurrentCultureIgnoreCase))
 				;
 		}
+		public bool IsPropertyOnNode(string[] propertyNames)
+		{
+			return propertyNames.All(p => this.IsPropertyOnNode(p) == true);
+		}
 		public NodeProperty GetPropertyFromNode(string propertyName)
 		{
-			Debug.Assert(this.IsPropertyOnNode(propertyName) == true, $"Cannot find property named '{propertyName}' on {this.NodeType.Name}");
-			
+			Debug.Assert(this.IsPropertyOnNode(propertyName) == true, $"Cannot find property named '{propertyName}' on {this.Name}");
+
 			NodeProperty property = null;
 			bool found =
 				this.PrimaryKeys.TryGetValue(propertyName, out property) ||
 				this.DataColumns.TryGetValue(propertyName, out property);
 			return found ? property : this.ConcurrencyControl;
+		}
+		public NodeProperty[] GetPropertiesFromNode(string[] propertyNames)
+		{
+			Debug.Assert(this.IsPropertyOnNode(propertyNames) == true, $"Cannot find properties {string.Join(", ", propertyNames)} on {this.Name}");
+			return propertyNames.Select(p => this.GetPropertyFromNode(p)).ToArray();
 		}
 		public bool ContainsEdgeToChildren(NodeProperty property)
 		{

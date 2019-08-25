@@ -44,6 +44,12 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			node.DbColumnName = columnAttr.Name;
 			node.DbColumnType = dbType;
+			node.Order = columnAttr.Order;
+			return node;
+		}
+		internal static NodeProperty HandleConstantAttribute(this NodeProperty node, PropertyInfo property)
+		{
+			node.ConstantValue = property.GetCustomAttribute<ConstantAttribute>()?.Value;
 			return node;
 		}
 		internal static NodeProperty HandleDataGenerationAttribute(this NodeProperty node, PropertyInfo property)
@@ -73,14 +79,24 @@ namespace AXAXL.DbEntity.EntityGraph
 			node.UpdateOption = columnAttr.DetermineColumnUpdateOption();
 			return node;
 		}
+		internal static readonly char[] C_FOREIGN_KEY_SEPARATORS = new char[] { ',', ' ' };
 		internal static NodeProperty HandleForeignKeyAttribute(this NodeProperty node, PropertyInfo property)
 		{
 			var fKeyAttr = property.GetCustomAttribute<ForeignKeyAttribute>();
-			var fKeyPropName = fKeyAttr != null ? fKeyAttr.Name : string.Empty;
+			string[] fKeyPropNames = null;
+			if (fKeyAttr != null)
+			{
+				// foreign key on parent node can name compound foreign key on child node in comma-separated names.
+				fKeyPropNames = fKeyAttr.Name.Split(C_FOREIGN_KEY_SEPARATORS, StringSplitOptions.RemoveEmptyEntries);
+				if (fKeyPropNames.Length == 0)
+				{
+					fKeyPropNames = null;
+				}
+			}
 
-			Debug.Assert(fKeyAttr == null || !string.IsNullOrEmpty(fKeyPropName), $"Name of ForeignKeyAttribute on {node.PropertyName} is blank");
+			Debug.Assert(fKeyAttr == null || fKeyPropNames != null , $"Name of ForeignKeyAttribute on {node.PropertyName} is blank");
 
-			node.ForeignKeyReference = fKeyPropName;
+			node.ForeignKeyReference = fKeyPropNames;
 
 			return node;
 		}
@@ -95,14 +111,7 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return node;
 		}
-		internal static bool IsPropertyANullable(this NodeProperty node)
-		{
-			return Nullable.GetUnderlyingType(node.PropertyType) != null;
-		}
-		internal static bool EqualsIgnoreCase(this string source, string target)
-		{
-			return source.Equals(target, StringComparison.CurrentCultureIgnoreCase);
-		}
+
 /*
 		internal static string ForeignKeyReference(this NodeProperty node)
 		{
@@ -153,32 +162,6 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal static bool IsEntity(this Type target)
 		{
 			return target.GetCustomAttribute<TableAttribute>() != null;
-		}
-		internal static bool IsPropertyACollection(this PropertyInfo property)
-		{
-			var propertyType = property.PropertyType;
-			var isArray = propertyType.IsArray && propertyType.GetElementType().IsEntity();
-			var isCollection = typeof(IEnumerable).IsAssignableFrom(propertyType) && propertyType.IsGenericType && propertyType.GetGenericArguments().First().IsEntity();
-			return isArray || isCollection;
-		}
-		internal static bool IsPropertyAnEntityReference(this PropertyInfo property)
-		{
-			return property.PropertyType.IsEntity();
-		}
-		internal static PropertyCategories GetPropertyTypeClassification(this PropertyInfo property)
-		{
-			var classification = PropertyCategories.Value;
-
-			if (property.IsPropertyACollection() == true)
-			{
-				classification = PropertyCategories.Collection;
-			}
-			else if (property.IsPropertyAnEntityReference() == true)
-			{
-				classification = PropertyCategories.ObjectReference;
-			}
-
-			return classification;
 		}
 		internal static NodePropertyUpdateOptions DetermineColumnUpdateOption(this Attribute argAttr)
 		{

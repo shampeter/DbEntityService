@@ -82,7 +82,8 @@ namespace AXAXL.DbEntity.EntityGraph
 					Owner            = newNode,
 					PropertyName     = property.Name,
 					PropertyType     = property.PropertyType,
-					PropertyCategory = property.GetPropertyTypeClassification()
+					PropertyCategory = property.GetPropertyTypeClassification(),
+					IsNullable       = property.IsPropertyANullable()
 				};
 				newProp
 					.HandleColumnAttribute(property, driver)
@@ -164,7 +165,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			var foreignKeyReference = argEdgeProperty.ForeignKeyReference;
 			// No foreign key defined. Skip.
-			if (string.IsNullOrEmpty(foreignKeyReference) || argEdgeProperty.PropertyCategory != PropertyCategories.Collection) return;
+			if (foreignKeyReference == null || argEdgeProperty.PropertyCategory != PropertyCategories.Collection) return;
 
 			Debug.Assert(
 				argNode.ContainsEdgeToChildren(argEdgeProperty), 
@@ -172,9 +173,10 @@ namespace AXAXL.DbEntity.EntityGraph
 			var edge = argNode.GetEdgeToChildren(argEdgeProperty);
 
 			var childNode = this.GetNodeReferencedByEdge(argEdgeProperty);
-			var fKeyPropertyOnChild = childNode.GetPropertyFromNode(foreignKeyReference);
+			var fKeyPropertyOnChild = childNode.GetPropertiesFromNode(foreignKeyReference);
+
 			edge.ChildNode = childNode;
-			edge.ChildNodeForeignKeys = new NodeProperty[]{ fKeyPropertyOnChild };
+			edge.ChildNodeForeignKeys = fKeyPropertyOnChild;
 		}
 		protected void HandleForeignKeyFoundOnChild(Node node, NodeProperty edgeProperty)
 		{
