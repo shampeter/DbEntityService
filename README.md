@@ -1,94 +1,70 @@
 # Database Entity Service
 
-This is the database access component designed for AXA XL Framework 6.0, replacing Desitny Framework 5.0.
+Features completion check list
 
-## Directions
+| Feature               | Description | Completion |
+|:----------------------|:------------|:------------:|
+| [Select](#feature-select)           | Retrieving entity from database                                 | <span style="font-size: 35px;">&#9685;</span> |
+| [Compound Foreign Key](#feature-compound-foreign-key) | Foreign keys and primary keys mapping by column order | <span style="font-size: 35px;">&#9681;</span> |
+| [Insert](#feature-insert)           | Insert entity into database                                     | <span style="font-size: 35px;">&#9681;</span> |
+| [Update](#feature-update)           | Update entity in database                                       | <span style="font-size: 35px;">&#9681;</span> |
+| [Delete](#feature-delete)           | Delete entity from database                                     | <span style="font-size: 35px;">&#9681;</span> |
+| [Connection](#feature-connection)   | Resolving connection dynamically at runtime by application code | <span style="font-size: 60px;">&#9675;</span> |
+| [Thread-safe](#feature-thread-save) | Test that making sure service is thread-safe.                   | <span style="font-size: 60px;">&#9675;</span> |
+| [Bulk Insert](#feature-bulk-insert) | Sql server specific bulk insert                                 | <span style="font-size: 60px;">&#9675;</span> |
+| [Stored Procedure](#feature-stored-procedure) | Retrieving entity from database                                 | <span style="font-size: 60px;">&#9675;</span> |
 
-Following are the design directions for this component which addresses many of the shortcomings encountered over the years on the existing Framework 5.0 database access capabilities.
+## Feature - Select
 
-1. Avoid Redundant Implementation
+- Simple scenario tested.
+- WIP in unit tests,
 
-    Framework 5.0 due to its age, has implemented features which were missing during its time of conception.  The framework or the underlying `Microsoft Enterprise Library` has implemented
+## Feature - Compound Foreign Key
 
-    - SQL command retry in times of database access issue; and
-    - Database connection to database transaction coupling so that it was guaranteed database connection was re-used under the same database transaction.
+- Design is done but ordering implementation has not finish.
+- WIP in unit tests.
 
-    These implementations will not be implemented again on this database access component in order to avoid redundant implementation and possible complication.
+## Feature - Insert
 
-1. Will Not Expose Underlying Database Connection and Data Reader Used
+- Design and implementation is done.
+- WIP in unit tests.
 
-    Framework 5.0 by using `Microsoft Enterprise Library` (or `EntLib` in abbreviation) exposed the `SQLDatabase` of the `EntLib` for application use.  Such feature helped guarantee that the underlying database connection was closed properly after simple query execution.  However, with respect to data reader, it was still left for application logics to create and close a data reader properly.  Over the years, it was observed that the usage of these 2 objects would varies widely and lead to hidden error, such as data reader left open indefinitely.
+## Feature - Update
 
-    In order to address this issue, Framework 6.0 will not expose any database connection, SQL command or data reader object.  If direct access to database connection or data reader is needed, developers would just code them directly following Microsoft references and guidelines.  Such arrangement, we hope, would help avoid confusion.
+- Design and implementation is done.
+- WIP in unit tests.
 
-1. Simple `C#` Object
+## Feature - Delete
 
-    Framework 5.0, when dealing with database persistence, required the concerned object to be designed according to base classes and interfaces.  Because of the features and capabilities of the language and runtime, such design was the only way.
+- Design and implementation is done.
+- WIP in unit tests.
 
-    Nevertheless, with the advance of `.NET` runtime and `C#` language features, database persistence can be implemented on simple `C#` object without any interface or base class requirement.  If individual application implementation find it useful to have a common base class of objects participating in database operation, such still can be done, but it would not be a requirement imposed by the framework anymore.
+## Feature - Connection
 
-1. Injection-based Automation
+- Have to think about it.
+- Feature required by `XCat`
 
-    Framework 5.0 carried a lot of automation on database columns, such as the audit columns like `added_by`, `modify_dt` and `version` etc.  The data assigned by these fields were hard-coded by framework to help automate the updates of these common fields.  Nevertheless, such implementation lead made enhancement much harder.
+## Feature - Thread-safe
 
-    With Framework 6.0, the update of these fields will still be automated but will be `injected` by applying annotation to the corresponding object properties.  Such implementation will open up a lot more possibilities for future enhancement.
+- Will need some effort to design and code test cases.
+- Have not started yet.
 
-1. Borrow a page from `Entity Framework Core`
+## Feature - Bulk Insert
 
-    Since Framework 5.0 was implemented in the days where there was no defacto standard ORM framework found in the industry, thus the full database access convention and API were designed following the best practices of those days.
+- Inserting data in bulk. Specific feature for Sql server using [SqlBulkCopy](https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlbulkcopy?view=netcore-2.2).
+- Have not started design yet.
 
-    Nevertheless, after 10 years, our unique implementation alienated new developers joining the time.  With that in mind, Framework 6.0 will be designed following the same design strategies of `Entity Framework Core`, hopefully new developers joining the team can draw on their experience with this industry defacto standard, making their adoption on Framework 6.0 easier.
+## Feature - Stored Procedure
 
-## Features
+- Call database stored procedure from service.
+- Have net started yet but don't expect it to be too hard.
 
-Following sections will describe the features implemented in the Framework 6.0 database access component.
+## Appendix - Graphics - Harvey Balls
 
-1. Object Annotation
-
-    Many of the Framework 5.0 custom attributes will be replaced by the same found in [System.ComponentModel.DataAnnotations](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.dataannotations?view=netcore-2.2) and [System.ComponentModel.DataAnnotations.Schema](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.dataannotations.schema?view=netcore-2.2).  Nevertheless, new custom attributes will be developed to address features not addressed by the attributes in these 2 namespaces.
-
-    Following are the attributes, in mind.
-
-    | Attribute  | System.Component   | Custom             | Description                             |
-    |------------|--------------------|--------------------|-----------------------------------------|
-    | Table      | :heavy_check_mark: |                    | Identify the underlying database table. |
-    | Column     | :heavy_check_mark: |                    | Identify the underlying database column.  Boolean property for identifying key or searchable columns as provided in Framework 5.0 will be retired. |
-    | Connection |                    | :heavy_check_mark: | ** Pending Design Decision **           |
-    | Key        | :heavy_check_mark: |                    | Identify the primary key of the underlying database table. |
-    | DatabaseGenerated | :heavy_check_mark: |                    | Identify if framework should skip the concerned object property as the underlying database column value is being taken care by database, such as database `Default` constraint |
-    | ForeignKey | :heavy_check_mark: |                    | Identify object property which correspond to the foreign key of a child set. |
-    | InverseProperty | :heavy_check_mark: |                    | Identify the navigation points between a parent-child relation |
-    | ValueInjection |                    | :heavy_check_mark: | Provide a `C#` script that will return a value for the corresponding object property during insertion, update or both.  |
-    | ActionInjection |                    | :heavy_check_mark: | Provide a `C#` script that will update the corresponding object property during insertion, update or both.  |
-    | ConcurrencyCheck | :heavy_check_mark: |                    | Identify the database column which will be used for optimistic record locking |
-
-## Overall Components / Sub-Systems Design
-
-1. Annotation System.  Dictate the annotations being used.  For this implementation, as mentioned, it will be the following.  If required, a different annotation system can be design to provide the same database specific meta data.
-
-    - `System.ComponentModel.DataAnnotations`
-    - `System.ComponentModel.DataAnnotations.Schema`
-    - Own custom annotation for `ValueInjection` and `ActionInjection`.
-
-1. Node Graph.  This is the database neutral meta data model that help map a plain object into a database table.  It identifies
-
-    - Table
-    - Schema
-    - Connection
-    - Primary Key
-    - Data Columns
-    - Optimistic Record Locking Mechanism
-    - Relationships between objects by means of Foreign Key and Parent/Child reference point in an object.
-
-1. Director. By means of [Builder Pattern](https://en.wikipedia.org/wiki/Builder_pattern#Definition), this is the component that will walk through the node graph and call `Builder` to materialize the objects from database.  It controls
-
-    - Which path to walk through and which to skip, like excluding some childset for the size of the object tree retrieved.
-    - How far up the direction from a child to parent and how deep the navigation on the graph will go from parent to child.
-    - Keep track of the path walked so that the navigation on the node graph won't go in circle.
-
-1. Builder or Sql Database Driver.  By means of [Builder Pattern](https://en.wikipedia.org/wiki/Builder_pattern#Definition), this is the builder.  It is responsible to
-
-    - Making us of information on node graph and build Sql Statement of a particular database vendor for `CRUD` operations.
-    - Translate a `where` clause in `LINQ` expressions into actual `where` clause in Sql of a particular database vendor.
-
-And would probably introduce a `DbContext-Like` facade object to provide one entry point.
+| Harvey Ball                                   | Meaning |
+|:---------------------------------------------:|---------|
+| <span style="font-size: 60px;">&#9675;</span> | 0%      |
+| <span style="font-size: 35px;">&#9684;</span> | 25%     |
+| <span style="font-size: 35px;">&#9681;</span> | 50%     |
+| <span style="font-size: 35px;">&#9685;</span> | 75%     |
+| <span style="font-size: 60px;">&#9679;</span> | 100%    |
