@@ -13,7 +13,25 @@ namespace AXAXL.DbEntity.Interfaces
 	public interface IChangeSet
 	{
 		/// <summary>
-		/// Submit an array of entities to be saved.  No change made to database yet.
+		/// Insert an array of entities into the database.  All are assumed to be new without regarding to the <seealso cref="ITrackable.EntityStatus"/> of each entity.
+		/// </summary>
+		/// <param name="entities">array of entities</param>
+		/// <returns>Return itself for chaining method calls.</returns>
+		IChangeSet Insert(params ITrackable[] entities);
+		/// <summary>
+		/// Update an array of entities in the database.  All are assumed to being updated without regarding to the <seealso cref="ITrackable.EntityStatus"/> of each entity.
+		/// </summary>
+		/// <param name="entities">array of entities</param>
+		/// <returns>Return itself for chaining method calls.</returns>
+		IChangeSet Update(params ITrackable[] entities);
+		/// <summary>
+		/// Delete an array of entities from the database.  All are assumed to be deleted without regarding to the <seealso cref="ITrackable.EntityStatus"/> of each entity.
+		/// </summary>
+		/// <param name="entities">array of entities</param>
+		/// <returns>Return itself for chaining method calls.</returns>
+		IChangeSet Delete(params ITrackable[] entities);
+		/// <summary>
+		/// Submit an array of entities to be saved.  No change made to database yet.  What needs to be done depends on the <seealso cref="ITrackable.EntityStatus"/> of each entity.
 		/// </summary>
 		/// <param name="entities">array of entity</param>
 		/// <returns>Return itself for chaining method calls.</returns>

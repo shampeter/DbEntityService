@@ -25,7 +25,7 @@ namespace Test.Sample
 				.AddLogging(
 					c => c
 						.AddConsole()
-						.SetMinimumLevel(LogLevel.Debug)
+						.SetMinimumLevel(LogLevel.Information)
 				)
 				.AddSqlDbEntityService(
 					option => option
@@ -39,36 +39,79 @@ namespace Test.Sample
 								.GetService<IDbService>()
 								.Bootstrap();
 
-			var contracts = service.Query<TCededContract>()
-				.Where(c => c.CededContractNum == 100)
-				.ToArray();
-			Console.WriteLine("Returned {0} contracts", contracts.Length);
-			var contract = contracts.FirstOrDefault();
-			Console.WriteLine(
-				string.Join(
-					Environment.NewLine,
-					contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey}, {l.Description}, {l.LayerType.Description}"))
-				);
+			TCededContract contract;
+			
+			contract = GetAndPrintContract(service, 100);
+
 			var stopLoss = service.Query<TLookups>().Where(l => l.Description == "Stop Loss").ToList().FirstOrDefault();
-			contract.CededContractLayers.Add(
-				new TCededContractLayer
-				{
-					Description = "Third Layer 2019-08-25",
-					LayerType = stopLoss,
-					AttachmentPoint = 1000000,
-					Limit = 3000000,
-					EntityStatus = EntityStatusEnum.New
-				}
-				);
-			var rowCount = service.Persist()
+			var newLayer = new TCededContractLayer
+			{
+				Description = $"Layer at {DateTime.Now}",
+				LayerType = stopLoss,
+				AttachmentPoint = 1000000,
+				Limit = 3000000,
+				EntityStatus = EntityStatusEnum.New
+			};
+
+			contract.CededContractLayers.Add(newLayer);
+
+			var rowInserted = service.Persist()
 				.Submit(c => c.Save(contract))
 				.Commit();
-			Console.WriteLine("Saved {0}", rowCount);
+			Console.WriteLine("Saved {0}", rowInserted);
 			Console.WriteLine(
 				string.Join(
 					Environment.NewLine,
-					contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey}, {l.Description}, {l.LayerType.Description}"))
+					contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey,-10}, {l.Description,-50}, {l.LayerType.Description,-30}, {l.AttachmentPoint}/{l.Limit}, {l.ModifyDate}"))
 				);
+
+			contract = GetAndPrintContract(service, 100);
+
+			var layerRefreshed = contract.CededContractLayers.Where(l => l.CededContractLayerPkey == newLayer.CededContractLayerPkey).FirstOrDefault();
+
+			if (layerRefreshed == null)
+			{
+				Console.WriteLine("Layer {0} not found", newLayer.CededContractLayerPkey);
+			}
+			else
+			{
+				layerRefreshed.Limit += 1000000;
+				layerRefreshed.EntityStatus = EntityStatusEnum.Updated;
+				var rowUpdated = service.Persist()
+					.Submit(c => c.Save(contract))
+					.Commit();
+
+				Console.WriteLine("Updated {0}", rowUpdated);
+				Console.WriteLine(
+					string.Join(
+						Environment.NewLine,
+						contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey,-10}, {l.Description,-50}, {l.LayerType.Description,-30}, {l.AttachmentPoint}/{l.Limit}, {l.ModifyDate}"))
+					);
+			}
+			contract = GetAndPrintContract(service, 100);
+
+			layerRefreshed = contract.CededContractLayers.Where(l => l.CededContractLayerPkey == newLayer.CededContractLayerPkey).FirstOrDefault();
+
+			if (layerRefreshed == null)
+			{
+				Console.WriteLine("Layer {0} not found", newLayer.CededContractLayerPkey);
+			}
+			else
+			{
+				layerRefreshed.EntityStatus = EntityStatusEnum.Deleted;
+				var rowUpdated = service.Persist()
+					.Submit(c => c.Save(contract))
+					.Commit();
+
+				Console.WriteLine("Deleted {0}", rowUpdated);
+				Console.WriteLine(
+					string.Join(
+						Environment.NewLine,
+						contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey,-10}, {l.Description,-50}, {l.LayerType.Description,-30}, {l.AttachmentPoint}/{l.Limit}, {l.ModifyDate}"))
+					);
+			}
+
+			contract = GetAndPrintContract(service, 100);
 
 			/*
 						var doc = service.Query<TCededContractLayerDoc>()
@@ -77,6 +120,21 @@ namespace Test.Sample
 										.FirstOrDefault();
 						Console.WriteLine("T_Doc returned.  Owner Type {0} Owner Guid {1}", doc?.OwnerType, doc?.OwnerGuid);
 			*/
+		}
+
+		private static TCededContract GetAndPrintContract(IDbService service, int contractNum)
+		{
+			var contracts = service.Query<TCededContract>()
+				.Where(c => c.CededContractNum == contractNum)
+				.ToArray();
+			Console.WriteLine("Refreshed contract from database.  Found {0} contracts", contracts.Length);
+			var contract = contracts.FirstOrDefault();
+			Console.WriteLine(
+				string.Join(
+					Environment.NewLine,
+					contract.CededContractLayers.Select(l => $"{l.CededContractLayerPkey,-10}, {l.Description,-50}, {l.LayerType.Description,-30}, {l.AttachmentPoint}/{l.Limit}, {l.ModifyDate}"))
+				);
+			return contract;
 		}
 		//static void BuildNodeTest()
 		//{

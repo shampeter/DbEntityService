@@ -40,20 +40,35 @@ namespace AXAXL.DbEntity.Services
 			{
 				foreach(var changeSet in this.ChangeSets)
 				{
-					var isolation = changeSet.IsIsolationLevelChanged == true ? changeSet.Isolation : this.isolation;
-					var scope = changeSet.IsTransactionScopeOptionChanged == true ? changeSet.ScopeOption : TransactionScopeOption.Required;
-					var option = new TransactionOptions { IsolationLevel = isolation };
-					using (var changeSetTransaction = new TransactionScope(scope, option))
+					if (changeSet.IsIsolationLevelChanged || changeSet.IsTransactionScopeOptionChanged)
 					{
-						foreach(var eachEntity in changeSet.Changes)
+						var isolation = changeSet.IsIsolationLevelChanged == true ? changeSet.Isolation : this.isolation;
+						var scope = changeSet.IsTransactionScopeOptionChanged == true ? changeSet.ScopeOption : TransactionScopeOption.Required;
+						var option = new TransactionOptions { IsolationLevel = isolation };
+						using (var changeSetTransaction = new TransactionScope(scope, option))
 						{
-							var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion);
-							rowCount += director.Save(eachEntity);
+							rowCount += this.CommitChangeSet(changeSet);
+							changeSetTransaction.Complete();
 						}
-						changeSetTransaction.Complete();
+					}
+					else
+					{
+						rowCount += this.CommitChangeSet(changeSet);
 					}
 				}
 				rootTransaction.Complete();
+			}
+
+			return rowCount;
+		}
+
+		private int CommitChangeSet(IChangeSet changeSet)
+		{
+			int rowCount = 0;
+			foreach (var eachEntity in changeSet.Changes)
+			{
+				var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion);
+				rowCount = director.Save(eachEntity);
 			}
 
 			return rowCount;

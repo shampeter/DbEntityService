@@ -15,7 +15,7 @@ namespace AXAXL.DbEntity.Services
 		public DbServiceOption()
 		{
 			this.ConnectionMap = new Dictionary<string, string>();
-			this.RootDefaultTransactionScope = TransactionScopeOption.RequiresNew;
+			this.RootDefaultTransactionScope = TransactionScopeOption.Required;
 			this.RootDefaultIsolation = IsolationLevel.ReadCommitted;
 		}
 		public IDbServiceOption AddOrUpdateConnection(string connectionName, string connectionString)

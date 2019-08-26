@@ -44,9 +44,28 @@ namespace AXAXL.DbEntity.Services
 			return this;
 		}
 
+		public IChangeSet Insert(params ITrackable[] entities)
+		{
+			this.SetAndAddChanges(entities, EntityStatusEnum.New);
+			return this;
+		}
+
+		public IChangeSet Update(params ITrackable[] entities)
+		{
+			this.SetAndAddChanges(entities, EntityStatusEnum.Updated);
+			return this;
+		}
+
+		public IChangeSet Delete(params ITrackable[] entities)
+		{
+			this.SetAndAddChanges(entities, EntityStatusEnum.Deleted);
+			return this;
+		}
+
 		public IChangeSet Save(params ITrackable[] entities)
 		{
 			Debug.Assert(entities != null);
+
 			foreach (var eachEntity in entities)
 			{
 				this.Changes.Add(eachEntity);
@@ -68,10 +87,19 @@ namespace AXAXL.DbEntity.Services
 			this.scopeOptionChanged = true;
 			return this;
 		}
+
 		public bool IsTransactionScopeOptionChanged => this.scopeOptionChanged;
 
 		public bool IsIsolationLevelChanged => this.isolationChanged;
 
-
+		private void SetAndAddChanges(ITrackable[] entities, EntityStatusEnum status)
+		{
+			Debug.Assert(entities != null && entities.Length > 0);
+			foreach(var entity in entities)
+			{
+				entity.EntityStatus = status;
+				this.Changes.Add(entity);
+			}
+		}
 	}
 }

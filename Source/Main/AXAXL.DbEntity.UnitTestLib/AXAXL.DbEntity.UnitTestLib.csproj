@@ -5,11 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="TestData\Seed\DbEntityServiceTestDbSeed.dacpac" />
+    <None Remove="TestData\Seed\DbEntityServiceUnitTestDb.dacpac" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="TestData\Seed\DbEntityServiceTestDbSeed.dacpac">
+    <Content Include="TestData\Seed\DbEntityServiceUnitTestDb.dacpac">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
