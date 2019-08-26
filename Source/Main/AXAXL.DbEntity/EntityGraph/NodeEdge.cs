@@ -109,7 +109,7 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return this;
 		}
-		public NodeEdge CompileForeignKeySettingAction()
+		public NodeEdge CompileChildForeignKeyWriters()
 		{
 			Expression<Action<object, object>>[] lambda = null;
 			if (this.ChildNodeForeignKeys != null && this.ChildNodeForeignKeys.Length > 0)

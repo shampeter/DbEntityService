@@ -90,6 +90,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					.HandleDataGenerationAttribute(property)
 					.HandleValueInjectionAttribute(property)
 					.HandleActionInjectionAttribute(property)
+					.HandleConstantAttribute(property)
 					.HandleForeignKeyAttribute(property)
 					.HandleInversePropertyAttribute(property)
 					.CompileScript()
@@ -159,6 +160,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					.CompileParentSettingAction()
 					.CompileParentPrimaryKeyReaders()
 					.CompileChildForeignKeyReaders()
+					.CompileChildForeignKeyWriters()
 					;
 			}
 		}

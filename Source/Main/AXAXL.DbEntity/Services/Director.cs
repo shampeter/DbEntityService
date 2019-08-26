@@ -138,7 +138,6 @@ namespace AXAXL.DbEntity.Services
 				case EntityStatusEnum.New:
 					this.Driver.Insert<ITrackable>(connectionString, entity, node);
 					recordCount++;
-					this.PopulateChildForeignKeys(entity, node, childEdges);
 					break;
 				case EntityStatusEnum.Updated:
 					this.Driver.Update<ITrackable>(connectionString, entity, node);
@@ -165,26 +164,27 @@ namespace AXAXL.DbEntity.Services
 					{
 						child.EntityStatus = entity.EntityStatus;
 					}
-					this.Save(child, childEdge, entity);
+					if (child.EntityStatus == EntityStatusEnum.New)
+					{
+						this.PopulateChildForeignKeys(entity, node, childEdge);
+					}
+					recordCount += this.Save(child, childEdge, entity);
 				}
 			}
-			return -1;
+			return recordCount;
 		}
-		private void PopulateChildForeignKeys(ITrackable parent, Node node, NodeEdge[] edges)
+		private void PopulateChildForeignKeys(ITrackable parent, Node node, NodeEdge edge)
 		{
-			foreach (var edge in edges)
-			{
-				var primaryKeys = edge.ParentPrimaryKeyReaders.Select(r => r(parent)).ToArray();
-				var foreignKeyWriters = edge.ChildForeignKeyWriter;
-				var iterator = edge.ChildReferenceOnParentNode.GetEnumeratorFunc(parent);
+			var primaryKeys = edge.ParentPrimaryKeyReaders.Select(r => r(parent)).ToArray();
+			var foreignKeyWriters = edge.ChildForeignKeyWriter;
+			var iterator = edge.ChildReferenceOnParentNode.GetEnumeratorFunc(parent);
 
-				while (iterator.MoveNext())
+			while (iterator.MoveNext())
+			{
+				var child = iterator.Current;
+				for (int i = 0; i < primaryKeys.Length && i < foreignKeyWriters.Length; i++)
 				{
-					var child = iterator.Current;
-					for (int i = 0; i < primaryKeys.Length && i < foreignKeyWriters.Length; i++)
-					{
-						foreignKeyWriters[i](child, primaryKeys[i]);
-					}
+					foreignKeyWriters[i](child, primaryKeys[i]);
 				}
 			}
 		}

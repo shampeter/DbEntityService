@@ -30,7 +30,7 @@ namespace AXAXL.DbEntity.MSSql
 		public (string InsertColumnsClause, string InsertValueClause, NodeProperty[] InsertColumns) CreateInsertComponent(Node node)
 		{
 			NodeProperty[] insertColumns, outputColumns;
-			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsert, out outputColumns, out insertColumns);
+			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsert, true, out outputColumns, out insertColumns);
 
 			var columns = string.Join(", ", insertColumns.Select(p => p.DbColumnName));
 			var values = string.Join(
@@ -56,7 +56,7 @@ namespace AXAXL.DbEntity.MSSql
 			NodeProperty[] updateColumns, outputColumns;
 			var mode = IsInserting ? NodePropertyUpdateOptions.ByDbOnInsert : NodePropertyUpdateOptions.ByDbOnInsertAndUpdate;
 
-			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsert, out outputColumns, out updateColumns);
+			this.IdentifyUpdateAndOutputColumns(node, mode, IsInserting, out outputColumns, out updateColumns);
 
 			if (outputColumns == null || outputColumns.Length <= 0)
 			{
@@ -67,37 +67,25 @@ namespace AXAXL.DbEntity.MSSql
 			outputClause = string.IsNullOrEmpty(outputClause) ? string.Empty : "OUTPUT " + outputClause;
 
 			var inputReader = Expression.Parameter(typeof(SqlDataReader), "reader");
+			var inputObject = Expression.Parameter(typeof(object), "object");
 			var inputEntity = Expression.Parameter(node.NodeType, "entity");
 			var exprBuffer = new List<Expression>();
 
-			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
+			exprBuffer.Add(
+				Expression.Assign(
+					inputEntity,
+					Expression.Convert(inputObject, node.NodeType)
+					)
+				);
 
 			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
 			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
-			for (int i = 0; i < outputColumns.Length; i++)
-			{
-				var column = outputColumns[i];
-				SqlDbType dbType;
-				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
-				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
-				var entityProperty = Expression.Property(inputEntity, column.PropertyName);
-				var dbReaderMethod = Expression.Invoke(
-					SqlTypeToReaderMap[dbType],
-					inputReader,
-					Expression.Constant(i)
+			exprBuffer.AddRange(
+				this.CreateSqlReaderFetchingExpressions(outputColumns, inputReader, inputEntity)
 				);
-				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
-				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
 
-				var conditional = Expression.IfThenElse(
-					Expression.Invoke(isDbNullFunc, inputReader, Expression.Constant(i)),
-					assignmentIfDbNull,
-					assignmentIfNotDbNull
-				);
-				exprBuffer.Add(conditional);
-			}
-			var exprBlock = Expression.Block(exprBuffer.ToArray());
-			var lambdaFunc = Expression.Lambda<Action<SqlDataReader, dynamic>> (exprBlock, new [] { inputReader, inputEntity });
+			var exprBlock = Expression.Block(new [] { inputEntity }, exprBuffer.ToArray());
+			var lambdaFunc = Expression.Lambda<Action<SqlDataReader, object>> (exprBlock, new [] { inputReader, inputObject });
 
 			this.LogDataFetchingExpression($"Delegate to capture output clause on {node.Name} when inserting='{IsInserting}'", lambdaFunc);
 
@@ -107,23 +95,16 @@ namespace AXAXL.DbEntity.MSSql
 		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node)
 		{
 			var tableName = this.FormatTableName(node);
-			var allColumns = node.PrimaryKeys.Values
-								.Concat(node.DataColumns.Values.Where(p => string.IsNullOrEmpty(p.DbColumnName) == false))
-								.ToArray();
-			if (node.ConcurrencyControl != null)
-			{
-				allColumns = allColumns.Concat(new[] { node.ConcurrencyControl }).ToArray();
-			}
+			var allColumns = node.AllDbColumns;
 
 			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
 
 			var selectColumns = string.Join(", ", allColumns.Select(p => $"{p.DbColumnName}"));
 			var selectClause = string.Format(@"SELECT {0} FROM {1}", selectColumns, tableName);
-			
+
 			var exprBuffer = new List<Expression>();
 			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
 			var outputParameter = Expression.Variable(node.NodeType, "entity");
-			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
 
 			// entity = new T();
 			exprBuffer.Add(
@@ -134,32 +115,7 @@ namespace AXAXL.DbEntity.MSSql
 			);
 			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
 			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
-			for (int i = 0; i < allColumns.Length; i++)
-			{
-				var column = allColumns[i];
-				SqlDbType dbType;
-				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
-				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
-				var entityProperty = Expression.Property(outputParameter, column.PropertyName);
-				Expression dbReaderMethod = Expression.Invoke(
-					SqlTypeToReaderMap[dbType],
-					inputParameter,
-					Expression.Constant(i)
-				);
-				if (column.IsNullable == true)
-				{
-					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
-				}
-				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
-				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
-
-				var conditional = Expression.IfThenElse(
-					Expression.Invoke(isDbNullFunc, inputParameter, Expression.Constant(i)),
-					assignmentIfDbNull,
-					assignmentIfNotDbNull
-				);
-				exprBuffer.Add(conditional);
-			}
+			exprBuffer.AddRange(CreateSqlReaderFetchingExpressions(allColumns, inputParameter, outputParameter));
 
 			var returnLabel = Expression.Label(node.NodeType, "return");
 
@@ -171,6 +127,42 @@ namespace AXAXL.DbEntity.MSSql
 			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
 
 			return (selectClause, lambdaFunc.Compile());
+		}
+
+		private Expression[] CreateSqlReaderFetchingExpressions(NodeProperty[] columns, ParameterExpression dataReader, Expression entity)
+		{
+			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
+			List<Expression> exprBuffer = new List<Expression>();
+
+			for (int i = 0; i < columns.Length; i++)
+			{
+				SqlDbType dbType;
+				var column = columns[i];
+
+				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
+				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
+
+				var entityProperty = Expression.Property(entity, column.PropertyName);
+				Expression dbReaderMethod = Expression.Invoke(
+					SqlTypeToReaderMap[dbType],
+					dataReader,
+					Expression.Constant(i)
+				);
+				if (column.IsNullable == true)
+				{
+					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
+				}
+				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
+				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
+
+				var conditional = Expression.IfThenElse(
+					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+					assignmentIfDbNull,
+					assignmentIfNotDbNull
+				);
+				exprBuffer.Add(conditional);
+			}
+			return exprBuffer.ToArray();
 		}
 
 		public IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null)
@@ -194,7 +186,7 @@ namespace AXAXL.DbEntity.MSSql
 		public (string AssignmentClause, NodeProperty[] UpdateColumns) CreateUpdateAssignmentComponent(Node node)
 		{
 			NodeProperty[] updateColumns, outputColumns;
-			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate, out outputColumns, out updateColumns);
+			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate, false, out outputColumns, out updateColumns);
 
 			return (
 					string.Join(
@@ -291,10 +283,16 @@ namespace AXAXL.DbEntity.MSSql
 			return lambda.Compile();
 		}
 
-		private void IdentifyUpdateAndOutputColumns(Node node, NodePropertyUpdateOptions updateOption, out NodeProperty[] outputColumnList, out NodeProperty[] updateColumnList)
+		private void IdentifyUpdateAndOutputColumns(Node node, NodePropertyUpdateOptions updateOption, bool IsInserting, out NodeProperty[] outputColumnList, out NodeProperty[] updateColumnList)
 		{
 			var allColumnList = node.DataColumns.Values
 									.Where(p => string.IsNullOrEmpty(p.DbColumnName) == false);
+			// combine primary keys into the list for consideration if inserting.  Don't need to consider primary keys when updating because primary key should not change
+			// during update and thus won't appear ever in setting clause and output clause.
+			if (IsInserting)
+			{
+				allColumnList = allColumnList.Concat(node.PrimaryKeys.Values);
+			}
 			outputColumnList = allColumnList
 									.Where(p => p.UpdateOption == updateOption).ToArray();
 			updateColumnList = allColumnList

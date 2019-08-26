@@ -10,6 +10,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 	[Table("t_ceded_contract_layer")]
     public partial class TCededContractLayer : ITrackable
     {
+		private TLookups layerType;
 		public TCededContractLayer()
 		{
 			this.CededContractLayerDocs = new List<TCededContractLayerDoc>();
@@ -61,7 +62,14 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         public virtual TCededContract CededContract { get; set; }
 
         [ForeignKey("LayerTypeFkey")]
-        public virtual TLookups LayerType { get; set; }
+        public TLookups LayerType {
+			get => this.layerType;
+			set
+			{
+				this.LayerTypeFkey = value.LookupsPkey;
+				this.layerType = value;
+			}
+		}
 
 		[InverseProperty(nameof(TCededContractLayerDoc.CededContractLayer))]
 		public IList<TCededContractLayerDoc> CededContractLayerDocs { get; set; }

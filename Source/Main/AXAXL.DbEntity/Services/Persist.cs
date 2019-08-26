@@ -28,20 +28,20 @@ namespace AXAXL.DbEntity.Services
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
 			this.ChangeSets = new List<IChangeSet>();
-			this.scopeOption = TransactionScopeOption.RequiresNew;
-			this.isolation = IsolationLevel.ReadCommitted;
+			this.scopeOption = serviceOption.RootDefaultTransactionScope;
+			this.isolation = serviceOption.RootDefaultIsolation;
 		}
 		public int Commit()
 		{
 			var rowCount = 0;
 			var rootOption = new TransactionOptions { IsolationLevel = this.isolation };
-
+			// TODO: Need fine tuning on transaction behavior.
 			using (var rootTransaction = new TransactionScope(this.scopeOption, rootOption))
 			{
 				foreach(var changeSet in this.ChangeSets)
 				{
 					var isolation = changeSet.IsIsolationLevelChanged == true ? changeSet.Isolation : this.isolation;
-					var scope = changeSet.IsTransactionScopeOptionChanged == true ? changeSet.ScopeOption : this.scopeOption;
+					var scope = changeSet.IsTransactionScopeOptionChanged == true ? changeSet.ScopeOption : TransactionScopeOption.Required;
 					var option = new TransactionOptions { IsolationLevel = isolation };
 					using (var changeSetTransaction = new TransactionScope(scope, option))
 					{
@@ -50,6 +50,7 @@ namespace AXAXL.DbEntity.Services
 							var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion);
 							rowCount += director.Save(eachEntity);
 						}
+						changeSetTransaction.Complete();
 					}
 				}
 				rootTransaction.Complete();
@@ -80,5 +81,6 @@ namespace AXAXL.DbEntity.Services
 			this.isolation = isolation;
 			return this;
 		}
+
 	}
 }

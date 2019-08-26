@@ -18,6 +18,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		private ILogger Log { get; set; }
 		private string _name;
 		private string _fullName;
+		private NodeProperty[] _allDbColumns;
 		public Node(Type nodeType, ILogger log)
 		{
 			this.PrimaryKeys = new Dictionary<string, NodeProperty>();
@@ -293,6 +294,23 @@ namespace AXAXL.DbEntity.EntityGraph
 		public string[] AllParentEdgeNames()
 		{
 			return this.EdgeToParent.Keys.ToArray();
+		}
+		public NodeProperty[] AllDbColumns
+		{
+			get
+			{
+				if (this._allDbColumns == null)
+				{
+					var allColumns = this.PrimaryKeys.Values
+										.Concat(this.DataColumns.Values.Where(p => string.IsNullOrEmpty(p.DbColumnName) == false));
+					if (this.ConcurrencyControl != null)
+					{
+						allColumns = allColumns.Concat(new[] { this.ConcurrencyControl });
+					}
+					this._allDbColumns = allColumns.ToArray();
+				}
+				return this._allDbColumns;
+			}
 		}
 	}
 }

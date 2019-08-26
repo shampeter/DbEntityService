@@ -108,7 +108,7 @@ namespace AXAXL.DbEntity.MSSql
 		protected override Expression VisitMember(MemberExpression member)
 		{
 			var parent = member.Member.DeclaringType;
-			if (parent != typeof(T))
+			if (parent.IsAssignableFrom(typeof(T)) == false)
 			{
 				var parameterName = $"@Parameter{++seq}";
 				buffer.Append(parameterName);

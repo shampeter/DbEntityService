@@ -139,9 +139,19 @@ namespace AXAXL.DbEntity.MSSql
 			var insertClauses = this.sqlGenerator.CreateInsertComponent(node);
 			var insertParameters = this.sqlGenerator.CreateSqlParameters(node, insertClauses.InsertColumns);
 			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, insertClauses.InsertColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate);
+			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
+			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
 			// capture current property value into sql parameters before updating property by framework injection
+
+			foreach (var eachAction in allActions)
+			{
+				eachAction(entity);
+			}
+			foreach (var eachInj in allFuncInj)
+			{
+				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
+			}
+
 			var paramWithValues = insertParameters.Select(
 					kv =>
 					{
@@ -151,23 +161,16 @@ namespace AXAXL.DbEntity.MSSql
 						return param;
 					}
 				).ToArray();
-			foreach (var eachAction in allActions)
-			{
-				eachAction(entity);
-			}
-			foreach(var eachInj in allFuncInj)
-			{
-				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
-			}
-			var withOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == false;
-			var insertSql = string.Format(@"INSERT INTO {0} ({1}){2}VALUES ({3})", tableName, insertClauses.InsertColumnsClause, withOutput ? $" {outputComponent.OutputClause} " : string.Empty, insertClauses.InsertValueClause);
+
+			var withNoOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == true;
+			var insertSql = string.Format(@"INSERT INTO {0} ({1}){2}VALUES ({3})", tableName, insertClauses.InsertColumnsClause, withNoOutput == false ? $" {outputComponent.OutputClause} " : string.Empty, insertClauses.InsertValueClause);
 			var cmd = new SqlCommand(insertSql);
 			cmd.Parameters.AddRange(paramWithValues);
 			using (var connection = new SqlConnection(connectionString))
 			{
 				connection.Open();
 				cmd.Connection = connection;
-				if (withOutput)
+				if (withNoOutput)
 				{
 					resultCount = cmd.ExecuteNonQuery();
 				}
@@ -175,8 +178,11 @@ namespace AXAXL.DbEntity.MSSql
 				{
 					using (var reader = cmd.ExecuteReader())
 					{
-						resultCount++;
-						outputComponent.EntityUpdateAction(reader, entity);
+						while (reader.Read())
+						{
+							resultCount++;
+							outputComponent.EntityUpdateAction(reader, entity);
+						}
 					}
 				}
 				if (resultCount != 1)
@@ -299,7 +305,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		protected virtual Action<dynamic>[] GetFrameworkUpdateActions(Node node, params NodePropertyUpdateOptions[] updateOption)
 		{
-			var actions = this.GetAllColumns(node)
+			var actions = node.AllDbColumns
 							.Where(c => updateOption.Contains(c.UpdateOption) && c.ActionInjection != null)
 							.Select(c => c.ActionInjection)
 							.ToArray();
@@ -307,7 +313,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected virtual (Action<dynamic, dynamic> ActionOnProperty, Func<dynamic> FuncInjection)[] CreateFrameworkUpdatesFromFuncInjection(Node node, params NodePropertyUpdateOptions[] updateOption)
 		{
-			var funcInjectColumns = this.GetAllColumns(node)
+			var funcInjectColumns = node.AllDbColumns
 										.Where(c => updateOption.Contains(c.UpdateOption) && c.FuncInjection != null)
 										.Select(
 											c => (this.CreateFrameworkUpdateFromUncInjection(node, c), c.FuncInjection)
@@ -316,19 +322,7 @@ namespace AXAXL.DbEntity.MSSql
 										;
 			return funcInjectColumns;
 		}
-		private IList<NodeProperty> GetAllColumns(Node node)
-		{
-			var allColumns = node.PrimaryKeys.Values
-								.Concat(
-									node.DataColumns.Values.Where(p => string.IsNullOrEmpty(p.DbColumnName))
-								)
-								.ToList();
-			if (node.ConcurrencyControl != null)
-			{
-				allColumns.Add(node.ConcurrencyControl);
-			}
-			return allColumns;
-		}
+
 		private Action<dynamic, dynamic> CreateFrameworkUpdateFromUncInjection(Node node, NodeProperty property)
 		{
 			var entityInput = Expression.Parameter(typeof(object), "entity");
