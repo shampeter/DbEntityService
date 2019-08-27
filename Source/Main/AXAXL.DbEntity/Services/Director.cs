@@ -137,14 +137,18 @@ namespace AXAXL.DbEntity.Services
 			{
 				case EntityStatusEnum.New:
 					this.Driver.Insert<ITrackable>(connectionString, entity, node);
+					entity.EntityStatus = EntityStatusEnum.NoChange;
 					recordCount++;
 					break;
 				case EntityStatusEnum.Updated:
+					// TODO: What if nothing was updated ... classic concurrency error ... do we need custom check?
 					this.Driver.Update<ITrackable>(connectionString, entity, node);
+					entity.EntityStatus = EntityStatusEnum.NoChange;
 					recordCount++;
 					break;
 				case EntityStatusEnum.Deleted:
 					recordCount++;
+					entity.EntityStatus = EntityStatusEnum.NoChange;
 					this.DeleteQueue.Add((parent, edge, entity));
 					break;
 			}
