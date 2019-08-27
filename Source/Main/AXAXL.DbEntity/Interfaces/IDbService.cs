@@ -9,12 +9,17 @@ namespace AXAXL.DbEntity.Interfaces
 	public interface IDbService
 	{
 		/// <summary>
-		/// Boostrap DbService where the servie will scan <paramref name="assemblies"/> for class type which has the a <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute"/> defined
+		/// Boostrap DbService where the servie will scan <paramref name="assemblies"/> for class type which has the a <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute"/> defined.
 		/// and create <see cref="AXAXL.DbEntity.EntityGraph.Node"/> to store the discovered meta data.
+		/// if <paramref name="assemblies"/> is null or empty, then use all loaded assemblies as found in <see cref="AppDomain.CurrentDomain"/>.
+		/// Use <paramref name="assemblyNamePrefixes"/> to narrow down the assembly to start by specifying the assembly name prefix.
+		/// Service will use case insensitives match to test assembly by name with <see cref="string.StartsWith(string, StringComparison)"/>
+		/// If <paramref name="assemblyNamePrefixes"/> is null or empty, service will search through all assemblies specified.
 		/// </summary>
 		/// <param name="assemblies">list of assemblies to scan.  If none, full assemblies loaded will be used. <see cref="AppDomain.CurrentDomain"/></param>
+		/// <param name="assemblyNamePrefixes">Assembely name prefixes.</param>
 		/// <returns></returns>
-		IDbService Bootstrap(params Assembly[] assemblies);
+		IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes);
 		/// <summary>
 		/// Run raw sql query.  See <see cref="IDatabaseDriver"/> for details.
 		/// </summary>

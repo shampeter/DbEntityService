@@ -21,7 +21,7 @@ namespace AXAXL.DbEntity.EntityGraph
 			Debug.Assert(this.log != null);
 			Debug.Assert(this.driver != null);
 		}
-		public void BuildNodes(params Assembly[] assemblies)
+		public void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes)
 		{
 			if (assemblies == null || assemblies.Length <= 0)
 			{
@@ -39,12 +39,19 @@ namespace AXAXL.DbEntity.EntityGraph
 				//		}
 				//	}
 				//);
-				foreach (var type in assembly.GetTypes())
+				if (
+					assemblyNamePrefixes == null || 
+					assemblyNamePrefixes.Length <= 0 || 
+					assemblyNamePrefixes.Any(p => assembly.FullName.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+				)
 				{
-					var node = this.BuildNode(type);
-					if (node != null)
+					foreach (var type in assembly.GetTypes())
 					{
-						_nodeMap.Add(type, node);
+						var node = this.BuildNode(type);
+						if (node != null)
+						{
+							_nodeMap.Add(type, node);
+						}
 					}
 				}
 			}
@@ -157,6 +164,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				eachEdge
 					.SortKeysByOrder()
 					.CompileChildAddingAction()
+					.CompileChildRemoveAction()
 					.CompileParentSettingAction()
 					.CompileParentPrimaryKeyReaders()
 					.CompileChildForeignKeyReaders()

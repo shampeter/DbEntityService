@@ -9,6 +9,7 @@ using System.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.EntityGraph;
 using AXAXL.DbEntity.Extensions;
+using ExpressionToString;
 
 namespace AXAXL.DbEntity.MSSql
 {
@@ -60,7 +61,7 @@ namespace AXAXL.DbEntity.MSSql
 		[Conditional("DEBUG")]
 		private void LoqSqlParameterCreationExpression(Expression argExpr)
 		{
-			this.log.LogDebug(argExpr.ToMarkDown());
+			this.log.LogDebug("Sql Parameter Creation ... ", argExpr.ToString("C#"));
 		}
 		protected override Expression VisitBinary(BinaryExpression node)
 		{

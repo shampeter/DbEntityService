@@ -35,7 +35,7 @@ namespace AXAXL.DbEntity.UnitTests
 			//var map = serviceProvider.GetService<INodeMap>();
 			this.dbService = serviceProvider
 								.GetService<IDbService>()
-								.Bootstrap();
+								.Bootstrap(null, new[] { "AXAXL.DbEntity.UnitTestLib" });
 		}
 		[TestMethod]
 		public void TestMethod1()

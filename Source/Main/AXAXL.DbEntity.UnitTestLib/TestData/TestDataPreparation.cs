@@ -9,11 +9,11 @@ namespace AXAXL.DbEntity.UnitTestLib.TestData
 	{
 		public static string InstallUnitTestDbIntoSqlLocalDb()
 		{
-			var scriptFilename = @"TestData/Seed/DbEntityServiceTestDbSeed.dacpac";
-			Debug.Assert(string.IsNullOrEmpty(scriptFilename) == false);
-			var connectionString = @"Server=(LocalDb)\MSSQLLocalDb; Integrated Security=true;";
-			var package = DacPackage.Load(scriptFilename);
-			var service = new DacServices(connectionString);
+			const string C_SEED_DACPAC_LOC = @"TestData/Seed/DbEntityServiceUnitTestDb.dacpac";
+			const string C_MSSQLLOCALDB_CONNECTION_STRING = @"Server=(LocalDb)\MSSQLLocalDb; Integrated Security=true;";
+
+			var package = DacPackage.Load(C_SEED_DACPAC_LOC);
+			var service = new DacServices(C_MSSQLLOCALDB_CONNECTION_STRING);
 			var option = new PublishOptions();
 			option.GenerateDeploymentReport = true;
 			option.GenerateDeploymentScript = false;

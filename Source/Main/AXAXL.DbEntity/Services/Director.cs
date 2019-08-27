@@ -196,10 +196,5 @@ namespace AXAXL.DbEntity.Services
 		{
 			return string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 		}
-		[Conditional("DEBUG")]
-		private void LogExpression(Expression expression)
-		{
-			this.Log.LogDebug(expression.ToMarkDown());
-		}
 	}
 }

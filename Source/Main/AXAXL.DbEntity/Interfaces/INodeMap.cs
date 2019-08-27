@@ -14,9 +14,14 @@ namespace AXAXL.DbEntity.Interfaces
 	{
 		/// <summary>
 		/// Build up meta data on entity objects found in <paramref name="assemblies"/> or all loaded assemblies as found in <see cref="AppDomain.CurrentDomain"/>
+		/// if <paramref name="assemblies"/> is null or empty.
+		/// Use <paramref name="assemblyNamePrefixes"/> to narrow down the assembly to start by specifying the assembly name prefix.
+		/// Service will use case insensitives match to test assembly by name with <see cref="string.StartsWith(string, StringComparison)"/>
+		/// If <paramref name="assemblyNamePrefixes"/> is null or empty, service will search through all assemblies specified.
 		/// </summary>
 		/// <param name="assemblies">Optional.  List of assemblies to search for meta data on entity class.</param>
-		void BuildNodes(params Assembly[] assemblies);
+		/// <oaram name="assemblyNamePrefixes">Name prefixes.</oaram>
+		void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes);
 		/// <summary>
 		/// True if a <see cref="Node"/> is found for the parameter <paramref name="type"/>.
 		/// </summary>

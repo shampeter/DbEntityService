@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ExpressionTreeToString" Version="1.5.67" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="3.3.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="2.2.0" />
     <PackageReference Include="System.Data.SqlClient" Version="4.6.1" />

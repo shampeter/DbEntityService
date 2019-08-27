@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -35,7 +36,7 @@ namespace AXAXL.DbEntity.EntityGraph
 
 	public class NodeProperty
 	{
-		internal static readonly ScriptOptions defaultScriptOption = ScriptOptions.Default.AddReferences(AppDomain.CurrentDomain.GetAssemblies());
+		private static Assembly[] _currentDomainAssemblies = null;
 		private ILogger Log { get; set; }
 		public NodeProperty(ILogger log)
 		{
@@ -103,16 +104,17 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public NodeProperty CompileScript()
 		{
-			this.CompileScriptAsync().Wait();
-			return this;
-		}
-		private async Task CompileScriptAsync()
-		{
 			if (string.IsNullOrEmpty(this.UpdateScript.Script) || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.SqlFunc || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.None)
 			{
-				return;
+				return this;
 			}
-			var options = defaultScriptOption;
+			if (_currentDomainAssemblies == null)
+			{
+				// Roslyn script compilation won't work with dynamic assemblies, thus exlcuding by testing IsDynamic 
+				_currentDomainAssemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => a.IsDynamic == false).ToArray();
+			}
+			Debug.Assert(_currentDomainAssemblies != null && _currentDomainAssemblies.Length > 0);
+			var options = ScriptOptions.Default.AddReferences(_currentDomainAssemblies);
 			IEnumerable<string> namespaces = this.UpdateScript.Namespaces ?? new string[0];
 			if (namespaces.Contains(this.Owner.NodeType.Namespace) == false)
 			{
@@ -122,14 +124,14 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			if (this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.Action)
 			{
-				this.ActionInjection = await CSharpScript.EvaluateAsync<Action<dynamic>>(this.UpdateScript.Script, options);
+				this.ActionInjection = CSharpScript.EvaluateAsync<Action<dynamic>>(this.UpdateScript.Script, options).Result;
 			}
 			if (this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.Func)
 			{
-				this.FuncInjection = await CSharpScript.EvaluateAsync<Func<dynamic>>(this.UpdateScript.Script, options);
+				this.FuncInjection = CSharpScript.EvaluateAsync<Func<dynamic>>(this.UpdateScript.Script, options).Result;
 			}
 
-			return;
+			return this;
 		}
 		private string GetFormatPropertyTypeName()
 		{

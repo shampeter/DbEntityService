@@ -23,9 +23,9 @@ namespace AXAXL.DbEntity.Services
 			this.Driver = dbDriver;
 			this.NodeMap = nodeMap;
 		}
-		public IDbService Bootstrap(params Assembly[] assemblies)
+		public IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes)
 		{
-			this.NodeMap.BuildNodes(assemblies);
+			this.NodeMap.BuildNodes(assemblies, assemblyNamePrefixes);
 			return this;
 		}
 		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)

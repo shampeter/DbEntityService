@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.Extensions;
+using ExpressionToString;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
@@ -181,7 +182,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			foreach (var expression in expressions)
 			{
-				this.Log.LogDebug("{1}{0}{2}", Environment.NewLine, message, expression.ToMarkDown());
+				this.Log.LogDebug("{0} ... {1}",message, expression.ToString("C#"));
 			}
 		}
 	}

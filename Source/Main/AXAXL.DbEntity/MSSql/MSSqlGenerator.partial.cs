@@ -9,7 +9,7 @@ using System.Text;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.Extensions;
-
+using ExpressionToString;
 namespace AXAXL.DbEntity.MSSql
 {
 	public partial class MSSqlGenerator : IMSSqlGenerator
@@ -18,8 +18,7 @@ namespace AXAXL.DbEntity.MSSql
 		[Conditional("DEBUG")]
 		private void LogDataFetchingExpression(string message, Expression expr)
 		{
-			this.log.LogDebug(message);
-			this.log.LogDebug(expr.ToMarkDown());
+			this.log.LogDebug("{0} ... {1}", message, expr.ToString("C#"));
 		}
 
 		[Conditional("DEBUG")]

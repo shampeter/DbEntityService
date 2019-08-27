@@ -37,7 +37,7 @@ namespace Test.Sample
 			//var map = serviceProvider.GetService<INodeMap>();
 			var service = serviceProvider
 								.GetService<IDbService>()
-								.Bootstrap();
+								.Bootstrap(null, new[] { "AXAXL.DbEntity.UnitTestLib" });
 
 			TCededContract contract;
 			

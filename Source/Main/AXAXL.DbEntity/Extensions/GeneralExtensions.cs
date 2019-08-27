@@ -32,6 +32,8 @@ namespace AXAXL.DbEntity.Extensions
 			}
 			return expandable;
 		}
+		/* Replaced this funcation with ToString("C#") extension from ExpressionToString
+		 * 
 		public static string ToMarkDown(this Expression argExpr)
 		{
 			var buffer = new StringBuilder();
@@ -75,5 +77,6 @@ namespace AXAXL.DbEntity.Extensions
 			}
 			return buffer.ToString();
 		}
+		*/
 	}
 }
