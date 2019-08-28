@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Diagnostics;
 using System.Reflection;
 using System.Linq;
@@ -32,6 +33,23 @@ namespace AXAXL.DbEntity.Extensions
 			}
 			return expandable;
 		}
+
+		public static TextWriter PrintLine(this TextWriter writer, string text)
+		{
+			writer.WriteLine(text);
+			return writer;
+		}
+		public static TextWriter PrintLine(this TextWriter writer)
+		{
+			writer.WriteLine();
+			return writer;
+		}
+		public static TextWriter PrintLine(this TextWriter writer, string format, object[] values)
+		{
+			writer.WriteLine(format, values);
+			return writer;
+		}
+
 		/* Replaced this funcation with ToString("C#") extension from ExpressionToString
 		 * 
 		public static string ToMarkDown(this Expression argExpr)

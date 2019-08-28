@@ -1,4 +1,3 @@
-using AXAXL.DbEntity.Interfaces;
 using System;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,8 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
@@ -24,6 +25,8 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes, string filenameToDebugPrintMap = null)
 		{
+			var saveDebugInfo = string.IsNullOrEmpty(filenameToDebugPrintMap) == false;
+
 			if (assemblies == null || assemblies.Length <= 0)
 			{
 				assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -48,7 +51,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				{
 					foreach (var type in assembly.GetTypes())
 					{
-						var node = this.BuildNode(type);
+						var node = this.BuildNode(type, saveDebugInfo);
 						if (node != null)
 						{
 							_nodeMap.Add(type, node);
@@ -56,7 +59,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					}
 				}
 			}
-			this.BuildNodeEdges();
+			this.BuildNodeEdges(saveDebugInfo);
 			this.PrintInMarkDown(filenameToDebugPrintMap);
 		}
 		public bool ContainsNode(Type type)
@@ -72,14 +75,20 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			if (string.IsNullOrEmpty(filenameToDebugPrintMap)) return;
 
-			var NL = Environment.NewLine;
-			File.WriteAllText(
-				filenameToDebugPrintMap, 
-				@"# ALL NODES" + NL + NL + string.Join(NL, this._nodeMap.Values.Select(p => p.ToMarkDown()).ToArray())
-				);
+			using (var writer = new StreamWriter(filenameToDebugPrintMap))
+			{
+				writer
+					.PrintLine(@"# ALL NODES")
+					.PrintLine();
+				foreach(var p in this._nodeMap.Values)
+				{
+					p.PrintMarkDown(writer);
+				}
+			}
+
 			this.log.LogDebug(@"Written full node map to {0}", filenameToDebugPrintMap);
 		}
-		public Node BuildNode(Type type)
+		public Node BuildNode(Type type, bool saveExpressionToStringForDebug = false)
 		{
 			if (type.IsEntity() == false) return null;
 
@@ -108,7 +117,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					.HandleForeignKeyAttribute(property)
 					.HandleInversePropertyAttribute(property)
 					.CompileScript()
-					.CompileDelegateForHandlingCollection()
+					.CompileDelegateForHandlingCollection(saveExpressionToStringForDebug)
 					;
 				
 				if (property.IsPrimaryKey())
@@ -134,7 +143,7 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return newNode;
 		}
-		protected void BuildNodeEdges()
+		protected void BuildNodeEdges(bool saveExpressionToStringForDebug = false)
 		{
 			foreach(var node in this._nodeMap.Values)
 			{
@@ -170,12 +179,12 @@ namespace AXAXL.DbEntity.EntityGraph
 			{
 				eachEdge
 					.SortKeysByOrder()
-					.CompileChildAddingAction()
-					.CompileChildRemoveAction()
-					.CompileParentSettingAction()
-					.CompileParentPrimaryKeyReaders()
-					.CompileChildForeignKeyReaders()
-					.CompileChildForeignKeyWriters()
+					.CompileChildAddingAction(saveExpressionToStringForDebug)
+					.CompileChildRemoveAction(saveExpressionToStringForDebug)
+					.CompileParentSettingAction(saveExpressionToStringForDebug)
+					.CompileParentPrimaryKeyReaders(saveExpressionToStringForDebug)
+					.CompileChildForeignKeyReaders(saveExpressionToStringForDebug)
+					.CompileChildForeignKeyWriters(saveExpressionToStringForDebug)
 					;
 			}
 		}

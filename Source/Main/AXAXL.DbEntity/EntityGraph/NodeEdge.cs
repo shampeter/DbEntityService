@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq.Expressions;
 using System.Linq;
 using System.Diagnostics;
@@ -28,6 +29,12 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Action<object, object>[] ChildForeignKeyWriter { get; set; }
 		public Func<object, dynamic>[] ParentPrimaryKeyReaders { get; set; }
 		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
+		public string ChildAddingActionInString { get; set; }
+		public string ChildRemovingActionInString { get; set; }
+		public string ParentSettingAction { get; set; }
+		public string ChildForeignKeyWriter { get; set; }
+		public string ParentPrimaryKeyReaders { get; set; }
+		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
 
 		public NodeEdge Merge(NodeEdge another)
 		{
@@ -54,7 +61,7 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			return this;
 		}
-		public NodeEdge CompileChildAddingAction()
+		public NodeEdge CompileChildAddingAction(bool saveExpressionToStringForDebug = false)
 		{
 			Expression<Action<object, IEnumerable<object>>> lambda = null;
 
@@ -163,9 +170,10 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
 		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
 		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
-		public string ToMarkDown()
+		public void PrintMarkDown(TextWriter writer)
 		{
-			return string.Format(
+			writer.WriteLine
+			(
 				C_NODE_EDGE_TEMPLATE,
 				this.ParentNode != null ? this.ParentNode.NodeType.Name : string.Empty,
 				string.Join(

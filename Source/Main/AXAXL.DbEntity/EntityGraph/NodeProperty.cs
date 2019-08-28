@@ -1,13 +1,14 @@
 ﻿using System;
+using System.IO;
 using System.Reflection;
 using System.Linq;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.Interfaces;
+using ExpressionToString;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
@@ -56,7 +57,9 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Action<dynamic> ActionInjection { get; set; }
 		public Func<dynamic> FuncInjection { get; set; }
 		public Func<object, IEnumerator<ITrackable>> GetEnumeratorFunc { get; set; }
+		private string GetEnumeratorFuncInString { get; set; }
 		public Action<object, object> GetRemoveItemMethodAction { get; set; }
+		private string GetRemoveItemMethodActionInString { get; set; }
 		public bool IsEdge { get; set; }
 		public bool IsNullable { get; set; }
 		public string ConstantValue { get; set; }
@@ -78,12 +81,16 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			return elementType;
 		}
-		public NodeProperty CompileDelegateForHandlingCollection()
+		public NodeProperty CompileDelegateForHandlingCollection(bool saveExpressionToStringForDebug = false)
 		{
 			if (this.PropertyCategory == PropertyCategories.Collection)
 			{
-				this.GetEnumeratorFunc = this.CreateGetEnumeratorFunc().Compile();
-				this.GetRemoveItemMethodAction = this.CreateRemoveItemAction().Compile();
+				var func = this.CreateGetEnumeratorFunc();
+				this.GetEnumeratorFuncInString = saveExpressionToStringForDebug ? func.ToString("C#") : null;
+				this.GetEnumeratorFunc = func.Compile();
+				var act = this.CreateRemoveItemAction();
+				this.GetRemoveItemMethodActionInString = saveExpressionToStringForDebug ? act.ToString("C#") : null;
+				this.GetRemoveItemMethodAction = act.Compile();
 			}
 			return this;
 		}
@@ -122,9 +129,9 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
 		internal static readonly string[] C_NODE_PROPERTY_HEADING = 
 			new string[] { "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script", "Constant" };
-		public string ToMarkDown()
+		public void PrintMarkDown(TextWriter writer)
 		{
-			return String.Format(
+			writer.WriteLine(
 				C_NODE_PROPERTY_TEMPLATE,
 				this.PropertyName,
 				this.GetFormattedPropertyTypeName(),

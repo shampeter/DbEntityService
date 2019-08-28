@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 using System.Text;
 using System.Linq;
 using System.Diagnostics;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
@@ -245,41 +247,49 @@ namespace AXAXL.DbEntity.EntityGraph
 												string.Empty;
 			return dbColumnName;
 		}
-		public string ToMarkDown()
+		public void PrintMarkDown(TextWriter writer)
 		{
-			var buffer = new StringBuilder();
-			var NL = Environment.NewLine;
-			buffer
-				.Append($"## CLASS __{this.NodeType.Name}__ as TABLE __{this.DbTableName}__").Append(NL)
-				.Append(NL)
-				.Append("__Primary Keys__").Append(NL)
-				.Append(NL)
-				.Append(String.Format(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)).Append(NL)
-				.Append(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
-				.Append(this.PrimaryKeys.ToMarkDown()).Append(NL)
-				.Append(NL)
-				.Append("__Data Columns__").Append(NL)
-				.Append(NL)
-				.Append(String.Format(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)).Append(NL)
-				.Append(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
-				.Append(this.DataColumns.ToMarkDown()).Append(NL)
-				.Append(NL)
-				.Append("__Edge To Child__").Append(NL)
-				.Append(NL)
-				.Append(string.Format(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)).Append(NL)
-				.Append(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
-				.Append(this.EdgeToChildren.ToMarkDown()).Append(NL)
-				.Append(NL)
-				.Append("__Edge To Parent__").Append(NL)
-				.Append(NL)
-				.Append(string.Format(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)).Append(NL)
-				.Append(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
-				.Append(this.EdgeToParent.ToMarkDown()).Append(NL)
-				.Append(NL)
-				.Append(@"---").Append(NL)
-				.Append(NL)
-			;
-			return buffer.ToString();
+			writer
+				.PrintLine($"## CLASS __{this.NodeType.Name}__ as TABLE __{this.DbTableName}__")
+				.PrintLine()
+				.PrintLine("__Primary Keys__")
+				.PrintLine()
+				.PrintLine(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)
+				.PrintLine(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER);
+
+			this.PrimaryKeys.PrintMarkDown(writer);
+
+			writer
+				.PrintLine()
+				.PrintLine("__Data Columns__")
+				.PrintLine()
+				.PrintLine(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)
+				.PrintLine(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER);
+
+			this.DataColumns.PrintMarkDown(writer);
+
+			writer
+				.PrintLine()
+				.PrintLine("__Edge To Child__")
+				.PrintLine()
+				.PrintLine(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)
+				.PrintLine(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER);
+
+			this.EdgeToChildren.PrintMarkDown(writer);
+
+			writer
+				.PrintLine()
+				.PrintLine("__Edge To Parent__")
+				.PrintLine()
+				.PrintLine(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)
+				.PrintLine(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER);
+
+			this.EdgeToParent.PrintMarkDown(writer);
+
+			writer
+				.PrintLine()
+				.PrintLine(@"---")
+				.PrintLine();
 		}
 		public string[] AllChildEdgeNames()
 		{

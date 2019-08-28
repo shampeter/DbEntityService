@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using System.Reflection;
@@ -200,13 +201,19 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		internal static bool IsPrimaryKey(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<KeyAttribute>() != null;
 		internal static bool IsConcurrencyCheck(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<ConcurrencyCheckAttribute>() != null;
-		internal static String ToMarkDown(this IDictionary<string, NodeProperty> dictionary)
+		internal static void PrintMarkDown(this IDictionary<string, NodeProperty> dictionary, TextWriter writer)
 		{
-			return string.Join(Environment.NewLine, dictionary.Values.Select(p => p.ToMarkDown()));
+			foreach (var p in dictionary.Values)
+			{
+				p.PrintMarkDown(writer);
+			}
 		}
-		internal static String ToMarkDown(this IDictionary<string, NodeEdge> dictionary)
+		internal static void PrintMarkDown(this IDictionary<string, NodeEdge> dictionary, TextWriter writer)
 		{
-			return string.Join(Environment.NewLine, dictionary.Values.Select(p => p.ToMarkDown()));
+			foreach (var p in dictionary.Values)
+			{
+				p.PrintMarkDown(writer);
+			}
 		}
 
 		// =>
