@@ -1,8 +1,8 @@
 # Example in using DbEntityService for querying data
 
->
-> The service is still be tested and developed.  Thus the exact API may change but the features presented in this tutorial would stay.
->
+**The service is still be tested and developed.  Thus the exact API may change but the features presented in this tutorial would stay.**
+
+*Assumption.  For a child set reference such as IList<SomeChildObject> on a parent entity object, the service __always assume__ that the reference __is not null__.  That means it is the application responsibility to make sure that a __child list is always instantiated__ in the parent entity constructor.*
 
 ## Retrieving Entity Object from Database
 
