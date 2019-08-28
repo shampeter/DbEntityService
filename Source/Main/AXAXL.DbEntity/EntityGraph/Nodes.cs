@@ -252,41 +252,13 @@ namespace AXAXL.DbEntity.EntityGraph
 			writer
 				.PrintLine($"## CLASS __{this.NodeType.Name}__ as TABLE __{this.DbTableName}__")
 				.PrintLine()
-				.PrintLine("__Primary Keys__")
+				.PrintLine("__Properties__")
 				.PrintLine()
-				.PrintLine(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)
-				.PrintLine(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER);
-
-			this.PrimaryKeys.PrintMarkDown(writer);
-
-			writer
+				.PrintNodePropertiesAsMarkDown(NodeProperty.C_NODE_PROPERTY_HEADING, this.PrimaryKeys, this.DataColumns, this.ConcurrencyControl)
 				.PrintLine()
-				.PrintLine("__Data Columns__")
+				.PrintLine("__Edges__")
 				.PrintLine()
-				.PrintLine(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)
-				.PrintLine(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER);
-
-			this.DataColumns.PrintMarkDown(writer);
-
-			writer
-				.PrintLine()
-				.PrintLine("__Edge To Child__")
-				.PrintLine()
-				.PrintLine(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)
-				.PrintLine(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER);
-
-			this.EdgeToChildren.PrintMarkDown(writer);
-
-			writer
-				.PrintLine()
-				.PrintLine("__Edge To Parent__")
-				.PrintLine()
-				.PrintLine(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)
-				.PrintLine(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER);
-
-			this.EdgeToParent.PrintMarkDown(writer);
-
-			writer
+				.PrintNodeEdgeAsMarkDown(NodeEdge.C_NODE_EDGE_HEADING, this.EdgeToChildren, this.EdgeToParent)
 				.PrintLine()
 				.PrintLine(@"---")
 				.PrintLine();

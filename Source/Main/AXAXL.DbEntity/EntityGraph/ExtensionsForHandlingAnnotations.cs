@@ -10,7 +10,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
 using AXAXL.DbEntity.Interfaces;
-
+using AXAXL.DbEntity.Extensions;
 namespace AXAXL.DbEntity.EntityGraph
 {
 	internal static class ExtensionsForHandlingAnnotations
@@ -201,19 +201,39 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		internal static bool IsPrimaryKey(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<KeyAttribute>() != null;
 		internal static bool IsConcurrencyCheck(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<ConcurrencyCheckAttribute>() != null;
-		internal static void PrintMarkDown(this IDictionary<string, NodeProperty> dictionary, TextWriter writer)
+
+		internal static TextWriter PrintNodePropertiesAsMarkDown(
+			this TextWriter writer, 
+			string[] headings, 
+			IDictionary<string, NodeProperty> primaryKeys,
+			IDictionary<string, NodeProperty> dataColumns,
+			NodeProperty versionColumn
+			)
 		{
-			foreach (var p in dictionary.Values)
+			var buffer = new List<string[]>();
+			buffer.AddRange(primaryKeys?.Values.Select(p => new[] { "P.Key" }.Concat(p.NodePropertyAttributeValues).ToArray()));
+			buffer.AddRange(dataColumns?.Values.Select(p => new[] { "Data" }.Concat(p.NodePropertyAttributeValues).ToArray()));
+			if (versionColumn != null)
 			{
-				p.PrintMarkDown(writer);
+				buffer.Add(new[] { "Version" }.Concat(versionColumn.NodePropertyAttributeValues).ToArray());
 			}
+
+			writer.PrintMarkDownTable(headings, buffer);
+			return writer;
 		}
-		internal static void PrintMarkDown(this IDictionary<string, NodeEdge> dictionary, TextWriter writer)
+		internal static TextWriter PrintNodeEdgeAsMarkDown(this TextWriter writer, string[] headings, IDictionary<string, NodeEdge> edgesToChild, IDictionary<string, NodeEdge> edgesToParent)
 		{
-			foreach (var p in dictionary.Values)
+			var buffer = new List<string[]>();
+			if (edgesToChild != null && edgesToChild.Count > 0)
 			{
-				p.PrintMarkDown(writer);
+				buffer.AddRange(edgesToChild.Values.Select(p => new[] { "To Child" }.Concat(p.NodeEdgeAttributeValues).ToArray()));
 			}
+			if (edgesToParent != null && edgesToParent.Count > 0)
+			{
+				buffer.AddRange(edgesToParent.Values.Select(p => new[] { "To Parent" }.Concat(p.NodeEdgeAttributeValues).ToArray()));
+			}
+			writer.PrintMarkDownTable(headings, buffer);
+			return writer;
 		}
 
 		// =>

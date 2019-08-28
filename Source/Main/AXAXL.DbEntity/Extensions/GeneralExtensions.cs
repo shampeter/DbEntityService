@@ -44,12 +44,62 @@ namespace AXAXL.DbEntity.Extensions
 			writer.WriteLine();
 			return writer;
 		}
-		public static TextWriter PrintLine(this TextWriter writer, string format, object[] values)
+		public static TextWriter PrintLine(this TextWriter writer, string format, params object[] values)
 		{
 			writer.WriteLine(format, values);
 			return writer;
 		}
-
+		public static TextWriter PrintMarkDownTable(this TextWriter writer, string[] headings, IEnumerable<string[]> rows)
+		{
+			if (rows != null && rows.Count() > 0)
+			{
+				foreach (var heading in headings)
+				{
+					writer.Write("| {0} ", heading);
+				}
+				writer.WriteLine(" |");
+				foreach (var heading in headings)
+				{
+					writer.Write("| {0} ", "---");
+				}
+				writer.WriteLine(" |");
+				foreach (var eachRow in rows)
+				{
+					foreach (var eachCell in eachRow)
+					{
+						writer.Write("| {0} ", eachCell);
+					}
+					writer.WriteLine(" |");
+				}
+			}
+			return writer;
+		}
+		public static TextWriter PrintMarkDownCSharp(this TextWriter writer, string heading, string csharpLikeCode)
+		{
+			if (!string.IsNullOrEmpty(csharpLikeCode))
+			{
+				writer
+					.PrintLine("__{0}__", heading)
+					.PrintLine();
+				writer
+					.PrintLine(@"```c#")
+					.PrintLine(csharpLikeCode)
+					.PrintLine(@"```")
+					.PrintLine();
+			}
+			return writer;
+		}
+		public static TextWriter PrintMarkDownCSharp(this TextWriter writer, string heading, string[] csharpLikeCodes)
+		{
+			if (csharpLikeCodes != null && csharpLikeCodes.Length > 0)
+			{
+				for(int i = 0; i < csharpLikeCodes.Length; i++)
+				{
+					writer.PrintMarkDownCSharp($"{heading} [{i}]", csharpLikeCodes[i]);
+				}
+			}
+			return writer;
+		}
 		/* Replaced this funcation with ToString("C#") extension from ExpressionToString
 		 * 
 		public static string ToMarkDown(this Expression argExpr)

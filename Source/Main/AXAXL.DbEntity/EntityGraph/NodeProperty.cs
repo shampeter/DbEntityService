@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.Extensions;
 using ExpressionToString;
 
 namespace AXAXL.DbEntity.EntityGraph
@@ -125,25 +126,21 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return this;
 		}
-		internal const string C_NODE_PROPERTY_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |";
-		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
 		internal static readonly string[] C_NODE_PROPERTY_HEADING = 
-			new string[] { "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script", "Constant" };
-		public void PrintMarkDown(TextWriter writer)
-		{
-			writer.WriteLine(
-				C_NODE_PROPERTY_TEMPLATE,
-				this.PropertyName,
-				this.GetFormattedPropertyTypeName(),
-				this.PropertyCategory.ToString(),
-				this.DbColumnName,
-				this.DbColumnType,
-				this.UpdateOption,
-				string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
-				this.UpdateScript.Script,
-				this.ConstantValue
-				);
-		}
+			new string[] { "Group", "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script", "Constant" };
+		internal string[] NodePropertyAttributeValues =>
+				new string[]
+				{
+					this.PropertyName,
+					this.GetFormattedPropertyTypeName(),
+					this.PropertyCategory.ToString(),
+					this.DbColumnName,
+					this.DbColumnType,
+					this.UpdateOption.ToString(),
+					string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
+					this.UpdateScript.Script,
+					this.ConstantValue
+				};
 		private string GetFormattedPropertyTypeName()
 		{
 			string formattedTypeName = this.PropertyType.Name;

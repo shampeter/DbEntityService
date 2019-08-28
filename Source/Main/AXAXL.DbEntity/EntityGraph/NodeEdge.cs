@@ -31,10 +31,10 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
 		public string ChildAddingActionInString { get; set; }
 		public string ChildRemovingActionInString { get; set; }
-		public string ParentSettingAction { get; set; }
-		public string ChildForeignKeyWriter { get; set; }
-		public string ParentPrimaryKeyReaders { get; set; }
-		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
+		public string ParentSettingActionInString { get; set; }
+		public string[] ChildForeignKeyWriterInString { get; set; }
+		public string[] ParentPrimaryKeyReadersInString { get; set; }
+		public string[] ChildForeignKeyReadersInString { get; set; }
 
 		public NodeEdge Merge(NodeEdge another)
 		{
@@ -74,13 +74,15 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.Log.LogDebug("Creating empty child adding action because there is no child set reference.");
 				lambda = this.CreateEmptyCollectionFillingAction();
 			}
-			this.LogExpression("Child Adding Action", lambda);
-
+			if (saveExpressionToStringForDebug)
+			{
+				this.ChildAddingActionInString = lambda.ToString("C#");
+			}
 			this.ChildAddingAction = lambda.Compile();
 
 			return this;
 		}
-		public NodeEdge CompileChildRemoveAction()
+		public NodeEdge CompileChildRemoveAction(bool saveExpressionToStringForDebug = false)
 		{
 			Expression<Action<object, object>> lambda = null;
 
@@ -93,13 +95,15 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.Log.LogDebug("Creating empty child adding action because there is no child set reference.");
 				lambda = this.CreateEmptyObjectAssignmentAction();
 			}
-			this.LogExpression("Child Remove Action", lambda);
-
+			if (saveExpressionToStringForDebug)
+			{
+				this.ChildRemovingActionInString = lambda.ToString("C#");
+			}
 			this.ChildRemovingAction = lambda.Compile();
 
 			return this;
 		}
-		public NodeEdge CompileParentSettingAction()
+		public NodeEdge CompileParentSettingAction(bool saveExpressionToStringForDebug = false)
 		{
 			Expression<Action<object, object>> lambda = null;
 
@@ -112,13 +116,16 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.Log.LogDebug("Creating empty parent setting action because there is no parent reference.");
 				lambda = this.CreateEmptyObjectAssignmentAction();
 			}
-			this.LogExpression("Parent Setting Action", lambda);
+			if (saveExpressionToStringForDebug)
+			{
+				this.ParentSettingActionInString = lambda.ToString("C#");
+			}
 
 			this.ParentSettingAction = lambda.Compile();
 
 			return this;
 		}
-		public NodeEdge CompileChildForeignKeyWriters()
+		public NodeEdge CompileChildForeignKeyWriters(bool saveExpressionToStringForDebug = false)
 		{
 			Expression<Action<object, object>>[] lambda = null;
 			if (this.ChildNodeForeignKeys != null && this.ChildNodeForeignKeys.Length > 0)
@@ -130,34 +137,39 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.Log.LogDebug("Creating empty parent setting action because there is no parent reference.");
 				lambda = this.ChildNodeForeignKeys.Select(p => this.CreateEmptyObjectAssignmentAction()).ToArray();
 			}
-			this.LogExpression("Foreign Key Setting Action", lambda);
+			if (saveExpressionToStringForDebug)
+			{
+				this.ChildForeignKeyWriterInString = lambda.Select(l => l.ToString("C#")).ToArray();
+			}
 
 			this.ChildForeignKeyWriter = lambda.Select(l => l.Compile()).ToArray();
 
 			return this;
 		}
-		public NodeEdge CompileParentPrimaryKeyReaders()
+		public NodeEdge CompileParentPrimaryKeyReaders(bool saveExpressionToStringForDebug = false)
 		{
-			this.ParentPrimaryKeyReaders =
-					this.ParentNodePrimaryKeys.Select(
-						p =>
-						{
-							var lambda = this.ParentNode.CreatePropertyValueReaderFunc(p);
-							this.LogExpression("Parent Primary Key Reader", lambda);
-							return lambda.Compile();
-						}).ToArray();
+			var lambda = this.ParentNodePrimaryKeys
+								.Select(p => this.ParentNode.CreatePropertyValueReaderFunc(p))
+								.ToArray();
+			if (saveExpressionToStringForDebug)
+			{
+				this.ParentPrimaryKeyReadersInString = lambda.Select(l => l.ToString("C#")).ToArray();
+			}
+			this.ParentPrimaryKeyReaders = lambda.Select(l => l.Compile()).ToArray();
+
 			return this;
 		}
-		public NodeEdge CompileChildForeignKeyReaders()
+		public NodeEdge CompileChildForeignKeyReaders(bool saveExpressionToStringForDebug = false)
 		{
-			this.ChildForeignKeyReaders =
-				this.ChildNodeForeignKeys.Select(
-					p =>
-					{
-						var lambda = this.ChildNode.CreatePropertyValueReaderFunc(p);
-						this.LogExpression("Child Foreign Key Reader", lambda);
-						return lambda.Compile();
-					}).ToArray();
+			var lambda = this.ChildNodeForeignKeys
+								.Select(p => this.ChildNode.CreatePropertyValueReaderFunc(p))
+								.ToArray();
+			if (saveExpressionToStringForDebug)
+			{
+				this.ChildForeignKeyReadersInString = lambda.Select(l => l.ToString("C#")).ToArray();
+			}
+			this.ChildForeignKeyReaders = lambda.Select(l => l.Compile()).ToArray();
+
 			return this;
 		}
 		private void CopyIfNull<P>(NodeEdge another, Func<NodeEdge, P> property, Action<NodeEdge, P> copyOver)
@@ -167,14 +179,10 @@ namespace AXAXL.DbEntity.EntityGraph
 				copyOver(this, property(another));
 			}
 		}
-		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
-		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
-		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
-		public void PrintMarkDown(TextWriter writer)
-		{
-			writer.WriteLine
-			(
-				C_NODE_EDGE_TEMPLATE,
+		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] {"Direction", "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
+		internal string[] NodeEdgeAttributeValues =>
+			new string[]
+			{
 				this.ParentNode != null ? this.ParentNode.NodeType.Name : string.Empty,
 				string.Join(
 					", ",
@@ -187,20 +195,6 @@ namespace AXAXL.DbEntity.EntityGraph
 					this.ChildNodeForeignKeys != null ? this.ChildNodeForeignKeys.Select(p => p.PropertyName).ToArray() : new string[0]
 				),
 				this.ParentReferenceOnChildNode != null ? this.ParentReferenceOnChildNode.PropertyName : string.Empty
-			);
-		}
-		[Conditional("DEBUG")]
-		private void LogExpression(string message, params Expression[] expressions)
-		{
-			foreach (var expression in expressions)
-			{
-				this.Log.LogDebug(
-					"{0}: {1} ... {2}", 
-					$"Edge.{this.ParentNode.Name}.{this.ChildNode.Name}", 
-					message, 
-					expression.ToString("C#")
-					);
-			}
-		}
+			};
 	}
 }
