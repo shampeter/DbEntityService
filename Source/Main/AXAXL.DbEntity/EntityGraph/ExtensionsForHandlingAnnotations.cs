@@ -201,15 +201,12 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		internal static bool IsPrimaryKey(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<KeyAttribute>() != null;
 		internal static bool IsConcurrencyCheck(this PropertyInfo argProperty) => argProperty.GetCustomAttribute<ConcurrencyCheckAttribute>() != null;
-
-		internal static TextWriter PrintNodePropertiesAsMarkDown(
-			this TextWriter writer, 
-			string[] headings, 
-			IDictionary<string, NodeProperty> primaryKeys,
-			IDictionary<string, NodeProperty> dataColumns,
-			NodeProperty versionColumn
-			)
+		internal static TextWriter PrintNodePropertiesAsMarkDown(this TextWriter writer, string[] headings, Node node)
 		{
+			var primaryKeys = node.PrimaryKeys;
+			var dataColumns = node.DataColumns;
+			var versionColumn = node.ConcurrencyControl;
+
 			var buffer = new List<string[]>();
 			buffer.AddRange(primaryKeys?.Values.Select(p => new[] { "P.Key" }.Concat(p.NodePropertyAttributeValues).ToArray()));
 			buffer.AddRange(dataColumns?.Values.Select(p => new[] { "Data" }.Concat(p.NodePropertyAttributeValues).ToArray()));
@@ -219,6 +216,21 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 
 			writer.PrintMarkDownTable(headings, buffer);
+
+			var exprToPrint = node.DataColumns.Values
+								.Where
+								(
+									d => string.IsNullOrEmpty(d.GetEnumeratorFuncInString) == false ||
+										string.IsNullOrEmpty(d.GetRemoveItemMethodActionInString) == false
+								)
+								.ToArray();
+
+			foreach(var eachProp in exprToPrint)
+			{
+				writer.PrintMarkDownCSharp($"{eachProp.PropertyName}: Getting Enumerator", eachProp.GetEnumeratorFuncInString);
+				writer.PrintMarkDownCSharp($"{eachProp.PropertyName}: Remove Method", eachProp.GetRemoveItemMethodActionInString);
+			}
+
 			return writer;
 		}
 		internal static TextWriter PrintNodeEdgeAsMarkDown(this TextWriter writer, string[] headings, IDictionary<string, NodeEdge> edgesToChild, IDictionary<string, NodeEdge> edgesToParent)

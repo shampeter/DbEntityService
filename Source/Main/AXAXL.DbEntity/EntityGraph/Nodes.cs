@@ -254,7 +254,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				.PrintLine()
 				.PrintLine("__Properties__")
 				.PrintLine()
-				.PrintNodePropertiesAsMarkDown(NodeProperty.C_NODE_PROPERTY_HEADING, this.PrimaryKeys, this.DataColumns, this.ConcurrencyControl)
+				.PrintNodePropertiesAsMarkDown(NodeProperty.C_NODE_PROPERTY_HEADING, this)
 				.PrintLine()
 				.PrintLine("__Edges__")
 				.PrintLine()

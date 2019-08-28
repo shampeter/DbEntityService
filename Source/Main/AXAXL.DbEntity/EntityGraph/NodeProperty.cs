@@ -58,9 +58,9 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Action<dynamic> ActionInjection { get; set; }
 		public Func<dynamic> FuncInjection { get; set; }
 		public Func<object, IEnumerator<ITrackable>> GetEnumeratorFunc { get; set; }
-		private string GetEnumeratorFuncInString { get; set; }
+		internal string GetEnumeratorFuncInString { get; set; }
 		public Action<object, object> GetRemoveItemMethodAction { get; set; }
-		private string GetRemoveItemMethodActionInString { get; set; }
+		internal string GetRemoveItemMethodActionInString { get; set; }
 		public bool IsEdge { get; set; }
 		public bool IsNullable { get; set; }
 		public string ConstantValue { get; set; }
