@@ -19,15 +19,16 @@ namespace AXAXL.DbEntity.EntityGraph
 		public Node ParentNode { get; set; }
 		public NodeProperty[] ParentNodePrimaryKeys { get; set; }
 		public NodeProperty ChildReferenceOnParentNode { get; set; }
+		public Node ChildNode { get; set; }
+		public NodeProperty[] ChildNodeForeignKeys { get; set; }
+		public NodeProperty ParentReferenceOnChildNode { get; set; }
 		public Action<object, IEnumerable<object>> ChildAddingAction { get; set; }
 		public Action<object, object> ChildRemovingAction { get; set; }
 		public Action<object, object> ParentSettingAction { get; set; }
 		public Action<object, object>[] ChildForeignKeyWriter { get; set; }
 		public Func<object, dynamic>[] ParentPrimaryKeyReaders { get; set; }
 		public Func<object, dynamic>[] ChildForeignKeyReaders { get; set; }
-		public Node ChildNode { get; set; }
-		public NodeProperty[] ChildNodeForeignKeys { get; set; }
-		public NodeProperty ParentReferenceOnChildNode { get; set; }
+
 		public NodeEdge Merge(NodeEdge another)
 		{
 			this.CopyIfNull(another, (p) => p.ParentNode, (n, p) => n.ParentNode = p);
@@ -159,10 +160,13 @@ namespace AXAXL.DbEntity.EntityGraph
 				copyOver(this, property(another));
 			}
 		}
+		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
+		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
+		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
 		public string ToMarkDown()
 		{
 			return string.Format(
-				Node.C_NODE_EDGE_TEMPLATE,
+				C_NODE_EDGE_TEMPLATE,
 				this.ParentNode != null ? this.ParentNode.NodeType.Name : string.Empty,
 				string.Join(
 					", ",
@@ -182,7 +186,12 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			foreach (var expression in expressions)
 			{
-				this.Log.LogDebug("{0} ... {1}",message, expression.ToString("C#"));
+				this.Log.LogDebug(
+					"{0}: {1} ... {2}", 
+					$"Edge.{this.ParentNode.Name}.{this.ChildNode.Name}", 
+					message, 
+					expression.ToString("C#")
+					);
 			}
 		}
 	}

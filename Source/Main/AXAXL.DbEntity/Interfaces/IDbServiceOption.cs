@@ -44,7 +44,9 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="isolation">Isolation level. see <see cref="IsolationLevel"/></param>
 		/// <returns>Return itself to enable method chaining.</returns>
 		IDbServiceOption SetRootDefaultIsolation(IsolationLevel isolation);
+		IDbServiceOption PrintNodeMapToFile(string filename);
 		TransactionScopeOption RootDefaultTransactionScope { get; }
 		IsolationLevel RootDefaultIsolation { get; }
+		string NodeMapPrintFilename { get; }
 	}
 }

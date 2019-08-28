@@ -20,8 +20,9 @@ namespace AXAXL.DbEntity.Interfaces
 		/// If <paramref name="assemblyNamePrefixes"/> is null or empty, service will search through all assemblies specified.
 		/// </summary>
 		/// <param name="assemblies">Optional.  List of assemblies to search for meta data on entity class.</param>
-		/// <oaram name="assemblyNamePrefixes">Name prefixes.</oaram>
-		void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes);
+		/// <param name="assemblyNamePrefixes">Name prefixes.</param>
+		/// <param nane="filenameToDebugPrintMap">when set, print the full map built to a markdown file of this given location.</param>
+		void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes, string filenameToDebugPrintMap = null);
 		/// <summary>
 		/// True if a <see cref="Node"/> is found for the parameter <paramref name="type"/>.
 		/// </summary>

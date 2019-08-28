@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.UnitTestLib.TestData;
@@ -11,6 +12,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Utilities
 	{
 		public static IDbService TestClassSetup()
 		{
+			var nodeMapPrintFile = Path.ChangeExtension(Path.GetTempFileName(), "md");
 			var report = TestDataPreparation.InstallUnitTestDbIntoSqlLocalDb();
 			Console.WriteLine(report);
 			var serviceProvider = new ServiceCollection()
@@ -23,6 +25,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Utilities
 					option => option
 								.AddOrUpdateConnection("SQL_Connection", @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnitTestDb; Integrated Security=true")
 								.SetAsDefaultConnection("SQL_Connection")
+								.PrintNodeMapToFile(nodeMapPrintFile)
 				)
 				.BuildServiceProvider()
 				;

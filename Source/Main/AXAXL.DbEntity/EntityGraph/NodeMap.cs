@@ -1,5 +1,6 @@
 using AXAXL.DbEntity.Interfaces;
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Diagnostics;
@@ -21,7 +22,7 @@ namespace AXAXL.DbEntity.EntityGraph
 			Debug.Assert(this.log != null);
 			Debug.Assert(this.driver != null);
 		}
-		public void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes)
+		public void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes, string filenameToDebugPrintMap = null)
 		{
 			if (assemblies == null || assemblies.Length <= 0)
 			{
@@ -56,7 +57,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				}
 			}
 			this.BuildNodeEdges();
-			this.PrintInMarkDown();
+			this.PrintInMarkDown(filenameToDebugPrintMap);
 		}
 		public bool ContainsNode(Type type)
 		{
@@ -67,10 +68,16 @@ namespace AXAXL.DbEntity.EntityGraph
 			return this.ContainsNode(type) ? this._nodeMap[type] : null;
 		}
 		[Conditional("DEBUG")]
-		public void PrintInMarkDown()
+		public void PrintInMarkDown(string filenameToDebugPrintMap)
 		{
+			if (string.IsNullOrEmpty(filenameToDebugPrintMap)) return;
+
 			var NL = Environment.NewLine;
-			this.log.LogDebug(@"# ALL NODES" + NL + NL + string.Join(NL, this._nodeMap.Values.Select(p => p.ToMarkDown()).ToArray()));
+			File.WriteAllText(
+				filenameToDebugPrintMap, 
+				@"# ALL NODES" + NL + NL + string.Join(NL, this._nodeMap.Values.Select(p => p.ToMarkDown()).ToArray())
+				);
+			this.log.LogDebug(@"Written full node map to {0}", filenameToDebugPrintMap);
 		}
 		public Node BuildNode(Type type)
 		{

@@ -9,12 +9,6 @@ namespace AXAXL.DbEntity.EntityGraph
 {
 	public class Node
 	{
-		internal const string C_NODE_PROPERTY_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |";
-		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
-		internal static readonly string[] C_NODE_PROPERTY_HEADING = new string[] { "Owner", "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script" };
-		internal const string C_NODE_EDGE_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} |";
-		internal const string C_NODE_EDGE_HEADER_DIVIDER = @"|---|---|---|---|---|---|";
-		internal static readonly string[] C_NODE_EDGE_HEADING = new string[] { "Parent", "P. Key", "Child Ref", "Child", "F. Key", "Parent Ref" };
 		private ILogger Log { get; set; }
 		private string _name;
 		private string _fullName;
@@ -260,26 +254,26 @@ namespace AXAXL.DbEntity.EntityGraph
 				.Append(NL)
 				.Append("__Primary Keys__").Append(NL)
 				.Append(NL)
-				.Append(String.Format(C_NODE_PROPERTY_TEMPLATE, C_NODE_PROPERTY_HEADING)).Append(NL)
-				.Append(C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
+				.Append(String.Format(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)).Append(NL)
+				.Append(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
 				.Append(this.PrimaryKeys.ToMarkDown()).Append(NL)
 				.Append(NL)
 				.Append("__Data Columns__").Append(NL)
 				.Append(NL)
-				.Append(String.Format(C_NODE_PROPERTY_TEMPLATE, C_NODE_PROPERTY_HEADING)).Append(NL)
-				.Append(C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
+				.Append(String.Format(NodeProperty.C_NODE_PROPERTY_TEMPLATE, NodeProperty.C_NODE_PROPERTY_HEADING)).Append(NL)
+				.Append(NodeProperty.C_NODE_PROPERTY_HEADER_DIVIDER).Append(NL)
 				.Append(this.DataColumns.ToMarkDown()).Append(NL)
 				.Append(NL)
 				.Append("__Edge To Child__").Append(NL)
 				.Append(NL)
-				.Append(string.Format(C_NODE_EDGE_TEMPLATE, C_NODE_EDGE_HEADING)).Append(NL)
-				.Append(C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
+				.Append(string.Format(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)).Append(NL)
+				.Append(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
 				.Append(this.EdgeToChildren.ToMarkDown()).Append(NL)
 				.Append(NL)
 				.Append("__Edge To Parent__").Append(NL)
 				.Append(NL)
-				.Append(string.Format(C_NODE_EDGE_TEMPLATE, C_NODE_EDGE_HEADING)).Append(NL)
-				.Append(C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
+				.Append(string.Format(NodeEdge.C_NODE_EDGE_TEMPLATE, NodeEdge.C_NODE_EDGE_HEADING)).Append(NL)
+				.Append(NodeEdge.C_NODE_EDGE_HEADER_DIVIDER).Append(NL)
 				.Append(this.EdgeToParent.ToMarkDown()).Append(NL)
 				.Append(NL)
 				.Append(@"---").Append(NL)

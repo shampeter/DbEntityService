@@ -78,21 +78,6 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			return elementType;
 		}
-		public string ToMarkDown()
-		{
-			return String.Format(
-				Node.C_NODE_PROPERTY_TEMPLATE,
-				this.Owner.NodeType.Name,
-				this.PropertyName,
-				this.GetFormatPropertyTypeName(),
-				this.PropertyCategory.ToString(),
-				this.DbColumnName,
-				this.DbColumnType,
-				this.UpdateOption,
-				string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
-				this.UpdateScript.Script
-				);
-		}
 		public NodeProperty CompileDelegateForHandlingCollection()
 		{
 			if (this.PropertyCategory == PropertyCategories.Collection)
@@ -133,7 +118,26 @@ namespace AXAXL.DbEntity.EntityGraph
 
 			return this;
 		}
-		private string GetFormatPropertyTypeName()
+		internal const string C_NODE_PROPERTY_TEMPLATE = @"| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |";
+		internal const string C_NODE_PROPERTY_HEADER_DIVIDER = @"|---|---|---|---|---|---|---|---|---|";
+		internal static readonly string[] C_NODE_PROPERTY_HEADING = 
+			new string[] { "Name", "Type", "Category", "Db Col", "Db Type", "Upd Optn", "Script Type", "Script", "Constant" };
+		public string ToMarkDown()
+		{
+			return String.Format(
+				C_NODE_PROPERTY_TEMPLATE,
+				this.PropertyName,
+				this.GetFormattedPropertyTypeName(),
+				this.PropertyCategory.ToString(),
+				this.DbColumnName,
+				this.DbColumnType,
+				this.UpdateOption,
+				string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
+				this.UpdateScript.Script,
+				this.ConstantValue
+				);
+		}
+		private string GetFormattedPropertyTypeName()
 		{
 			string formattedTypeName = this.PropertyType.Name;
 			if (this.PropertyType.IsGenericType)

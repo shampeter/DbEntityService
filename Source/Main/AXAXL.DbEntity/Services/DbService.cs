@@ -25,7 +25,7 @@ namespace AXAXL.DbEntity.Services
 		}
 		public IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes)
 		{
-			this.NodeMap.BuildNodes(assemblies, assemblyNamePrefixes);
+			this.NodeMap.BuildNodes(assemblies, assemblyNamePrefixes, this.ServiceOption.NodeMapPrintFilename);
 			return this;
 		}
 		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)

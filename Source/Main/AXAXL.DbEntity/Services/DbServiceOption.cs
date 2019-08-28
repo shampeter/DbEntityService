@@ -11,7 +11,7 @@ namespace AXAXL.DbEntity.Services
 		private string DefaultConnectionName { get; set; }
 		public TransactionScopeOption RootDefaultTransactionScope { get; private set; }
 		public IsolationLevel RootDefaultIsolation { get; private set; }
-
+		public string NodeMapPrintFilename { get; private set; }
 		public DbServiceOption()
 		{
 			this.ConnectionMap = new Dictionary<string, string>();
@@ -35,6 +35,11 @@ namespace AXAXL.DbEntity.Services
 			Debug.Assert(string.IsNullOrEmpty(connectionName) == false);
 			Debug.Assert(this.ConnectionMap.ContainsKey(connectionName) == true, $"No connection setup by name '{connectionName}' found");
 			this.DefaultConnectionName = connectionName;
+			return this;
+		}
+		public IDbServiceOption PrintNodeMapToFile(string filename)
+		{
+			this.NodeMapPrintFilename = filename;
 			return this;
 		}
 		public string GetDefaultConnectionString()

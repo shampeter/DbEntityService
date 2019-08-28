@@ -47,8 +47,11 @@ namespace AXAXL.DbEntity.MSSql
 					.ToArray();
 			cmd.Parameters.AddRange(parameterWithValue);
 
+			this.LogSql("Select<T> with dictionary parameters", node, cmd);
+
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
+
 		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
@@ -60,6 +63,7 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				cmd.Parameters.Add(parameter());
 			}
+			this.LogSql("Select<T> with where expression", node, cmd);
 			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
@@ -68,17 +72,17 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
 			var queryParameters = this.sqlGenerator.CreateSqlParametersForRawSqlParameters(parameters);
-
+			var cmd = new SqlCommand(rawQuery);
+			if (queryParameters != null && queryParameters.Length > 0)
+			{
+				cmd.Parameters.AddRange(queryParameters);
+			}
+			this.LogSql("Select with raw query", null, cmd);
 			IEnumerable<dynamic> result = null;
 			using (var connection = new SqlConnection(connectionString))
 			{
 				connection.Open();
-				var cmd = new SqlCommand(rawQuery, connection);
-				if (queryParameters != null && queryParameters.Length > 0)
-				{
-					cmd.Parameters.AddRange(queryParameters);
-				}
-
+				cmd.Connection = connection;
 				using (var reader = cmd.ExecuteReader())
 				{
 					var idx2Name = reader.GetColumnSchema().ToDictionary(k => k.ColumnOrdinal.Value, v => v.ColumnName);
@@ -117,6 +121,9 @@ namespace AXAXL.DbEntity.MSSql
 					})
 					.ToArray();
 			deleteSql.Parameters.AddRange(paramWithValues);
+
+			this.LogSql("Delete<T>", node, deleteSql);
+
 			using (var connection = new SqlConnection(connectionString))
 			{
 				connection.Open();
@@ -166,6 +173,9 @@ namespace AXAXL.DbEntity.MSSql
 			var insertSql = string.Format(@"INSERT INTO {0} ({1}){2}VALUES ({3})", tableName, insertClauses.InsertColumnsClause, withNoOutput == false ? $" {outputComponent.OutputClause} " : string.Empty, insertClauses.InsertValueClause);
 			var cmd = new SqlCommand(insertSql);
 			cmd.Parameters.AddRange(paramWithValues);
+
+			this.LogSql("Insert<T>", node, cmd);
+
 			using (var connection = new SqlConnection(connectionString))
 			{
 				connection.Open();
@@ -240,6 +250,8 @@ namespace AXAXL.DbEntity.MSSql
 			var cmd = new SqlCommand(updateSql);
 			cmd.Parameters.AddRange(updateParmeterWithValues);
 			cmd.Parameters.AddRange(whereParameterWithValues);
+
+			this.LogSql("Update<T>", node, cmd);
 
 			using (var connection = new SqlConnection(connectionString))
 			{
@@ -339,5 +351,26 @@ namespace AXAXL.DbEntity.MSSql
 
 			return lambda.Compile();
 		}
+		[Conditional("DEBUG")]
+		private void LogSql(string message, Node node, SqlCommand cmd)
+		{
+			Debug.Assert(cmd != null);
+
+			var sql = cmd.CommandText;
+			var parameters = string.Join(
+						", ",
+						cmd.Parameters
+								.Cast<SqlParameter>()
+								.Select(p =>
+								{
+									var name = p.ParameterName;
+									var value = p.SqlValue.ToString();
+									return $"{name} = {value}";
+								})
+						);
+			this.log.LogDebug("| {0} | {1} | {2} | {3} |", message, node?.Name, sql, parameters);
+		}
+
+
 	}
 }
