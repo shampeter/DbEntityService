@@ -272,16 +272,15 @@ namespace AXAXL.DbEntity.MSSql
 
 			return lambda.Compile();
 		}
-
+		// TODO: updateOption is not sufficient to cover all scenario.  May need to change to use bit-wise OR operation for flexibility.
 		private void IdentifyUpdateAndOutputColumns(Node node, NodePropertyUpdateOptions updateOption, bool IsInserting, out NodeProperty[] outputColumnList, out NodeProperty[] updateColumnList)
 		{
-			var allColumnList = node.DataColumns.Values
-									.Where(p => string.IsNullOrEmpty(p.DbColumnName) == false);
-			// combine primary keys into the list for consideration if inserting.  Don't need to consider primary keys when updating because primary key should not change
+			var allColumnList = node.AllDbColumns.AsEnumerable();
+			// Include primary keys from the list for consideration if inserting. Exclude primary keys when updating because primary key should not change
 			// during update and thus won't appear ever in setting clause and output clause.
-			if (IsInserting)
+			if (! IsInserting)
 			{
-				allColumnList = allColumnList.Concat(node.PrimaryKeys.Values);
+				allColumnList = allColumnList.Except(node.PrimaryKeys.Values);
 			}
 			outputColumnList = allColumnList
 									.Where(p => p.UpdateOption == updateOption).ToArray();

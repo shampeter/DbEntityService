@@ -44,7 +44,7 @@ namespace AXAXL.DbEntity.UnitTests
 
 			// Confirm system or DB updated values were carried back into entity after update.
 			Assert.IsTrue(modifyDateAfterUpdate >= timeBeforeUpdate, $"Modify date after update is {modifyDateAfterUpdate}, but timestamp taken before update is {timeBeforeUpdate}");
-			Assert.AreNotEqual<byte[]>(versionBeforeUpdate, versionAfterUpdate);
+			Assert.AreNotEqual<string>(BitConverter.ToString(versionBeforeUpdate), BitConverter.ToString(versionAfterUpdate), $"Version after update is {BitConverter.ToString(versionAfterUpdate)}, and version before update is {BitConverter.ToString(versionBeforeUpdate)}");
 
 			var contractAfterRefresh = _dbService.Query<TCededContract>().Where(p => p.CededContractNum == 101).ToArray().FirstOrDefault();
 			Assert.IsNotNull(contractAfterRefresh);
@@ -57,7 +57,7 @@ namespace AXAXL.DbEntity.UnitTests
 
 			Assert.AreEqual<decimal?>(layerAfterRefresh.Limit, limitBeforeUpdate + limitIncrement);
 			Assert.AreEqual<DateTime>(modifyDateAfterUpdate, modifyDateAfterRefresh);
-			Assert.AreEqual<byte[]>(versionAfterUpdate, versionAfterRefresh);
+			Assert.AreEqual<string>(BitConverter.ToString(versionAfterUpdate), BitConverter.ToString(versionAfterRefresh));
 
 		}
 	}

@@ -215,12 +215,12 @@ namespace AXAXL.DbEntity.MSSql
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, pKeyAndVersion, @"upd_");
 			var whereParameter = this.sqlGenerator.CreateSqlParameters(node, pKeyAndVersion, @"upd_");
 			var whereReaders = this.sqlGenerator.CreatePropertyValueReaderMap(node, pKeyAndVersion);
-			var outputComponent = this.sqlGenerator.CreateOutputComponent(node, true);
+			var outputComponent = this.sqlGenerator.CreateOutputComponent(node, false);
 			var updateComponent = this.sqlGenerator.CreateUpdateAssignmentComponent(node);
 			var updateParameters = this.sqlGenerator.CreateSqlParameters(node, updateComponent.UpdateColumns);
 			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, updateComponent.UpdateColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate);
+			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
+			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
 			// capture current property value into sql parameters before updating property by framework injection
 			var whereParameterWithValues =
 				whereParameter
@@ -249,8 +249,14 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
 			}
-			var withOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == false;
-			var updateSql = string.Format(@"UPDATE {0} SET {1}{2} {3}", tableName, updateComponent.AssignmentClause, withOutput ? $" {outputComponent.OutputClause} " : string.Empty, whereClause);
+			var withNoOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == true;
+			var updateSql = string.Format(
+				@"UPDATE {0} SET {1}{2} {3}", 
+				tableName, 
+				updateComponent.AssignmentClause, 
+				withNoOutput ? string.Empty : $" {outputComponent.OutputClause} ", 
+				whereClause
+				);
 			var cmd = new SqlCommand(updateSql);
 			cmd.Parameters.AddRange(updateParmeterWithValues);
 			cmd.Parameters.AddRange(whereParameterWithValues);
@@ -261,7 +267,7 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				connection.Open();
 				cmd.Connection = connection;
-				if (withOutput)
+				if (withNoOutput)
 				{
 					resultCount = cmd.ExecuteNonQuery();
 				}
@@ -269,8 +275,11 @@ namespace AXAXL.DbEntity.MSSql
 				{
 					using (var reader = cmd.ExecuteReader())
 					{
-						resultCount++;
-						outputComponent.EntityUpdateAction(reader, entity);
+						while (reader.Read())
+						{
+							resultCount++;
+							outputComponent.EntityUpdateAction(reader, entity);
+						}
 					}
 				}
 				if (resultCount != 1)

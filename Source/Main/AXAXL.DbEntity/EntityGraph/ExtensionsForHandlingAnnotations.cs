@@ -203,12 +203,12 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			return target.GetCustomAttribute<TableAttribute>() != null;
 		}
-		internal static NodePropertyUpdateOptions DetermineColumnUpdateOption(this Attribute argAttr)
+		internal static NodePropertyUpdateOptions DetermineColumnUpdateOption(this Attribute attr)
 		{
 			var option = NodePropertyUpdateOptions.ByApp;
-			if (typeof(DatabaseGeneratedAttribute).IsAssignableFrom(argAttr.GetType()))
+			if (typeof(DatabaseGeneratedAttribute).IsAssignableFrom(attr.GetType()))
 			{
-				DatabaseGeneratedAttribute columnAttr = argAttr as DatabaseGeneratedAttribute;
+				DatabaseGeneratedAttribute columnAttr = attr as DatabaseGeneratedAttribute;
 				switch (columnAttr.DatabaseGeneratedOption)
 				{
 					case DatabaseGeneratedOption.Computed:
@@ -219,9 +219,9 @@ namespace AXAXL.DbEntity.EntityGraph
 						break;
 				}
 			}
-			else if (typeof(InjectionAttribute).IsAssignableFrom(argAttr.GetType()))
+			else if (typeof(InjectionAttribute).IsAssignableFrom(attr.GetType()))
 			{
-				var argWhen = (argAttr as InjectionAttribute).When;
+				var argWhen = (attr as InjectionAttribute).When;
 				switch (argWhen)
 				{
 					case InjectionOptions.WhenInserted:
