@@ -215,7 +215,10 @@ namespace AXAXL.DbEntity.EntityGraph
 				buffer.Add(new[] { "Version" }.Concat(versionColumn.NodePropertyAttributeValues).ToArray());
 			}
 
-			writer.PrintMarkDownTable(headings, buffer);
+			writer
+				.PrintMarkDownTable(headings, buffer)
+				.PrintLine()
+				;
 
 			var exprToPrint = node.DataColumns.Values
 								.Where
@@ -244,7 +247,36 @@ namespace AXAXL.DbEntity.EntityGraph
 			{
 				buffer.AddRange(edgesToParent.Values.Select(p => new[] { "To Parent" }.Concat(p.NodeEdgeAttributeValues).ToArray()));
 			}
-			writer.PrintMarkDownTable(headings, buffer);
+			writer
+				.PrintMarkDownTable(headings, buffer)
+				.PrintLine();
+
+			foreach(var toChild in edgesToChild.Values)
+			{
+				writer
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Action To Add Child", toChild.ChildAddingActionInString)
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Action to Remove Child", toChild.ChildRemovingActionInString)
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Action to Set Parent", toChild.ParentSettingActionInString)
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Write Child Foreign Keys", toChild.ChildForeignKeyWriterInString)
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Read Parent Primary Keys", toChild.ParentPrimaryKeyReadersInString)
+					.PrintMarkDownCSharp($"{toChild.ParentNode.Name} &rarr; {toChild.ChildNode.Name} : Read Child Foreign Keys", toChild.ChildForeignKeyReadersInString)
+					.PrintLine()
+					;
+			}
+
+			foreach (var toParent in edgesToParent.Values)
+			{
+				writer
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Action To Add Child", toParent.ChildAddingActionInString)
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Action to Remove Child", toParent.ChildRemovingActionInString)
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Action to Set Parent", toParent.ParentSettingActionInString)
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Write Child Foreign Keys", toParent.ChildForeignKeyWriterInString)
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Read Parent Primary Keys", toParent.ParentPrimaryKeyReadersInString)
+					.PrintMarkDownCSharp($"{toParent.ParentNode.Name} &rarr; {toParent.ChildNode.Name} : Read Child Foreign Keys", toParent.ChildForeignKeyReadersInString)
+					.PrintLine()
+					;
+			}
+
 			return writer;
 		}
 
