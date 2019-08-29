@@ -215,6 +215,7 @@ namespace AXAXL.DbEntity.EntityGraph
 			var lambda = Expression.Lambda<Action<object, object>>(block, new[] { entityInput, elementToBeRemoved });
 			return lambda;
 		}
+
 		public static NodeProperty IdentifyMember<TEntity>(this Node node, Expression<Func<TEntity, dynamic>> memberExpression) where TEntity : class
 		{
 			var member = memberExpression.Body as MemberExpression;

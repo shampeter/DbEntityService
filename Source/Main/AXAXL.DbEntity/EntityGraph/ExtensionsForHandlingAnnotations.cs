@@ -48,9 +48,48 @@ namespace AXAXL.DbEntity.EntityGraph
 			node.Order = columnAttr.Order;
 			return node;
 		}
+		internal static IDictionary<TypeCode, Func<string, (bool Success, object Converted)>> _constantValueParserMap = new Dictionary<TypeCode, Func<string, (bool, object)>>
+		{
+			[TypeCode.Boolean] = (string input) => { bool output; var success = Boolean.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Byte] = (string input) => { byte output; var success = Byte.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Char] = (string input) => { char output; var success = Char.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.DateTime] = (string input) => { DateTime output; var success = DateTime.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Decimal] = (string input) => { decimal output; var success = Decimal.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Double] = (string input) => { double output; var success = Double.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Int16] = (string input) => { short output; var success = Int16.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Int32] = (string input) => { int output; var success = Int32.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Int64] = (string input) => { long output; var success = Int64.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.String] = (string input) => (true, input),
+			[TypeCode.Single] = (string input) => { Single output; var success = Single.TryParse(input, out output); return (success, (object)output); }
+			// [TypeCode.DBNull] = (string input) => { bool output; var success = DBNull.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.Empty] = (string input) => { bool output; var success = Empty.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.Object] = (string input) => { bool output; var success = Object.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.SByte] = (string input) => { bool output; var success = SByte.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.UInt16] = (string input) => { bool output; var success = UInt16.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.UInt32] = (string input) => { bool output; var success = UInt32.TryParse(input, out output); return (success, (object)output); },
+			// [TypeCode.UInt64] = (string input) => { bool output; var success = UInt64.TryParse(input, out output); return (success, (object)output); }
+		};
 		internal static NodeProperty HandleConstantAttribute(this NodeProperty node, PropertyInfo property)
 		{
-			node.ConstantValue = property.GetCustomAttribute<ConstantAttribute>()?.Value;
+			var constantAttribute = property.GetCustomAttribute<ConstantAttribute>();
+			if (constantAttribute == null)
+			{
+				// no constant attribute.  Skip.
+				return node;
+			}
+			var constantValue = constantAttribute.Value;
+			Debug.Assert(string.IsNullOrEmpty(constantValue) == false, $"Constant value assigned to {property.Name} cannot be blank.");
+
+			var type = property.PropertyType;
+			var underlyingType = Nullable.GetUnderlyingType(type);
+			type = underlyingType ?? type;
+
+			var converted = _constantValueParserMap[Type.GetTypeCode(type)].Invoke(constantValue);
+			Debug.Assert(converted.Success, $"Cannot convert constant value {constantValue} into {property.PropertyType.Name}");
+
+			node.ConstantValue = converted.Converted;
+			node.ConstantValueSetterAction = property.SetValue;
+
 			return node;
 		}
 		internal static NodeProperty HandleDataGenerationAttribute(this NodeProperty node, PropertyInfo property)

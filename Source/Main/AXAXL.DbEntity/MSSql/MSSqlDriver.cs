@@ -148,7 +148,7 @@ namespace AXAXL.DbEntity.MSSql
 			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, insertClauses.InsertColumns);
 			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
 			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
-			// capture current property value into sql parameters before updating property by framework injection
+			var allConstantColumns = node.AllDbColumns.Where(p => p.IsConstant).ToArray();
 
 			foreach (var eachAction in allActions)
 			{
@@ -157,6 +157,10 @@ namespace AXAXL.DbEntity.MSSql
 			foreach (var eachInj in allFuncInj)
 			{
 				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
+			}
+			foreach(var eachConstantCol in allConstantColumns)
+			{
+				eachConstantCol.ConstantValueSetterAction.Invoke(entity, eachConstantCol.ConstantValue);
 			}
 
 			var paramWithValues = insertParameters.Select(

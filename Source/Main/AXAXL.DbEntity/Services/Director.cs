@@ -128,10 +128,10 @@ namespace AXAXL.DbEntity.Services
 		{
 			var node = this.NodeMap.GetNode(entity.GetType());
 			Debug.Assert(node != null, $"Failed to locate node for entity of type '{entity.GetType().FullName}'");
+
 			var connectionString = this.GetConnectionString(node);
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false);
 
-			var childEdges = node.AllChildEdgeNames().Select(p => node.GetEdgeToChildren(p)).ToArray();
 			var recordCount = 0;
 			switch (entity.EntityStatus)
 			{
@@ -152,7 +152,9 @@ namespace AXAXL.DbEntity.Services
 					this.DeleteQueue.Add((parent, edge, entity));
 					break;
 			}
-			foreach(var childEdge in childEdges)
+
+			var childEdges = node.AllChildEdgeNames().Select(p => node.GetEdgeToChildren(p)).ToArray();
+			foreach (var childEdge in childEdges)
 			{
 				// Skip child set if indicated in exclusion list.
 				if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(childEdge.ChildReferenceOnParentNode)) continue;

@@ -35,18 +35,8 @@ namespace AXAXL.DbEntity.MSSql
 			var columns = string.Join(", ", insertColumns.Select(p => p.DbColumnName));
 			var values = string.Join(
 								", ", 
-								insertColumns.Select(
-									p =>
-									{
-										if (p.IsConstant)
-										{
-											return this.FormatConstantValueAsParameterValue(node, p);
-										}
-										else
-										{
-											return $"@{p.PropertyName}";
-										}
-								}));
+								insertColumns.Select(p => $"@{p.PropertyName}")
+								);
 
 			return (columns, values, insertColumns);
 		}
@@ -170,7 +160,7 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(columns != null && columns.Length > 0 && columns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
 			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : parameterPrefix;
 
-			return columns.Where(c => c.IsConstant == false).ToDictionary(
+			return columns.ToDictionary(
 				key => key.PropertyName, 
 				value =>
 				{
@@ -304,11 +294,13 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(property.IsConstant, $"{property.PropertyName} of {node.Name} is not marked as constant");
 			var constantValue = property.ConstantValue;
-			if (property.PropertyType.IsAssignableFrom(typeof(string)) || property.PropertyType.IsAssignableFrom(typeof(DateTime)))
+			var typeCode = Type.GetTypeCode(constantValue?.GetType());
+			var constantString = constantValue?.ToString();
+			if (typeCode == TypeCode.String || typeCode == TypeCode.DateTime)
 			{
-				constantValue = $"'{constantValue}'";
+				constantString = $"'{constantString}'";
 			}
-			return constantValue;
+			return constantString;
 		}
 		#endregion
 	}

@@ -44,6 +44,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			this.IsEdge = false;
 			this.Log = log;
+			this.ConstantValue = null;
 		}
 		public Node Owner { get; set; }
 		public string PropertyName { get; set; }
@@ -61,11 +62,14 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal string GetEnumeratorFuncInString { get; set; }
 		public Action<object, object> GetRemoveItemMethodAction { get; set; }
 		internal string GetRemoveItemMethodActionInString { get; set; }
+		public Action<object, string> GetConstantSettingAction { get; set; }
+		internal string GetConstantSettingActionInString { get; set; }
 		public bool IsEdge { get; set; }
 		public bool IsNullable { get; set; }
-		public string ConstantValue { get; set; }
+		public object ConstantValue { get; set; }
+		internal Action<object, object> ConstantValueSetterAction { get; set; }
 		public int Order { get; set; }
-		public bool IsConstant => this.PropertyCategory == PropertyCategories.Value && string.IsNullOrEmpty(this.ConstantValue) == false;
+		public bool IsConstant => this.PropertyCategory == PropertyCategories.Value && this.ConstantValue != null;
 		public Type GetTypeReferencedByEdge()
 		{
 			if (! this.IsEdge) throw new InvalidOperationException($"Invalid operation. '{this.PropertyName}' is not an edge.");
@@ -139,7 +143,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					this.UpdateOption.ToString(),
 					string.IsNullOrEmpty(this.UpdateScript.Script) ? string.Empty : this.UpdateScript.ScriptType.ToString(),
 					this.UpdateScript.Script,
-					this.ConstantValue
+					this.ConstantValue?.ToString()
 				};
 		private string GetFormattedPropertyTypeName()
 		{
