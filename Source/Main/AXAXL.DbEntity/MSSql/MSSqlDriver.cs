@@ -132,7 +132,7 @@ namespace AXAXL.DbEntity.MSSql
 
 				if (returnCount <= 0)
 				{
-					throw new InvalidOperationException($"{returnCount} count returned by {deleteClause+whereClause} with parameters {this.PrintParameters(paramWithValues)}");
+					throw new DbUpdateConcurrencyException(returnCount, deleteClause + whereClause, this.PrintParameters(paramWithValues));
 				}
 			}
 			return entity;
@@ -275,7 +275,7 @@ namespace AXAXL.DbEntity.MSSql
 				}
 				if (resultCount != 1)
 				{
-					throw new InvalidOperationException($"{resultCount} returned from update sql {updateSql} with parameter for where clause is {this.PrintParameters(whereParameterWithValues)}");
+					throw new DbUpdateConcurrencyException(resultCount, updateSql, this.PrintParameters(whereParameterWithValues));
 				}
 			}
 			return entity;

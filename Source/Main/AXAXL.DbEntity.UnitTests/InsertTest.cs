@@ -5,7 +5,6 @@ using AXAXL.DbEntity.UnitTestLib.Models;
 using AXAXL.DbEntity.UnitTestLib.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-
 namespace AXAXL.DbEntity.UnitTests
 {
 	[TestClass]
@@ -13,17 +12,11 @@ namespace AXAXL.DbEntity.UnitTests
 	{
 		private static IDbService _dbService;
 
-		private TestContext _testContext;
-		public TestContext TestContext
-		{
-			get => this._testContext;
-			set => this._testContext = value;
-		}
-
 		[ClassInitialize()]
 		public static void TestSetup(TestContext context)
 		{
-			_dbService = ClassInitializeHelper.TestClassSetup();
+			_dbService = CommonTestContext.service;
+			ClassInitializeHelper.TestDatabaseSetup();
 		}
 
 		[TestMethod]

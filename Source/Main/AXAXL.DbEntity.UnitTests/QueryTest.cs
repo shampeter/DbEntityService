@@ -21,7 +21,8 @@ namespace AXAXL.DbEntity.UnitTests
 		[ClassInitialize()]
 		public static void TestSetup(TestContext context)
 		{
-			_dbService = ClassInitializeHelper.TestClassSetup();
+			_dbService = CommonTestContext.service;
+			ClassInitializeHelper.TestDatabaseSetup();
 		}
 		[TestMethod]
 		[Description("Query from parent and test if all children are built")]
