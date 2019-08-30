@@ -20,7 +20,7 @@ namespace AXAXL.DbEntity.UnitTests
 		}
 		[TestMethod]
 		[Description("Happy path update test.")]
-		public void HappyPathUpdateTest()
+		public void SingleUpdateTest()
 		{
 			var contract = _dbService.Query<TCededContract>().Where(p => p.CededContractNum == 101).ToArray().FirstOrDefault();
 			Assert.IsNotNull(contract);
@@ -58,7 +58,32 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.AreEqual<decimal?>(layerAfterRefresh.Limit, limitBeforeUpdate + limitIncrement);
 			Assert.AreEqual<DateTime>(modifyDateAfterUpdate, modifyDateAfterRefresh);
 			Assert.AreEqual<string>(BitConverter.ToString(versionAfterUpdate), BitConverter.ToString(versionAfterRefresh));
+		}
 
+		[TestMethod]
+		[ExpectedException(typeof(DbUpdateConcurrencyException))]
+		public void ConcurrentUpdateErrorTest()
+		{
+			var contract1 = _dbService.Query<TCededContract>().Where(p => p.CededContractPkey == 1).ToArray().FirstOrDefault();
+			var contract2 = _dbService.Query<TCededContract>().Where(p => p.CededContractPkey == 1).ToArray().FirstOrDefault();
+
+			Assert.IsNotNull(contract1);
+			Assert.IsNotNull(contract2);
+
+			contract1.UwYear = 2019;
+			contract1.EntityStatus = EntityStatusEnum.Updated;
+
+			contract2.UwYear = 2020;
+			contract2.EntityStatus = EntityStatusEnum.Updated;
+
+			_dbService.Persist().Submit(c => c.Save(contract1)).Commit();
+			contract1 = _dbService.Query<TCededContract>().Where(c => c.CededContractPkey == 1).ToArray().FirstOrDefault();
+			Assert.AreEqual(2019, contract1.UwYear);
+
+			// This is expected to fail with DbUpdateConcurrencyException.
+			_dbService.Persist().Submit(c => c.Save(contract2)).Commit();
+			contract2 = _dbService.Query<TCededContract>().Where(c => c.CededContractPkey == 1).ToArray().FirstOrDefault();
+			Assert.AreEqual(2020, contract2.UwYear);
 		}
 	}
 }
