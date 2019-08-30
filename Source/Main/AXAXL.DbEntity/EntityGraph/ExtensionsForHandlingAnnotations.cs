@@ -13,6 +13,9 @@ using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Extensions;
 namespace AXAXL.DbEntity.EntityGraph
 {
+	/// <summary>
+	/// Shortcuts to everything concerning custom attributes or attributes from System.ComponentModel.
+	/// </summary>
 	internal static class ExtensionsForHandlingAnnotations
 	{
 		internal static Node HandleTableAttribute(this Node node)

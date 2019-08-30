@@ -12,6 +12,9 @@ using AXAXL.DbEntity.EntityGraph;
 
 namespace AXAXL.DbEntity.EntityGraph
 {
+	/// <summary>
+	/// Shortcut that works on objects from AXAXL.DbEntity.EntityGraph namespace.
+	/// </summary>
 	public static class EntityGraphExtensions
 	{
 		private static readonly string NL = Environment.NewLine;

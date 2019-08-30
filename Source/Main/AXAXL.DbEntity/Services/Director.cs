@@ -19,7 +19,7 @@ namespace AXAXL.DbEntity.Services
 		private ILogger Log { get; set; }
 		private IDbServiceOption ServiceOption { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
-		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity)> DeleteQueue { get; set; }
+		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
 		//private ISet<string> PathWalked { get; set; }
 		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, int timeoutDurationInSeconds = 30)
 		{
@@ -29,7 +29,7 @@ namespace AXAXL.DbEntity.Services
 			this.Exclusion = exclusion ?? new Dictionary<Node, NodeProperty[]>();
 			this.ServiceOption = serviceOption;
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
-			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity)>();
+			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
@@ -115,9 +115,13 @@ namespace AXAXL.DbEntity.Services
 				var reverseOrderQueue = this.DeleteQueue.ToArray().Reverse();
 				foreach(var eachDeleted in reverseOrderQueue)
 				{
-					var connectionString = this.GetConnectionString(eachDeleted.Edge.ChildNode);
-					this.Driver.Delete<ITrackable>(connectionString, eachDeleted.ChildEntity, eachDeleted.Edge.ChildNode);
-					eachDeleted.Edge.ChildRemovingAction(eachDeleted.ParentEntity, eachDeleted.ChildEntity);
+					var connectionString = this.GetConnectionString(eachDeleted.ChildNode);
+					this.Driver.Delete<ITrackable>(connectionString, eachDeleted.ChildEntity, eachDeleted.ChildNode);
+					// When the deleted is the root node, then there will be no edge.
+					if (eachDeleted.Edge != null)
+					{
+						eachDeleted.Edge.ChildRemovingAction(eachDeleted.ParentEntity, eachDeleted.ChildEntity);
+					}
 				}
 			}
 
@@ -141,15 +145,14 @@ namespace AXAXL.DbEntity.Services
 					recordCount++;
 					break;
 				case EntityStatusEnum.Updated:
-					// TODO: What if nothing was updated ... classic concurrency error ... do we need custom check?
 					this.Driver.Update<ITrackable>(connectionString, entity, node);
 					entity.EntityStatus = EntityStatusEnum.NoChange;
 					recordCount++;
 					break;
 				case EntityStatusEnum.Deleted:
 					recordCount++;
-					entity.EntityStatus = EntityStatusEnum.NoChange;
-					this.DeleteQueue.Add((parent, edge, entity));
+					//entity.EntityStatus = EntityStatusEnum.NoChange;
+					this.DeleteQueue.Add((parent, edge, entity, node));
 					break;
 			}
 

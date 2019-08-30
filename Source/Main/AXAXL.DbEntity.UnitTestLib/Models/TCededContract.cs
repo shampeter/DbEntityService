@@ -10,6 +10,8 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 	[Table("t_ceded_contract")]
     public class TCededContract : ITrackable
     {
+		private TCompany xlCompany;
+		private TCompany cedant;
         public TCededContract()
         {
             CededContractLayers = new List<TCededContractLayer>();
@@ -59,10 +61,25 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 		public byte[] Version { get; set; }
 
         [ForeignKey(nameof(CedantCompanyFkey))]
-        public TCompany CedantCompany { get; set; }
+        public TCompany CedantCompany {
+			get => this.cedant;
+			set
+			{
+				this.CedantCompanyFkey = value.CompanyPkey;
+				this.cedant = value;
+			}
+		}
 
         [ForeignKey(nameof(XlCompanyFkey))]
-        public TCompany XlCompany { get; set; }
+        public TCompany XlCompany
+		{
+			get => this.xlCompany;
+			set
+			{
+				this.XlCompanyFkey = value.CompanyPkey;
+				this.xlCompany = value;
+			}
+		}
 
 		[InverseProperty(nameof(TCededContractLayer.CededContract))]
 		public IList<TCededContractLayer> CededContractLayers { get; set; }

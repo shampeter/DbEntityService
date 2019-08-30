@@ -72,5 +72,13 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.IsTrue(doc.CededContractLayer.LayerType.Description == @"Excess of Loss");
 			Assert.IsTrue(doc.CededContractLayer.CededContract.CededContractPkey == 1 && doc.CededContractLayer.CededContract.CedantCompany.CompanyName == "Travellers");
 		}
+
+		[TestMethod]
+		[Description("Query that return nothing.")]
+		public void QueryReturnNothingTest()
+		{
+			var company = _dbService.Query<TCompany>().FirstOrDefault(c => c.CompanyPkey == 1000);
+			Assert.IsNull(company, "Null should be returned where query failed to return anything.");
+		}
 	}
 }

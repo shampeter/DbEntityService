@@ -14,7 +14,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 			 * TODO: THIS IS TEMPORARY CODE FOR TESTING ONLY.  A FORMAL DESIGN ON GETTING SPU_GUID WILL BE DELIVERED LATER.
 			 */
 			int result;
-			var connectionString = @"Server=localhost,1433; Database=DbEntityServiceTestDb; User Id=DbEntityService; Password=Password1";
+			var connectionString = @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnitTestDb; Integrated Security=true";
 
 			using (var connection = new SqlConnection(connectionString))
 			{

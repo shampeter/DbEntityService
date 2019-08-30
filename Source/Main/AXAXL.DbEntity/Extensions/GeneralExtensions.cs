@@ -1,16 +1,14 @@
 ﻿using System;
 using System.IO;
-using System.Diagnostics;
-using System.Reflection;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Collections.Generic;
-using System.Text;
 using System.Dynamic;
-using AXAXL.DbEntity.EntityGraph;
 
 namespace AXAXL.DbEntity.Extensions
 {
+	/// <summary>
+	/// Provide shortcuts to general functionalities which does not requires any dependency on AXAXL.DbEntity namespace.
+	/// </summary>
 	public static class GeneralExtensions
 	{
 		private static readonly string NL = Environment.NewLine;
