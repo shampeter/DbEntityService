@@ -15,3 +15,7 @@
     - Unit tests utilize `SqlLocalDb`.
     - Unit tests utilize a DacPac named `DbEntityServiceUnitTestDb.dacpac` located under AXAXL.DbEntity.UnitTestLib/TestData/Seed as seed data for tests.
     - Refer to [this README.md](./AXAXL.DbEntity.UnitTestLib/TestData/README.md) on how to update and maintain this seed data.
+
+## References that is useful to read for `CSharpScript`
+
+[Script API Sample from Github](https://github.com/dotnet/roslyn/wiki/Scripting-API-Samples)
