@@ -212,7 +212,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				switch (columnAttr.DatabaseGeneratedOption)
 				{
 					case DatabaseGeneratedOption.Computed:
-						option = NodePropertyUpdateOptions.ByDbOnInsertAndUpdate;
+						option = NodePropertyUpdateOptions.ByDbOnInsert | NodePropertyUpdateOptions.ByDbOnUpdate;
 						break;
 					case DatabaseGeneratedOption.Identity:
 						option = NodePropertyUpdateOptions.ByDbOnInsert;
@@ -228,7 +228,7 @@ namespace AXAXL.DbEntity.EntityGraph
 						option = NodePropertyUpdateOptions.ByFwkOnInsert;
 						break;
 					case InjectionOptions.WhenInsertedAndUpdated:
-						option = NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate;
+						option = NodePropertyUpdateOptions.ByFwkOnInsert | NodePropertyUpdateOptions.ByFwkOnUpdate;
 						break;
 					case InjectionOptions.WhenUpdated:
 						option = NodePropertyUpdateOptions.ByFwkOnUpdate;

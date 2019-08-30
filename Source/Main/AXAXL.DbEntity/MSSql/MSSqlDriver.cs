@@ -146,8 +146,8 @@ namespace AXAXL.DbEntity.MSSql
 			var insertClauses = this.sqlGenerator.CreateInsertComponent(node);
 			var insertParameters = this.sqlGenerator.CreateSqlParameters(node, insertClauses.InsertColumns);
 			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, insertClauses.InsertColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
+			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert);
+			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert);
 			var allConstantColumns = node.AllDbColumns.Where(p => p.IsConstant).ToArray();
 
 			foreach (var eachAction in allActions)
@@ -219,8 +219,8 @@ namespace AXAXL.DbEntity.MSSql
 			var updateComponent = this.sqlGenerator.CreateUpdateAssignmentComponent(node);
 			var updateParameters = this.sqlGenerator.CreateSqlParameters(node, updateComponent.UpdateColumns);
 			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, updateComponent.UpdateColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnUpdate, NodePropertyUpdateOptions.ByFwkOnInsertAndUpdate);
+			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnUpdate);
+			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnUpdate);
 			// capture current property value into sql parameters before updating property by framework injection
 			var whereParameterWithValues =
 				whereParameter
@@ -328,18 +328,18 @@ namespace AXAXL.DbEntity.MSSql
 			return string.Join(", ", parameterValues);
 		}
 
-		protected virtual Action<dynamic>[] GetFrameworkUpdateActions(Node node, params NodePropertyUpdateOptions[] updateOption)
+		protected virtual Action<dynamic>[] GetFrameworkUpdateActions(Node node, NodePropertyUpdateOptions currentOperation)
 		{
 			var actions = node.AllDbColumns
-							.Where(c => updateOption.Contains(c.UpdateOption) && c.ActionInjection != null)
+							.Where(c => (c.UpdateOption & currentOperation) != NodePropertyUpdateOptions.ByApp && c.ActionInjection != null)
 							.Select(c => c.ActionInjection)
 							.ToArray();
 			return actions;
 		}
-		protected virtual (Action<dynamic, dynamic> ActionOnProperty, Func<dynamic> FuncInjection)[] CreateFrameworkUpdatesFromFuncInjection(Node node, params NodePropertyUpdateOptions[] updateOption)
+		protected virtual (Action<dynamic, dynamic> ActionOnProperty, Func<dynamic> FuncInjection)[] CreateFrameworkUpdatesFromFuncInjection(Node node, NodePropertyUpdateOptions currentOperation)
 		{
 			var funcInjectColumns = node.AllDbColumns
-										.Where(c => updateOption.Contains(c.UpdateOption) && c.FuncInjection != null)
+										.Where(c => (c.UpdateOption & currentOperation) != NodePropertyUpdateOptions.ByApp && c.FuncInjection != null)
 										.Select(
 											c => (this.CreateFrameworkUpdateFromUncInjection(node, c), c.FuncInjection)
 											)

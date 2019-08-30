@@ -19,14 +19,14 @@ namespace AXAXL.DbEntity.EntityGraph
 		Collection,
 		ObjectReference
 	}
+	[Flags]
 	public enum NodePropertyUpdateOptions
 	{
-		ByApp,
-		ByDbOnInsert,
-		ByDbOnInsertAndUpdate,
-		ByFwkOnInsert,
-		ByFwkOnInsertAndUpdate,
-		ByFwkOnUpdate
+		ByApp = 0b_0000_0000,
+		ByDbOnInsert = 0b_0000_0001,
+		ByDbOnUpdate = 0b_0000_0010,
+		ByFwkOnInsert = 0b_0000_0100,
+		ByFwkOnUpdate = 0b_0000_1000
 	}
 	public enum NodePropertyUpdateScriptTypes
 	{

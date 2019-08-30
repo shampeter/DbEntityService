@@ -30,7 +30,7 @@ namespace AXAXL.DbEntity.MSSql
 		public (string InsertColumnsClause, string InsertValueClause, NodeProperty[] InsertColumns) CreateInsertComponent(Node node)
 		{
 			NodeProperty[] insertColumns, outputColumns;
-			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsert, true, out outputColumns, out insertColumns);
+			this.IdentifyUpdateAndOutputColumns(node, true, out outputColumns, out insertColumns);
 
 			var columns = string.Join(", ", insertColumns.Select(p => p.DbColumnName));
 			var values = string.Join(
@@ -41,12 +41,11 @@ namespace AXAXL.DbEntity.MSSql
 			return (columns, values, insertColumns);
 		}
 
-		public (string OutputClause, Action<SqlDataReader, dynamic> EntityUpdateAction) CreateOutputComponent(Node node, bool IsInserting = true)
+		public (string OutputClause, Action<SqlDataReader, dynamic> EntityUpdateAction) CreateOutputComponent(Node node, bool isInserting = true)
 		{
 			NodeProperty[] updateColumns, outputColumns;
-			var mode = IsInserting ? NodePropertyUpdateOptions.ByDbOnInsert : NodePropertyUpdateOptions.ByDbOnInsertAndUpdate;
 
-			this.IdentifyUpdateAndOutputColumns(node, mode, IsInserting, out outputColumns, out updateColumns);
+			this.IdentifyUpdateAndOutputColumns(node, isInserting, out outputColumns, out updateColumns);
 
 			if (outputColumns == null || outputColumns.Length <= 0)
 			{
@@ -77,7 +76,7 @@ namespace AXAXL.DbEntity.MSSql
 			var exprBlock = Expression.Block(new [] { inputEntity }, exprBuffer.ToArray());
 			var lambdaFunc = Expression.Lambda<Action<SqlDataReader, object>> (exprBlock, new [] { inputReader, inputObject });
 
-			this.LogDataFetchingExpression($"Delegate to capture output clause on {node.Name} when inserting='{IsInserting}'", lambdaFunc);
+			this.LogDataFetchingExpression($"Delegate to capture output clause on {node.Name} when inserting='{isInserting}'", lambdaFunc);
 
 			return (outputClause, lambdaFunc.Compile());
 		}
@@ -176,7 +175,7 @@ namespace AXAXL.DbEntity.MSSql
 		public (string AssignmentClause, NodeProperty[] UpdateColumns) CreateUpdateAssignmentComponent(Node node)
 		{
 			NodeProperty[] updateColumns, outputColumns;
-			this.IdentifyUpdateAndOutputColumns(node, NodePropertyUpdateOptions.ByDbOnInsertAndUpdate, false, out outputColumns, out updateColumns);
+			this.IdentifyUpdateAndOutputColumns(node, false, out outputColumns, out updateColumns);
 
 			return (
 					string.Join(
@@ -272,18 +271,19 @@ namespace AXAXL.DbEntity.MSSql
 
 			return lambda.Compile();
 		}
-		// TODO: updateOption is not sufficient to cover all scenario.  May need to change to use bit-wise OR operation for flexibility.
-		private void IdentifyUpdateAndOutputColumns(Node node, NodePropertyUpdateOptions updateOption, bool IsInserting, out NodeProperty[] outputColumnList, out NodeProperty[] updateColumnList)
+
+		private void IdentifyUpdateAndOutputColumns(Node node,  bool isInserting, out NodeProperty[] outputColumnList, out NodeProperty[] updateColumnList)
 		{
+			var currentOp = isInserting ? NodePropertyUpdateOptions.ByDbOnInsert : NodePropertyUpdateOptions.ByDbOnUpdate;
 			var allColumnList = node.AllDbColumns.AsEnumerable();
 			// Include primary keys from the list for consideration if inserting. Exclude primary keys when updating because primary key should not change
 			// during update and thus won't appear ever in setting clause and output clause.
-			if (! IsInserting)
+			if (! isInserting)
 			{
 				allColumnList = allColumnList.Except(node.PrimaryKeys.Values);
 			}
 			outputColumnList = allColumnList
-									.Where(p => p.UpdateOption == updateOption).ToArray();
+									.Where(p => (p.UpdateOption & currentOp) != NodePropertyUpdateOptions.ByApp).ToArray();
 			updateColumnList = allColumnList
 									.Except(outputColumnList)
 									.ToArray();
