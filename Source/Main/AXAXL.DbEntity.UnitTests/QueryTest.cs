@@ -80,5 +80,21 @@ namespace AXAXL.DbEntity.UnitTests
 			var company = _dbService.Query<TCompany>().FirstOrDefault(c => c.CompanyPkey == 1000);
 			Assert.IsNull(company, "Null should be returned where query failed to return anything.");
 		}
+
+		[TestMethod]
+		[Description("Query with child exlusion test")]
+		public void QueryWithExclusionTest()
+		{
+			var contract = _dbService
+							.Query<TCededContract>()
+							.Where(c => c.CededContractNum == 100)
+							.Exclude<TCededContractLayer>(l => l.CededContractLayerDocs)
+							.ToArray()
+							.FirstOrDefault()
+							;
+			Assert.IsNotNull(contract);
+			var docCount = contract.CededContractLayers.Sum(l => l.CededContractLayerDocs.Count);
+			Assert.AreEqual(0, docCount);
+		}
 	}
 }

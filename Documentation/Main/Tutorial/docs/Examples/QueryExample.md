@@ -68,3 +68,21 @@ Where the dictionary parameter is used to provide value to the sql parameter `@S
 And the result can be accessed by, say `someTable[10].some_field_1`, for the `some_field_1` column of the eleventh row of the query resultset.
 
 For details of this C# type supporting this feature, please read [ExpandoObject Class](https://docs.microsoft.com/en-us/dotnet/api/system.dynamic.expandoobject?view=netcore-2.2).
+
+## Running Query with some child set excluded
+
+Assuming we have a structure like this
+
+`TCededContract.CededContractLayers` &rarr; `TCededContractLayer.CededContractLayerDocs` &rarr; `TCededContractContractLayerDoc`
+
+Then to retrieve a contract, say with contract number being 100, but leaving out the `CededContractLayerDocs` of `TCededContractLayer`, the code to do that will look like this:
+
+```c#
+var contract = _dbService
+				.Query<TCededContract>()
+				.Where(c => c.CededContractNum == 100)
+				.Exclude<TCededContractLayer>(l => l.CededContractLayerDocs)
+				.ToArray()
+				.FirstOrDefault()
+				;
+```
