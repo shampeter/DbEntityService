@@ -13,5 +13,7 @@ namespace AXAXL.DbEntity.Annotation
 	public class InjectionAttribute : Attribute
 	{
 		public InjectionOptions When { get; set; }
+		public string[] ScriptNamespaces { get; set; }
+		public string ServiceName { get; set; }
 	}
 }

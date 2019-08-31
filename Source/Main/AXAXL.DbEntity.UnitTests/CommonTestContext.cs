@@ -30,6 +30,7 @@ namespace AXAXL.DbEntity.UnitTests
 								.SetAsDefaultConnection("SQL_Connection")
 								.PrintNodeMapToFile(config.GetValue<string>(@"DbEntity:NodeMapExport"))
 				)
+				.AddSingleton<INextSequence, HelperMethods>()
 				.BuildServiceProvider()
 				;
 			//var map = serviceProvider.GetService<INodeMap>();

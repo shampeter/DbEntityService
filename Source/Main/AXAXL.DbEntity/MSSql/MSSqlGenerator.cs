@@ -186,18 +186,25 @@ namespace AXAXL.DbEntity.MSSql
 			);
 		}
 
-		public SqlParameter[] CreateSqlParametersForRawSqlParameters(IDictionary<string, object> parameters)
+		public IDictionary<string, SqlParameter> CreateSqlParametersForRawSqlParameters((string Name, object Value, ParameterDirection Direction)[] parameters)
 		{
-			if (parameters == null)
+			var resultBuffer = parameters?.ToDictionary(
+				key => key.Name,
+				p =>
+				{
+					var parameterName = p.Name.StartsWith('@') ? p.Name : "@" + p.Name;
+					return new SqlParameter()
+					{
+						ParameterName = parameterName,
+						Direction = p.Direction
+					};
+				});
+			resultBuffer = resultBuffer ?? new Dictionary<string, SqlParameter>();
+			if (resultBuffer.Any(kv => kv.Value.Direction == ParameterDirection.ReturnValue) == false)
 			{
-				return new SqlParameter[0];
+				resultBuffer.Add("Return", new SqlParameter() { ParameterName = @"@ReturnValue", Direction = ParameterDirection.ReturnValue });
 			}
-			return parameters.Select(kv => {
-				var parameterName = kv.Key.StartsWith('@') ? kv.Key : "@"+kv.Key;
-				object parameterValue = kv.Value ?? DBNull.Value;
-				return new SqlParameter(parameterName, parameterValue);
-
-			}).ToArray();			
+			return resultBuffer;
 		}
 
 		public string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null)

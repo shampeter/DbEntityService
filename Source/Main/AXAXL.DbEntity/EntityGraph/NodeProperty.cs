@@ -32,8 +32,9 @@ namespace AXAXL.DbEntity.EntityGraph
 	{
 		None,
 		Action,
-		Func,
-		SqlFunc
+		Func
+		//,
+		//SqlFunc
 	}
 
 	public class NodeProperty
@@ -55,7 +56,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public string[] ForeignKeyReference { get; set; }
 		public string InversePropertyReference { get; set; }
 		public NodePropertyUpdateOptions UpdateOption { get; set; }
-		public (NodePropertyUpdateScriptTypes ScriptType, string Script, string[] Namespaces) UpdateScript { get; set; }
+		public (NodePropertyUpdateScriptTypes ScriptType, string Script, string[] Namespaces, string ServiceName) UpdateScript { get; set; }
 		public Action<dynamic> ActionInjection { get; set; }
 		public Func<dynamic> FuncInjection { get; set; }
 		public Func<object, IEnumerator<ITrackable>> GetEnumeratorFunc { get; set; }
@@ -99,9 +100,10 @@ namespace AXAXL.DbEntity.EntityGraph
 			}
 			return this;
 		}
-		public NodeProperty CompileScript()
+		public NodeProperty CompileScript(IServiceProvider serviceProvider)
 		{
-			if (string.IsNullOrEmpty(this.UpdateScript.Script) || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.SqlFunc || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.None)
+			//if (string.IsNullOrEmpty(this.UpdateScript.Script) || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.SqlFunc || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.None)
+			if (string.IsNullOrEmpty(this.UpdateScript.Script) || this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.None)
 			{
 				return this;
 			}
@@ -111,21 +113,31 @@ namespace AXAXL.DbEntity.EntityGraph
 				_currentDomainAssemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => a.IsDynamic == false).ToArray();
 			}
 			Debug.Assert(_currentDomainAssemblies != null && _currentDomainAssemblies.Length > 0);
+
 			var options = ScriptOptions.Default.AddReferences(_currentDomainAssemblies);
 			IEnumerable<string> namespaces = this.UpdateScript.Namespaces ?? new string[0];
+			object globals = null;
+
 			if (namespaces.Contains(this.Owner.NodeType.Namespace) == false)
 			{
 				namespaces = namespaces.Union(new[] { typeof(Object).Namespace, this.Owner.NodeType.Namespace });
 			}
 			options = options.AddImports(namespaces);
 
+			if (! String.IsNullOrEmpty(this.UpdateScript.ServiceName))
+			{
+				Type type = Type.GetType(this.UpdateScript.ServiceName);
+				Debug.Assert(type != null, $"Cannot find type of name {this.UpdateScript.ServiceName}");
+				globals = serviceProvider.GetService(type);
+				Debug.Assert(globals != null, $"Failed to locate service by type {type.FullName}");
+			}
 			if (this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.Action)
 			{
-				this.ActionInjection = CSharpScript.EvaluateAsync<Action<dynamic>>(this.UpdateScript.Script, options).Result;
+				this.ActionInjection = CSharpScript.EvaluateAsync<Action<dynamic>>(this.UpdateScript.Script, options, globals: globals).Result;
 			}
 			if (this.UpdateScript.ScriptType == NodePropertyUpdateScriptTypes.Func)
 			{
-				this.FuncInjection = CSharpScript.EvaluateAsync<Func<dynamic>>(this.UpdateScript.Script, options).Result;
+				this.FuncInjection = CSharpScript.EvaluateAsync<Func<dynamic>>(this.UpdateScript.Script, options, globals: globals).Result;
 			}
 
 			return this;

@@ -21,7 +21,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 
-		SqlParameter[] CreateSqlParametersForRawSqlParameters(IDictionary<string, object> parameters);
+		IDictionary<string, SqlParameter> CreateSqlParametersForRawSqlParameters((string Name, object Value, ParameterDirection Direction)[] parameters);
 	
 		string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null);
 

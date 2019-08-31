@@ -3,40 +3,45 @@ using System.Collections.Generic;
 using System.Text;
 using System.Data.SqlClient;
 using System.Data;
+using System.Transactions;
+using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.UnitTestLib.Models
 {
-	public class HelperMethods
+	public class HelperMethods : INextSequence
 	{
-		public static int NextSequence(int argType, int argRange)
+		private IDbService DbService { get; set; }
+		public HelperMethods(IDbService dbService)
 		{
-			/*
-			 * TODO: THIS IS TEMPORARY CODE FOR TESTING ONLY.  A FORMAL DESIGN ON GETTING SPU_GUID WILL BE DELIVERED LATER.
-			 */
-			int result;
-			var connectionString = @"Server=(LocalDB)\MSSqlLocalDb; Database=DbEntityServiceUnitTestDb; Integrated Security=true";
-
-			using (var connection = new SqlConnection(connectionString))
-			{
-				connection.Open();
-				var cmd = new SqlCommand("[dbo].[spu_getguid]", connection);
-				cmd.CommandType = CommandType.StoredProcedure;
-				var type = new SqlParameter("@seq_type", SqlDbType.Int);
-				type.Value = argType;
-				type.Direction = ParameterDirection.Input;
-				var range = new SqlParameter("@range", SqlDbType.Int);
-				range.Value = argRange;
-				range.Direction = ParameterDirection.Input;
-				var nextSeq = new SqlParameter("@next_seq", SqlDbType.Int);
-				nextSeq.Direction = ParameterDirection.Output;
-				cmd.Parameters.Add(type);
-				cmd.Parameters.Add(range);
-				cmd.Parameters.Add(nextSeq);
-				cmd.Prepare();
-				cmd.ExecuteNonQuery();
-				result = Convert.ToInt32(cmd.Parameters["@next_seq"].Value);
-			}
-			return result;
+			this.DbService = dbService;
+		}
+		public int NextIntSequence(int type, int range)
+		{
+			IDictionary<string, object> outputParameters;
+			var resultSet = this.DbService.ExecuteCommand()
+										.SetStoredProcedure("[dbo].[spu_getguid]")
+										.SetParameters(
+											(@"seq_type", type, ParameterDirection.Input),
+											(@"range", range, ParameterDirection.Input),
+											(@"next_seq", -1, ParameterDirection.Output)
+										)
+										.SetTransactionScopeOption(TransactionScopeOption.Suppress)
+										.Execute(out outputParameters);
+			return (int)outputParameters["next_seq"];
+		}
+		public long NextLongSequence(int type, int range)
+		{
+			IDictionary<string, object> outputParameters;
+			var resultSet = this.DbService.ExecuteCommand()
+										.SetStoredProcedure("[dbo].[spu_getlong]")
+										.SetParameters(
+											(@"seq_type", type, ParameterDirection.Input),
+											(@"range", range, ParameterDirection.Input),
+											(@"next_seq", -1L, ParameterDirection.Output)
+										)
+										.SetTransactionScopeOption(TransactionScopeOption.Suppress)
+										.Execute(out outputParameters);
+			return (long)outputParameters["next_seq"];
 		}
 		// TODO: Need to figure out how to get the session user Id.  This is left for security service design where we may use JWT to carry user's claims round a user sessin.
 		public static string CurrentUserId => "Testing";

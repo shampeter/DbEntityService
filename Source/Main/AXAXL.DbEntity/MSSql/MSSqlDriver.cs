@@ -67,17 +67,24 @@ namespace AXAXL.DbEntity.MSSql
 			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<dynamic> Select(string connectionString, string rawQuery, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30)
+		public IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30)
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			var queryParameters = this.sqlGenerator.CreateSqlParametersForRawSqlParameters(parameters);
-			var cmd = new SqlCommand(rawQuery);
-			if (queryParameters != null && queryParameters.Length > 0)
+			parameters = parameters ?? new (string, object, ParameterDirection)[0];
+			var cmdParameters = this.sqlGenerator.CreateSqlParametersForRawSqlParameters(parameters);
+			foreach(var input in parameters)
 			{
-				cmd.Parameters.AddRange(queryParameters);
+				if (cmdParameters.ContainsKey(input.Name))
+				{
+					cmdParameters[input.Name].Value = input.Value ?? DBNull.Value;
+				}
 			}
-			this.LogSql("Select with raw query", null, cmd);
+			var cmd = new SqlCommand(rawSqlCommand);
+			cmd.CommandType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+			cmd.Parameters.AddRange(cmdParameters.Values.ToArray());
+
+			this.LogSql("Execute command", null, cmd);
 			IEnumerable<dynamic> result = null;
 			using (var connection = new SqlConnection(connectionString))
 			{
@@ -96,6 +103,12 @@ namespace AXAXL.DbEntity.MSSql
 								.ToArray();
 				}
 			}
+			outputParameters = cmdParameters
+								.Where(kv => kv.Value.Direction != ParameterDirection.Input)
+								.ToDictionary(
+									k => k.Key,
+									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
+								);
 			return result;
 		}
 
@@ -372,12 +385,12 @@ namespace AXAXL.DbEntity.MSSql
 			var sql = cmd.CommandText;
 			var parameters = string.Join(
 						", ",
-						cmd.Parameters
+						cmd.Parameters?
 								.Cast<SqlParameter>()
 								.Select(p =>
 								{
 									var name = p.ParameterName;
-									var value = p.SqlValue.ToString();
+									var value = p.SqlValue?.ToString() ?? @"null";
 									return $"{name} = {value}";
 								})
 						);

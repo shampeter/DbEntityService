@@ -21,14 +21,6 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns></returns>
 		IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes);
 		/// <summary>
-		/// Run raw sql query.  See <see cref="IDatabaseDriver"/> for details.
-		/// </summary>
-		/// <param name="rawQuery"></param>
-		/// <param name="parameters"></param>
-		/// <param name="connectionName"></param>
-		/// <returns></returns>
-		IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null);
-		/// <summary>
 		/// Obtain an instance of IQuery to execute query on entity of type <typeparamref name="T"/>.
 		/// </summary>
 		/// <typeparam name="T">Entity class type</typeparam>
@@ -39,5 +31,10 @@ namespace AXAXL.DbEntity.Interfaces
 		/// </summary>
 		/// <returns>Return itself for chaining method calls.</returns>
 		IPersist Persist();
+		IExecuteCommand ExecuteCommand();
+		/*
+		 * Moved functionality to IExecuteCommand which combine running stored procedure, raw sql such as insert, update, and delete into one.
+		IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null);
+		*/
 	}
 }

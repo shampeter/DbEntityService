@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using AXAXL.DbEntity.EntityGraph;
@@ -55,14 +56,14 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
 		IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30) where T : class, new();
 		/// <summary>
-		/// Select data by raw sql query using dictionary value from <paramref name="parameters"/> as parameter value for sql parameter set in where condition.
+		/// Execute sql command using values from <paramref name="parameters"/> as parameter value for sql command.
 		/// </summary>
 		/// <param name="connectionString">Database connection string</param>
-		/// <param name="rawQuery">Raw sql query</param>
-		/// <param name="parameters">Dictionary of value used for sql parameters used in sql query.</param>
+		/// <param name="rawSqlCommand">Raw sql query</param>
+		/// <param name="parameters">Array of value tuple which has parameter name, value and direction.</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
-		/// <returns>List of <see cref="System.Dynamic.ExpandoObject"/> where the properties will be that from the sql query resultset.</returns>
-		IEnumerable<dynamic> Select(string connectionString, string rawQuery, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30);
+		/// <returns>List of <see cref="System.Dynamic.ExpandoObject"/> of any resultset returned.</returns>
+		IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30);
 		/// <summary>
 		/// Return corresponding <see cref="System.Data.SqlDbType"/> for a C# object type.
 		/// </summary>

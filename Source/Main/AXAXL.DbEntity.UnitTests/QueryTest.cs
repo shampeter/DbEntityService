@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.UnitTestLib.Models;
 using AXAXL.DbEntity.UnitTestLib.Utilities;
@@ -95,6 +96,23 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.IsNotNull(contract);
 			var docCount = contract.CededContractLayers.Sum(l => l.CededContractLayerDocs.Count);
 			Assert.AreEqual(0, docCount);
+		}
+
+		[TestMethod]
+		[Description("Raw Sql Command test with no parameters")]
+		public void RawQueryTest()
+		{
+			IDictionary<string, object> output;
+			var resultSet = _dbService
+							.ExecuteCommand()
+							.SetCommand("Select c.company_name, ct.description from t_company c inner join t_lookups ct on c.company_type_fkey = ct.lookups_pkey")
+							.Execute(out output)
+							.ToArray();
+			Assert.IsNotNull(resultSet);
+			Assert.AreEqual(6, resultSet.Length, $"Number of rows returned = {resultSet.Length} but expecting 6");
+			var stateFarm = resultSet.Where(r => r.company_name == "State Farm").FirstOrDefault();
+			Assert.IsNotNull(stateFarm);
+			Assert.AreEqual("Cedant Company", stateFarm.description);
 		}
 	}
 }

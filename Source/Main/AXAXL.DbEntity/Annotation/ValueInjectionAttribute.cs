@@ -9,7 +9,7 @@ namespace AXAXL.DbEntity.Annotation
 		{
 		}
 		public string FunctionScript { get; set; }
-		public string[] ScriptNamespaces { get; set; }
-		public string SQLFunction { get; set; }
+		//public string[] ScriptNamespaces { get; set; }
+		//public string SQLFunction { get; set; }
 	}
 }

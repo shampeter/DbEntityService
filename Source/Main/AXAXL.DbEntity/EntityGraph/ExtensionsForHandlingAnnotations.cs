@@ -107,9 +107,10 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			ValueInjectionAttribute columnAttr = property.GetCustomAttribute<ValueInjectionAttribute>();
 			if (columnAttr == null) return node;
-			var updateScript = !string.IsNullOrEmpty(columnAttr.FunctionScript) ?
-							(NodePropertyUpdateScriptTypes.Func, columnAttr.FunctionScript, columnAttr.ScriptNamespaces) :
-							(NodePropertyUpdateScriptTypes.SqlFunc, columnAttr.SQLFunction, null);
+			var updateScript = (NodePropertyUpdateScriptTypes.Func, columnAttr.FunctionScript, columnAttr.ScriptNamespaces, columnAttr.ServiceName);
+			//var updateScript = !string.IsNullOrEmpty(columnAttr.FunctionScript) ?
+			//				(NodePropertyUpdateScriptTypes.Func, columnAttr.FunctionScript, columnAttr.ScriptNamespaces) :
+			//				(NodePropertyUpdateScriptTypes.SqlFunc, columnAttr.SQLFunction, null);
 			node.UpdateScript = updateScript;
 			node.UpdateOption = columnAttr.DetermineColumnUpdateOption();
 			return node;
@@ -118,7 +119,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			ActionInjectionAttribute columnAttr = property.GetCustomAttribute<ActionInjectionAttribute>();
 			if (columnAttr == null) return node;
-			node.UpdateScript = (NodePropertyUpdateScriptTypes.Action, columnAttr.ActionScript, columnAttr.ScriptNamespaces);
+			node.UpdateScript = (NodePropertyUpdateScriptTypes.Action, columnAttr.ActionScript, columnAttr.ScriptNamespaces, columnAttr.ServiceName);
 			node.UpdateOption = columnAttr.DetermineColumnUpdateOption();
 			return node;
 		}

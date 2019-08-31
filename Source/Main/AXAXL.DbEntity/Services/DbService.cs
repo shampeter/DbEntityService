@@ -18,6 +18,11 @@ namespace AXAXL.DbEntity.Services
 		private INodeMap NodeMap { get; set; }
 		public DbService(ILoggerFactory factory, IDatabaseDriver dbDriver, INodeMap nodeMap, IDbServiceOption serviceOption)
 		{
+			Debug.Assert(factory != null);
+			Debug.Assert(dbDriver != null);
+			Debug.Assert(nodeMap != null);
+			Debug.Assert(serviceOption != null);
+
 			this.Log = factory.CreateLogger<DbService>();
 			this.ServiceOption = serviceOption;
 			this.Driver = dbDriver;
@@ -27,14 +32,6 @@ namespace AXAXL.DbEntity.Services
 		{
 			this.NodeMap.BuildNodes(assemblies, assemblyNamePrefixes, this.ServiceOption.NodeMapPrintFilename);
 			return this;
-		}
-		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)
-		{
-			Debug.Assert(string.IsNullOrEmpty(rawQuery) == false);
-			Debug.Assert(this.Driver != null);
-
-			var connection = string.IsNullOrEmpty(connectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(connectionName);
-			return this.Driver.Select(connection, rawQuery, parameters);
 		}
 
 		public IQuery<T> Query<T>() where T : class, new()
@@ -51,5 +48,21 @@ namespace AXAXL.DbEntity.Services
 				;
 			return unitOfWork;
 		}
+
+		public IExecuteCommand ExecuteCommand()
+		{
+			return new ExecuteCommand(this.Log, this.ServiceOption, this.Driver);
+		}
+		/* Functionality has moved to IExecuteCommand
+		 * 
+		public IEnumerable<dynamic> FromRawSql(string rawQuery, IDictionary<string, object> parameters, string connectionName = null)
+		{
+			Debug.Assert(string.IsNullOrEmpty(rawQuery) == false);
+			Debug.Assert(this.Driver != null);
+
+			var connection = string.IsNullOrEmpty(connectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(connectionName);
+			return this.Driver.Select(connection, rawQuery, parameters);
+		}
+		*/
 	}
 }

@@ -24,7 +24,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         public int CededContractPkey { get; set; }
 
         [Column("ceded_contract_num")]
-        [ValueInjection(FunctionScript = "() => HelperMethods.NextSequence(1, 1)", When = InjectionOptions.WhenInserted)]
+        [ValueInjection(FunctionScript = "() => NextIntSequence(1, 1)", When = InjectionOptions.WhenInserted, ServiceName = "AXAXL.DbEntity.UnitTestLib.Models.INextSequence, AXAXL.DbEntity.UnitTestLib")]
         public int CededContractNum { get; set; }
 
         [Column("uw_year")]

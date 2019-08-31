@@ -16,12 +16,15 @@ namespace AXAXL.DbEntity.EntityGraph
 		private IDictionary<Type, Node> _nodeMap = new ConcurrentDictionary<Type, Node>();
 		private ILogger log = null;
 		private IDatabaseDriver driver = null;
-		public NodeMap(ILoggerFactory factory, IDatabaseDriver driver)
+		private IServiceProvider serviceProvider;
+		public NodeMap(ILoggerFactory factory, IDatabaseDriver driver, IServiceProvider serviceProvider)
 		{
 			this.log = factory.CreateLogger<NodeMap>();
 			this.driver = driver;
+			this.serviceProvider = serviceProvider;
 			Debug.Assert(this.log != null);
 			Debug.Assert(this.driver != null);
+			Debug.Assert(this.serviceProvider != null);
 		}
 		public void BuildNodes(Assembly[] assemblies, string[] assemblyNamePrefixes, string filenameToDebugPrintMap = null)
 		{
@@ -116,7 +119,7 @@ namespace AXAXL.DbEntity.EntityGraph
 					.HandleConstantAttribute(property)
 					.HandleForeignKeyAttribute(property)
 					.HandleInversePropertyAttribute(property)
-					.CompileScript()
+					.CompileScript(this.serviceProvider)
 					.CompileDelegateForHandlingCollection(saveExpressionToStringForDebug)
 					;
 				

@@ -9,7 +9,7 @@ namespace AXAXL.DbEntity.Annotation
 		{
 		}
 		public string ActionScript { get; set; }
-		public string[] ScriptNamespaces { get; set; }
+		//public string[] ScriptNamespaces { get; set; }
 	}
 
 }
