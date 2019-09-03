@@ -2,6 +2,19 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <AssemblyOriginatorKeyFile>DbEntityService.snk</AssemblyOriginatorKeyFile>
+    <Authors>AXA XL GT CAS</Authors>
+    <Company>AXA XL</Company>
+    <Description>Database to Entity Object mapping and access library</Description>
+    <Copyright>Copyright 2019 (c) AXA XL, member of AXA.  All rights reserved</Copyright>
+    <PackageProjectUrl>http://stadb1478.r02.xlgs.local:8080/DefaultCollection/AXAXL.ReIns.Framework</PackageProjectUrl>
+    <PackageIconUrl>file://ewrap0342d.r02.xlgs.local/Program Files/XLReFramework/Destiny_Framework_Icon.png</PackageIconUrl>
+    <RepositoryUrl>http://stadb1478.r02.xlgs.local:8080/DefaultCollection/AXAXL.ReIns.Framework</RepositoryUrl>
+    <RepositoryType>Team Foundation Server</RepositoryType>
+    <PackageTags>Database; Sqlserver; ORM</PackageTags>
+    <PackageReleaseNotes>1.0.0 initial release</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,5 +23,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="2.2.0" />
     <PackageReference Include="System.Data.SqlClient" Version="4.6.1" />
   </ItemGroup>
+	
+	<Target Name="nugetpack">
+		<Exec Command="msbuild /t:pack /p:IncludeSymbols=true /p:IncludeReferencedProjects=true /p:Configuration=Release &quot;$(ProjectPath)&quot;" />
+	</Target>
 
 </Project>
