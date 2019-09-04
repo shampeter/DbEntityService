@@ -1,14 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AXAXL.DbEntity.SampleApp.Models
 {
-    public partial class AuthorContact
-    {
-        public long AuthorId { get; set; }
-        public string ContactNumber { get; set; }
-        public string Address { get; set; }
+	[Table("AuthorContact")]
+    public class AuthorContact : TrackableEntity
+	{
+		[Column("Id")]
 
-        public virtual Author Author { get; set; }
-    }
+		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+		[Key]
+		public long Id { get; set; }
+
+		[Column("AuthorId")]
+		public long AuthorId { get; set; }
+
+		[Column("ContactNumber")]
+		public string ContactNumber { get; set; }
+
+		[Column("Address")]
+		public string Address { get; set; }
+
+		[ForeignKey(nameof(AuthorId))]
+		[InverseProperty(nameof(Models.Author.AuthorContacts))]
+        public Author Author { get; set; }
+
+		[Column("Version")]
+		[ConcurrencyCheck]
+		public byte[] Version { get; set; }
+	}
 }

@@ -1,0 +1,57 @@
+@startuml Bookstore ER Diagram
+' AutoInclude
+
+entity Author 
+{
+    * **Id : BIGINT** 
+	---
+    * Name NVARCHAR
+} 
+
+ 
+entity AuthorContact 
+{ 
+	* **Id : BIGINT**
+	---
+    * AuthorId : BIGINT
+	---
+    ContactNumber : NVARCHAR
+    Address       : NVARCHAR
+} 
+ 
+entity BookCategory 
+{
+	* **Id : BIGINT**
+	--- 
+    * Name : NVARCHAR
+} 
+
+entity Publisher 
+{    
+	* **Id : BIGINT**
+	---
+    * Name NVARCHAR 
+} 
+ 
+entity Book 
+{
+	* **Id : BIGINT**
+	---
+    * Title : NVARCHAR
+    * CategoryId : BIGINT
+    * PublisherId : BIGINT
+} 
+ 
+entity BookAuthors 
+{
+	* **BookId :  BIGINT**
+    * **AuthorId : BIGINT**
+}
+
+Author       ||--|{ AuthorContact : AuthorId
+Author       ||--|{ BookAuthors : AuthorId
+Book         ||--|{ BookAuthors : BookId
+BookCategory ||--|{ Book : CategoryId
+Publisher    ||--|{ Book : PublishId
+
+@enduml

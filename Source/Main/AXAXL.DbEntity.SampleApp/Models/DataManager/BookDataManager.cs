@@ -2,14 +2,15 @@
 using System.Linq;
 using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
+using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 {
     public class BookDataManager : IDataRepository<Book, BookDto>
     {
-        readonly BookStoreContext _bookStoreContext;
+        readonly IDbService _bookStoreContext;
 
-        public BookDataManager(BookStoreContext storeContext)
+        public BookDataManager(IDbService storeContext)
         {
             _bookStoreContext = storeContext;
         }

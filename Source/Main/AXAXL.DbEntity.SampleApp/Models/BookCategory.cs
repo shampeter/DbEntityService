@@ -1,18 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AXAXL.DbEntity.SampleApp.Models
 {
-    public partial class BookCategory
-    {
+	[Table("BookCategory")]
+    public class BookCategory : TrackableEntity
+	{
         public BookCategory()
         {
-            Book = new HashSet<Book>();
+            Books = new HashSet<Book>();
         }
 
+		[Column("Id")]
+		[Key]
+		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long Id { get; set; }
-        public string Name { get; set; }
 
-        public virtual ICollection<Book> Book { get; set; }
-    }
+		[Column("Name")]
+		public string Name { get; set; }
+
+		[InverseProperty(nameof(Models.Book.Category))]
+        public ICollection<Book> Books { get; set; }
+
+		[Column("Version")]
+		[ConcurrencyCheck]
+		public byte[] Version { get; set; }
+	}
 }
