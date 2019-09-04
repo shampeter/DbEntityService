@@ -81,7 +81,7 @@ namespace AXAXL.DbEntity.MSSql
 			return (outputClause, lambdaFunc.Compile());
 		}
 
-		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node)
+		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node, int maxNumOfRow)
 		{
 			var tableName = this.FormatTableName(node);
 			var allColumns = node.AllDbColumns;
@@ -89,7 +89,7 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
 
 			var selectColumns = string.Join(", ", allColumns.Select(p => $"{p.DbColumnName}"));
-			var selectClause = string.Format(@"SELECT {0} FROM {1}", selectColumns, tableName);
+			var selectClause = string.Format(@"SELECT {0}{1} FROM {2}", maxNumOfRow <= 0 ? string.Empty : $" TOP {maxNumOfRow} ", selectColumns, tableName);
 
 			var exprBuffer = new List<Expression>();
 			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");

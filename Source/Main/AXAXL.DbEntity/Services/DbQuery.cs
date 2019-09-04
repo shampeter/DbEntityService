@@ -58,14 +58,14 @@ namespace AXAXL.DbEntity.Services
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			return this;
 		}
-		public T[] ToArray()
+		public T[] ToArray(int maxNumOfRow = -1)
 		{
-			return this.ExecuteQuery(typeof(T)).ToArray();
+			return this.ExecuteQuery(typeof(T), maxNumOfRow).ToArray();
 		}
 
-		public IList<T> ToList()
+		public IList<T> ToList(int maxNumOfRow = -1)
 		{
-			return this.ExecuteQuery(typeof(T)).ToList();
+			return this.ExecuteQuery(typeof(T), maxNumOfRow).ToList();
 		}
 
 		public IQuery<T> Where(Expression<Func<T, bool>> whereClause)
@@ -73,12 +73,12 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClause = whereClause;
 			return this;
 		}
-		private IEnumerable<T> ExecuteQuery(Type entityType)
+		private IEnumerable<T> ExecuteQuery(Type entityType, int maxNumOfRow)
 		{
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
-			var queryResult = this.Driver.Select(connection, node, this.WhereClause, this.TimeoutDurationInSeconds);
+			var queryResult = this.Driver.Select(connection, node, this.WhereClause, maxNumOfRow, this.TimeoutDurationInSeconds);
 			foreach(var eachEntity in queryResult)
 			{
 				director.Build<T>(eachEntity, true, true);

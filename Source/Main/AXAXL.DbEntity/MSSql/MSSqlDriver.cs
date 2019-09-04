@@ -30,7 +30,7 @@ namespace AXAXL.DbEntity.MSSql
 				$"Dictionary contains key which is not present in the given node."
 				);
 
-			var select = this.sqlGenerator.CreateSelectComponent(node);
+			var select = this.sqlGenerator.CreateSelectComponent(node, -1);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns);
@@ -52,16 +52,16 @@ namespace AXAXL.DbEntity.MSSql
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			var where = this.sqlGenerator.CompileWhereClause<T>(node, whereClause);
-			var select = this.sqlGenerator.CreateSelectComponent(node);
+			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(node, whereClause) : (WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			var select = this.sqlGenerator.CreateSelectComponent(node, maxNumOfRow);
 			var cmd = new SqlCommand(select.SelectClause + where.WhereClause);
 			foreach (var parameter in where.SqlParameters)
 			{
-				cmd.Parameters.Add(parameter());
+				cmd.Parameters.Add(parameter.Invoke());
 			}
 			this.LogSql("Select<T> with where expression", node, cmd);
 			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
