@@ -51,24 +51,6 @@ var contracts = service.Query<TCedecContract>()
 
 Because foreign key has been setup between `TCededContract` and `TCompany`, the query will also retrieve the corresponding `TCompany` object for this contract, and it can be access via this `XlCompany` property on `TCededContract`.
 
-## Running Raw SQL against Database.
-
-To run plain query and fetch result by the service, the code can look like this.
-
-```c#
-var service = serviceProvider
-			.GetService<IDbService>();
-var someTable = service.FromRawSql(
-			@"select t.some_field_1, t.some_field_2, t.some_field_3 from some_table t where t.some_key = @SomeKey",
-			new Dictionary<string, object>{ ["@SomeKey"] = 123 }
-			).ToArray();
-```
-Where the dictionary parameter is used to provide value to the sql parameter `@SomeKey` in query.
-
-And the result can be accessed by, say `someTable[10].some_field_1`, for the `some_field_1` column of the eleventh row of the query resultset.
-
-For details of this C# type supporting this feature, please read [ExpandoObject Class](https://docs.microsoft.com/en-us/dotnet/api/system.dynamic.expandoobject?view=netcore-2.2).
-
 ## Running Query with some child set excluded
 
 Assuming we have a structure like this
@@ -85,4 +67,47 @@ var contract = _dbService
 				.ToArray()
 				.FirstOrDefault()
 				;
+```
+
+## Running Raw SQL against Database
+
+To run plain query and fetch result by the service, the code can look like this.
+
+```c#
+IDictionary<string, object> output;
+var resultSet = serviceProvider
+			.GetService<IDbService>();
+			.ExecuteCommand()
+			.SetCommand("Select c.company_name, ct.description from t_company c inner join t_lookups ct on c.company_type_fkey = ct.lookups_pkey")
+			.Execute(out output)
+			.ToArray();
+```
+
+In this example, the `resultSet` will be an array of `ExpandoObject` object with property `company_name` and `description`.  To access the result, one can just do this, for example,
+
+```c#
+foreach(var eachRow in resultSet)
+{
+	Console.WriteLine("Company = {0}, Type = {1}", eachRow.company_name, eachRow.description);
+}
+```
+
+For details of this C# type supporting this feature, please read [ExpandoObject Class](https://docs.microsoft.com/en-us/dotnet/api/system.dynamic.expandoobject?view=netcore-2.2).
+
+## Running stored procedure, such as `spu_getguid`
+
+To execute, say, spu_getguid in an independent transaction, one can do this:
+
+```c#
+IDictionary<string, object> outputParameters;
+var resultSet = this.DbService.ExecuteCommand()
+							.SetStoredProcedure("[dbo].[spu_getguid]")
+							.SetParameters(
+								(@"guid_id", type, ParameterDirection.Input),
+								(@"add2guid", range, ParameterDirection.Input),
+								(@"next_guid", -1, ParameterDirection.Output)
+							)
+							.SetTransactionScopeOption(TransactionScopeOption.Suppress)
+							.Execute(out outputParameters);
+var nextGuid = (int)outputParameters["next_seq"];
 ```

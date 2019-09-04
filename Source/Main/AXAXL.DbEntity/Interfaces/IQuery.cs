@@ -9,13 +9,15 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <summary>
 		/// Execute the query and return entities found in a list.
 		/// </summary>
+		/// <param name="maxNumOfRow">Set the maximum number of rows to be returned.  If set as <= 0, returns all rows</param>
 		/// <returns>List of entities</returns>
-		IList<T> ToList();
+		IList<T> ToList(int maxNumOfRow = -1);
 		/// <summary>
 		/// Execute the query and return entities found in an array.
 		/// </summary>
+		/// <param name="maxNumOfRow">Set the maximum number of rows to be returned.  If set as <= 0, returns all rows</param>
 		/// <returns>An array of entities</returns>
-		T[] ToArray();
+		T[] ToArray(int maxNumOfRow = -1);
 		/// <summary>
 		/// Specify the where clause of the query by a Lambda expression.
 		/// </summary>

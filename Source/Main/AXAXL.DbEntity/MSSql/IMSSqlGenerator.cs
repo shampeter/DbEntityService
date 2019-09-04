@@ -17,7 +17,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		NodeProperty[] ExtractColumnByPropertyName(Node node, params string[] propertyNames);
 
-		(string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node);
+		(string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node, int maxNumOfRow);
 
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 

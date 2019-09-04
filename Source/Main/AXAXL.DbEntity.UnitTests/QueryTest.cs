@@ -114,5 +114,33 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.IsNotNull(stateFarm);
 			Assert.AreEqual("Cedant Company", stateFarm.description);
 		}
+
+		[TestMethod]
+		[Description("Query with no where clause that return everything.")]
+		public void ReturnAllContractTest()
+		{
+			var contracts = _dbService.Query<TCededContract>().ToList();
+
+			Assert.AreEqual(2, contracts.Count(), $"There should be 2 contracts");
+			Assert.AreEqual(5, contracts.SelectMany(p => p.CededContractLayers).Count(), "There should be totally 5 layers.");
+			Assert.AreEqual(3, contracts.SelectMany(c => c.CededContractDocs).Count() + contracts.SelectMany(p => p.CededContractLayers).SelectMany(l => l.CededContractLayerDocs).Count());
+		}
+
+		[TestMethod]
+		[Description("Query with max. number of row returned set")]
+		public void MaxRowTest()
+		{
+			IList<TLookups> lookups = null;
+
+			lookups = _dbService.Query<TLookups>().ToList(3);
+			Assert.AreEqual(3, lookups.Count(), $"Should only return 3 lookups");
+
+			lookups = _dbService.Query<TLookups>().ToArray(7);
+			Assert.AreEqual(6, lookups.Count(), $"There should be totally 6 lookups");
+
+			lookups = _dbService.Query<TLookups>().ToArray();
+			Assert.AreEqual(6, lookups.Count(), $"There should be totally 6 lookups");
+
+		}
 	}
 }

@@ -43,8 +43,9 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="node">The <see cref="Node"/> representing the meta data and object-to-relational database mapping of the entity class.</param>
 		/// <param name="whereClause">Lambda expression representing the where clause for select.</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
+		/// <param name="maxNumOfRow">Specific maximum number of rows to be returned.  Set as <= 0 to return all rows.</param>
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
-		IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int timeoutDurationInSeconds = 30) where T : class, new();
+		IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, int timeoutDurationInSeconds = 30) where T : class, new();
 		/// <summary>
 		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.
 		/// </summary>
