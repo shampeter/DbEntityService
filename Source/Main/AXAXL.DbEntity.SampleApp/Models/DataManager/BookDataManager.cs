@@ -6,61 +6,50 @@ using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 {
-    public class BookDataManager : IDataRepository<Book, BookDto>
+    public class BookDataManager : IDataRepository<Book>
     {
-        readonly IDbService _bookStoreContext;
+        readonly IDbService _dbService;
 
-        public BookDataManager(IDbService storeContext)
+        public BookDataManager(IDbService dbService)
         {
-            _bookStoreContext = storeContext;
+            _dbService = dbService;
         }
 
         public IEnumerable<Book> GetAll()
         {
-            throw new System.NotImplementedException();
+			return _dbService.Query<Book>().ToArray();
         }
         
         public Book Get(long id)
         {
-            _bookStoreContext.ChangeTracker.LazyLoadingEnabled = false;
-
-            var book = _bookStoreContext.Book
-                .SingleOrDefault(b => b.Id == id);
-
-            if (book == null)
-            {
-                return null;
-            }
-
-            _bookStoreContext.Entry(book)
-                .Collection(b => b.BookAuthors)
-                .Load();
-
-            _bookStoreContext.Entry(book)
-                .Reference(b => b.Publisher)
-                .Load();
-            
-            return book;
+			return _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
         }
 
-        public BookDto GetDto(long id)
+        public Book Add(Book entity)
         {
-            throw new System.NotImplementedException();
+			entity.EntityStatus = EntityStatusEnum.New;
+			_dbService.Persist().Submit(c => c.Save(entity)).Commit();
+			return entity;
         }
 
-        public void Add(Book entity)
+        public Book Update(Book entityToUpdate, Book entity)
         {
-            throw new System.NotImplementedException();
+			entityToUpdate.EntityStatus = EntityStatusEnum.Updated;
+			entityToUpdate.CategoryId = entity.CategoryId;
+			entityToUpdate.PublisherId = entity.PublisherId;
+			entityToUpdate.Title = entity.Title;
         }
 
-        public void Update(Book entityToUpdate, Book entity)
+        public int Delete(Book entity)
         {
-            throw new System.NotImplementedException();
-        }
-
-        public void Delete(Book entity)
-        {
-            throw new System.NotImplementedException();
-        }
+			var returnCount = 0;
+			var entityToDelete = _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
+			if (entityToDelete != null)
+			{
+				entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
+				returnCount = _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
+			}
+			return returnCount;
+		}
     }
 }

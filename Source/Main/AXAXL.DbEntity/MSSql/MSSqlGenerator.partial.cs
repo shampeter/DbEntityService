@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using AXAXL.DbEntity.Annotation;
-using System.Text;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
-using AXAXL.DbEntity.Extensions;
 using ExpressionToString;
+using AXAXL.DbEntity.Interfaces;
+
 namespace AXAXL.DbEntity.MSSql
 {
 	public partial class MSSqlGenerator : IMSSqlGenerator
@@ -69,7 +67,8 @@ namespace AXAXL.DbEntity.MSSql
 			[typeof(Single?)] = SqlDbType.Real,
 			[typeof(Int16?)] = SqlDbType.SmallInt,
 			[typeof(Byte?)] = SqlDbType.TinyInt,
-			[typeof(Guid?)] = SqlDbType.UniqueIdentifier
+			[typeof(Guid?)] = SqlDbType.UniqueIdentifier,
+			[typeof(Timestamp)] = SqlDbType.VarBinary
 
 			// [typeof(String)] = SqlDbType.Char,
 			// [typeof(Char[])] = SqlDbType.Char,

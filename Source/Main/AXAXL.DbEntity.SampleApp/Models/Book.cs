@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using AXAXL.DbEntity.Interfaces;
+
 namespace AXAXL.DbEntity.SampleApp.Models
 {
 	[Table("Book")]
@@ -39,6 +41,6 @@ namespace AXAXL.DbEntity.SampleApp.Models
 
 		[Column("Version")]
 		[ConcurrencyCheck]
-		public byte[] Version { get; set; }
+		public Timestamp Version { get; set; }
 	}
 }

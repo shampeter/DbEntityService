@@ -22,9 +22,5 @@ namespace AXAXL.DbEntity.SampleApp.Models
 		[InverseProperty(nameof(Models.Book.BookAuthors))]
 		[ForeignKey(nameof(BookId))]
         public virtual Book Book { get; set; }
-
-		[Column("Version")]
-		[ConcurrencyCheck]
-		public byte[] Version { get; set; }
 	}
 }

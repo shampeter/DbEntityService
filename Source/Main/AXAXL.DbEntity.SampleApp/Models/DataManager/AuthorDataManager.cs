@@ -1,12 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
 using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 {
-    public class AuthorDataManager : IDataRepository<Author, AuthorDto>
+    public class AuthorDataManager : IDataRepository<Author>
     {
         readonly IDbService _dbService;
 
@@ -22,29 +24,27 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 					.ToList();
         }
 
-        public Author Get(long id)
+        public Author Get(long id, long version = -1)
         {
-			var author = _dbService
+			Expression<Func<Author, bool>> whereWithVersion = (a) => a.Id == id && a.Version == (Timestamp)version;
+			Expression<Func<Author, bool>> whereWithNoVersion = (a) => a.Id == id;
+			var where = version < 0 ? whereWithNoVersion : whereWithVersion;
+
+			Author author = _dbService
 							.Query<Author>()
-							.FirstOrDefault(a => a.Id == id);
+							.FirstOrDefault(where);
 
             return author;
         }
 
-        public AuthorDto GetDto(long id)
-        {
-			var author = _dbService.Query<Author>().FirstOrDefault(a => a.Id == id);
-			return AuthorDtoMapper.MapToDto(author);
-        }
-
-
-        public void Add(Author entity)
+        public Author Add(Author entity)
         {
 			entity.EntityStatus = EntityStatusEnum.New;
 			_dbService.Persist().Submit(c => c.Save(entity)).Commit();
+			return entity;
         }
 
-        public void Update(Author entityToUpdate, Author entity)
+        public Author Update(Author entityToUpdate, Author entity)
         {
             entityToUpdate.Name = entity.Name;
 
@@ -64,11 +64,20 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 				added.EntityStatus = EntityStatusEnum.New;
 			}
 			_dbService.Persist().Submit(c => c.Save(entityToUpdate)).Commit();
+
+			return entityToUpdate;
         }
 
-        public void Delete(Author entity)
+        public int Delete(long id)
         {
-            throw new System.NotImplementedException();
+			var returnCount = 0;
+			var entityToDelete = _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
+			if (entityToDelete != null)
+			{
+				entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
+				returnCount = _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
+			}
+			return returnCount;
         }
     }
 }
