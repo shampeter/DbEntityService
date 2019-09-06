@@ -126,7 +126,7 @@ namespace System
 		}
 		public TypeCode GetTypeCode()
 		{
-			return TypeCode.UInt64;
+			return TypeCode.Object;
 		}
 
 		public bool ToBoolean(IFormatProvider provider)
