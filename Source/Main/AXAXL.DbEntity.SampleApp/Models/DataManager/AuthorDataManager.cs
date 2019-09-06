@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
 using AXAXL.DbEntity.Interfaces;
 
@@ -24,17 +22,16 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 					.ToList();
         }
 
-        public Author Get(long id, long version = -1)
+		public Author Get(long id)
+		{
+			return _dbService.Query<Author>().FirstOrDefault((a) => a.Id == id);
+		}
+
+		public Author Get(long id, RowVersion version)
         {
-			Expression<Func<Author, bool>> whereWithVersion = (a) => a.Id == id && a.Version == (Timestamp)version;
-			Expression<Func<Author, bool>> whereWithNoVersion = (a) => a.Id == id;
-			var where = version < 0 ? whereWithNoVersion : whereWithVersion;
-
-			Author author = _dbService
-							.Query<Author>()
-							.FirstOrDefault(where);
-
-            return author;
+			return _dbService
+					.Query<Author>()
+					.FirstOrDefault((a) => a.Id == id && a.Version == version);
         }
 
         public Author Add(Author entity)
@@ -44,15 +41,15 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 			return entity;
         }
 
-        public Author Update(Author entityToUpdate, Author entity)
+        public Author Update(Author existingEntityFromDb, Author entityReturnedFromClient)
         {
-            entityToUpdate.Name = entity.Name;
+            existingEntityFromDb.Name = entityReturnedFromClient.Name;
 
-            entityToUpdate.Contact.Address = entity.Contact?.Address;
-            entityToUpdate.Contact.ContactNumber = entity.Contact?.ContactNumber;
+            existingEntityFromDb.Contact.Address = entityReturnedFromClient.Contact?.Address;
+            existingEntityFromDb.Contact.ContactNumber = entityReturnedFromClient.Contact?.ContactNumber;
 
-            var deletedBooks = entityToUpdate.BookAuthors.Except(entity.BookAuthors).ToList();
-            var addedBooks = entity.BookAuthors.Except(entityToUpdate.BookAuthors).ToList();
+            var deletedBooks = existingEntityFromDb.BookAuthors.Except(entityReturnedFromClient.BookAuthors).ToList();
+            var addedBooks = entityReturnedFromClient.BookAuthors.Except(existingEntityFromDb.BookAuthors).ToList();
 
 			foreach(var deleted in deletedBooks)
 			{
@@ -60,24 +57,18 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 			}
 			foreach(var added in addedBooks)
 			{
-				entityToUpdate.BookAuthors.Add(added);
+				existingEntityFromDb.BookAuthors.Add(added);
 				added.EntityStatus = EntityStatusEnum.New;
 			}
-			_dbService.Persist().Submit(c => c.Save(entityToUpdate)).Commit();
+			_dbService.Persist().Submit(c => c.Save(existingEntityFromDb)).Commit();
 
-			return entityToUpdate;
+			return existingEntityFromDb;
         }
 
-        public int Delete(long id)
-        {
-			var returnCount = 0;
-			var entityToDelete = _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
-			if (entityToDelete != null)
-			{
-				entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
-				returnCount = _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
-			}
-			return returnCount;
-        }
+		public int Delete(Author entityToDelete)
+		{
+			entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
+			return _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
+		}
     }
 }

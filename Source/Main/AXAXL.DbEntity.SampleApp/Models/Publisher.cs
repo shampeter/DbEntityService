@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Interfaces;
@@ -26,6 +27,6 @@ namespace AXAXL.DbEntity.SampleApp.Models
 
 		[Column("Version")]
 		[ConcurrencyCheck]
-		public Timestamp Version { get; set; }
+		public RowVersion Version { get; set; }
 	}
 }

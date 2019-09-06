@@ -35,7 +35,7 @@ namespace AXAXL.DbEntity.SampleApp.Models
 
 		[Column("Version")]
 		[ConcurrencyCheck]
-		public Timestamp Version { get; set; }
+		public RowVersion Version { get; set; }
 
 		public AuthorContact Contact
 		{

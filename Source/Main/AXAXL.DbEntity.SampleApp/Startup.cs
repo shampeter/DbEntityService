@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using AXAXL.DbEntity.SampleApp.Models;
 using AXAXL.DbEntity.SampleApp.Models.DataManager;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -29,15 +28,25 @@ namespace AXAXL.DbEntity.SampleApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<BookStoreContext>(opts => opts.UseSqlServer(Configuration["ConnectionString:BooksDB"]));
-            services.AddScoped<IDataRepository<Author, AuthorDto>, AuthorDataManager>();
-            services.AddScoped<IDataRepository<Book, BookDto>, BookDataManager>();
-            services.AddScoped<IDataRepository< Publisher, PublisherDto>, PublisherDataManager>();
-
-            services.AddMvc()
-                .AddJsonOptions(
-                    options => options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
-                ).SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+			services
+				.AddSqlDbEntityService(
+					dbOption => dbOption
+								.AddOrUpdateConnection("BookDb", Configuration["ConnectionString:BooksDB"])
+								.SetAsDefaultConnection("BookDb")
+				)
+				.AddScoped<IDataRepository<Author>, AuthorDataManager>()
+				.AddScoped<IDataRepository<Book>, BookDataManager>()
+				.AddScoped<IDataRepository<Publisher>, PublisherDataManager>()
+				.AddMvc()
+				.AddJsonOptions(
+					options => options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+				)
+				.SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
+				;
+            //services.AddDbContext<BookStoreContext>(opts => opts.UseSqlServer(Configuration["ConnectionString:BooksDB"]));
+            //services.AddScoped<IDataRepository<Author, AuthorDto>, AuthorDataManager>();
+            //services.AddScoped<IDataRepository<Book, BookDto>, BookDataManager>();
+            //services.AddScoped<IDataRepository< Publisher, PublisherDto>, PublisherDataManager>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

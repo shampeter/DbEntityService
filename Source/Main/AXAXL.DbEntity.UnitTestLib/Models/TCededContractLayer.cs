@@ -55,7 +55,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 		[ConcurrencyCheck]
         [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
 		[Column("version")]
-        public byte[] Version { get; set; }
+        public RowVersion Version { get; set; }
 
         [ForeignKey(nameof(CededContractFkey))]
         [InverseProperty(nameof(TCededContract.CededContractLayers))]

@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AXAXL.DbEntity.SampleApp.Models;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
+using AXAXL.DbEntity.SampleApp.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,9 +13,9 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
     [ApiController]
     public class BooksController : ControllerBase
     {
-        private readonly IDataRepository<Book, BookDto> _dataRepository;
+        private readonly IDataRepository<Book> _dataRepository;
 
-        public BooksController(IDataRepository<Book, BookDto> dataRepository)
+        public BooksController(IDataRepository<Book> dataRepository)
         {
             _dataRepository = dataRepository;
         }

@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using AXAXL.DbEntity.SampleApp.Models;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AXAXL.DbEntity.SampleApp.Controllers
@@ -14,9 +9,9 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
     [ApiController]
     public class AuthorsController : ControllerBase
     {
-        private readonly IDataRepository<Author, AuthorDto> _dataRepository;
+        private readonly IDataRepository<Author> _dataRepository;
 
-        public AuthorsController(IDataRepository<Author, AuthorDto> dataRepository)
+        public AuthorsController(IDataRepository<Author> dataRepository)
         {
             _dataRepository = dataRepository;
         }
@@ -33,7 +28,7 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
         [HttpGet("{id}", Name = "GetAuthor")]
         public IActionResult Get(int id)
         {
-            var author = _dataRepository.GetDto(id);
+            var author = _dataRepository.Get(id);
             if (author == null)
             {
                 return NotFound("Author not found.");
@@ -69,15 +64,10 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
                 return BadRequest("Author is null.");
             }
 
-            var authorToUpdate = _dataRepository.Get(id);
+            var authorToUpdate = _dataRepository.Get(id, author.Version);
             if (authorToUpdate == null)
             {
                 return NotFound("The Employee record couldn't be found.");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest();
             }
 
             _dataRepository.Update(authorToUpdate, author);

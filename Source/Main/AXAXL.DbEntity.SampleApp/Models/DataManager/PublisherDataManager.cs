@@ -1,51 +1,63 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
+using System;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
 using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 {
-    public class PublisherDataManager : IDataRepository<Publisher, PublisherDto>
+    public class PublisherDataManager : IDataRepository<Publisher>
     {
-        readonly IDbService _bookStoreContext;
+        readonly IDbService _dbService;
 
-        public PublisherDataManager(IDbService storeContext)
+        public PublisherDataManager(IDbService dbService)
         {
-            _bookStoreContext = storeContext;
+            _dbService = dbService;
         }
 
         public IEnumerable<Publisher> GetAll()
         {
-            throw new System.NotImplementedException();
+			return _dbService.Query<Publisher>().ToArray();
         }
 
         public Publisher Get(long id)
         {
-            return _bookStoreContext.Publisher
-                .Include(a => a.Books)
-                .Single(b => b.Id == id);
+			return _dbService.Query<Publisher>().FirstOrDefault(p => p.Id == id);
+        }
+		public Publisher Get(long id, RowVersion version)
+		{
+			return _dbService.Query<Publisher>().FirstOrDefault(p => p.Id == id && p.Version == version);
+		}
+        public Publisher Add(Publisher entity)
+        {
+			_dbService.Persist().Submit(p => p.Save(entity)).Commit();
+			return entity;
         }
 
-        public PublisherDto GetDto(long id)
+        public Publisher Update(Publisher existingEntityFromDb, Publisher entityReturnedFromClient)
         {
-            throw new System.NotImplementedException();
+			existingEntityFromDb.EntityStatus = EntityStatusEnum.Updated;
+			existingEntityFromDb.Name = entityReturnedFromClient.Name;
+			var deleted = existingEntityFromDb.Books.Except(entityReturnedFromClient.Books).ToArray();
+			var added = entityReturnedFromClient.Books.Except(existingEntityFromDb.Books).ToArray();
+			foreach(var each in deleted)
+			{
+				each.EntityStatus = EntityStatusEnum.Deleted;
+			}
+			foreach(var each in added)
+			{
+				each.EntityStatus = EntityStatusEnum.New;
+			}
+
+			_dbService.Persist().Submit(c => c.Save(existingEntityFromDb)).Commit();
+
+			return existingEntityFromDb;
         }
 
-        public void Add(Publisher entity)
+        public int Delete(Publisher entity)
         {
-            throw new System.NotImplementedException();
-        }
-
-        public void Update(Publisher entityToUpdate, Publisher entity)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        public void Delete(Publisher entity)
-        {
-            _bookStoreContext.Remove(entity);
-            _bookStoreContext.SaveChanges();
+			entity.EntityStatus = EntityStatusEnum.Deleted;
+			return _dbService.Persist().Submit(c => c.Save(entity)).Commit();
         }
     }
 }

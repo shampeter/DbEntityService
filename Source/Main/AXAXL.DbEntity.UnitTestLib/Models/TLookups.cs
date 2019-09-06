@@ -24,7 +24,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         [Column("version")]
         [ConcurrencyCheck]
 		[DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-		public byte[] Version { get; set; }
+		public RowVersion Version { get; set; }
 
         [ForeignKey("LookupsGroupPkey")]
         [InverseProperty("TLookups")]

@@ -68,7 +68,7 @@ namespace AXAXL.DbEntity.MSSql
 			[typeof(Int16?)] = SqlDbType.SmallInt,
 			[typeof(Byte?)] = SqlDbType.TinyInt,
 			[typeof(Guid?)] = SqlDbType.UniqueIdentifier,
-			[typeof(Timestamp)] = SqlDbType.VarBinary
+			[typeof(RowVersion)] = SqlDbType.VarBinary
 
 			// [typeof(String)] = SqlDbType.Char,
 			// [typeof(Char[])] = SqlDbType.Char,

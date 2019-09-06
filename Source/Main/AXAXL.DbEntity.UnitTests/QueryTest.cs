@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Data;
 using System.Collections.Generic;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.UnitTestLib.Models;
@@ -141,6 +142,41 @@ namespace AXAXL.DbEntity.UnitTests
 			lookups = _dbService.Query<TLookups>().ToArray();
 			Assert.AreEqual(6, lookups.Count(), $"There should be totally 6 lookups");
 
+		}
+
+		[TestMethod]
+		[Description("Query involving RowVersion comparison")]
+		public void QueryWithRowVersion()
+		{
+			long version = 2019;
+			var contract = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == 1 && c.Version == version);
+			Assert.IsNotNull(contract);
+			Assert.AreEqual(100, contract.CededContractNum);
+		}
+
+		[TestMethod]
+		[Description("Raw Query involving RowVersion comparison")]
+		public void RawQueryWithRowVersion()
+		{
+			long version = 2019;
+			int key = 1;
+			var sql =
+				@"select c.ceded_contract_pkey, c.ceded_contract_num " +
+				@"from t_ceded_contract c " +
+				@"where c.ceded_contract_pkey = @key and c.version = @ver";
+
+			IDictionary<string, object> output;
+			var resultSet = _dbService.ExecuteCommand()
+					.SetCommand(sql)
+					.SetParameters(
+						("key", key, ParameterDirection.Input),
+						("ver", version, ParameterDirection.Input)
+					)
+					.Execute(out output)
+					;
+			Assert.IsNotNull(resultSet);
+			Assert.AreEqual(1, resultSet.Count());
+			Assert.AreEqual(100, resultSet.First().ceded_contract_num);
 		}
 	}
 }

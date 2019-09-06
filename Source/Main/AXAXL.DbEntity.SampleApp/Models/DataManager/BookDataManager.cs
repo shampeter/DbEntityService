@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using AXAXL.DbEntity.SampleApp.Models.DTO;
+using System;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
 using AXAXL.DbEntity.Interfaces;
 
@@ -25,6 +25,11 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 			return _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
         }
 
+		public Book Get(long id, RowVersion version)
+		{
+			return _dbService.Query<Book>().FirstOrDefault(b => b.Id == id && b.Version == version);
+		}
+
         public Book Add(Book entity)
         {
 			entity.EntityStatus = EntityStatusEnum.New;
@@ -32,24 +37,23 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 			return entity;
         }
 
-        public Book Update(Book entityToUpdate, Book entity)
+        public Book Update(Book existingEntityFromDb, Book entityReturnedFromClient)
         {
-			entityToUpdate.EntityStatus = EntityStatusEnum.Updated;
-			entityToUpdate.CategoryId = entity.CategoryId;
-			entityToUpdate.PublisherId = entity.PublisherId;
-			entityToUpdate.Title = entity.Title;
+			existingEntityFromDb.EntityStatus = EntityStatusEnum.Updated;
+			existingEntityFromDb.CategoryId = entityReturnedFromClient.CategoryId;
+			existingEntityFromDb.PublisherId = entityReturnedFromClient.PublisherId;
+			existingEntityFromDb.Title = entityReturnedFromClient.Title;
+
+			_dbService.Persist().Submit(c => c.Save(existingEntityFromDb)).Commit();
+
+			return existingEntityFromDb;
         }
 
-        public int Delete(Book entity)
-        {
-			var returnCount = 0;
-			var entityToDelete = _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
-			if (entityToDelete != null)
-			{
-				entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
-				returnCount = _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
-			}
-			return returnCount;
+		public int Delete(Book entityToDelete)
+		{
+
+			entityToDelete.EntityStatus = EntityStatusEnum.Deleted;
+			return _dbService.Persist().Submit(c => c.Save(entityToDelete)).Commit();
 		}
     }
 }

@@ -58,7 +58,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
         [ConcurrencyCheck]
         [Column("version")]
 		[DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-		public byte[] Version { get; set; }
+		public RowVersion Version { get; set; }
 
         [ForeignKey(nameof(CedantCompanyFkey))]
         public TCompany CedantCompany {
