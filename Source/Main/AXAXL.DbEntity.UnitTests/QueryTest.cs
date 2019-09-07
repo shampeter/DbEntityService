@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Data;
 using System.Collections.Generic;
@@ -148,35 +149,67 @@ namespace AXAXL.DbEntity.UnitTests
 		[Description("Query involving RowVersion comparison")]
 		public void QueryWithRowVersion()
 		{
-			long version = 2019;
-			var contract = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == 1 && c.Version == version);
+			// Version column seems to hold different value in different machine even though the test database was imported int LocalDB on every run on a test class.  Thus
+			// we need to get the version from the database of a record first before using it in query again to verify where clause compilation can handle RowVersion custom type.
+			var primaryKey = 1;
+			var contract = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == primaryKey);
 			Assert.IsNotNull(contract);
-			Assert.AreEqual(100, contract.CededContractNum);
+
+			long versionInLong = contract.Version;
+			var contractFromLongVersion = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == primaryKey && c.Version == versionInLong);
+			Assert.IsNotNull(contractFromLongVersion);
+			Assert.AreEqual(100, contractFromLongVersion.CededContractNum);
+
+			ulong versionInULong = contract.Version;
+			var contractFromULongVersion = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == primaryKey && c.Version == versionInULong);
+			Assert.IsNotNull(contractFromULongVersion);
+			Assert.AreEqual(100, contractFromULongVersion.CededContractNum);
+
+			var nativeVersion = contract.Version;
+			var contractFromNativeVersion = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == primaryKey && c.Version == nativeVersion);
+			Assert.IsNotNull(contractFromNativeVersion);
+			Assert.AreEqual(100, contractFromNativeVersion.CededContractNum);
+
+			int versionInInt = (int)contract.Version;
+			var contractFromIntVersion = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == primaryKey && c.Version == versionInInt);
+			Assert.IsNotNull(contractFromIntVersion);
+			Assert.AreEqual(100, contractFromIntVersion.CededContractNum);
 		}
 
 		[TestMethod]
 		[Description("Raw Query involving RowVersion comparison")]
 		public void RawQueryWithRowVersion()
 		{
-			long version = 2019;
+			// Version column seems to hold different value in different machine even though the test database was imported int LocalDB on every run on a test class.  Thus
+			// we need to get the version from the database of a record first before using it in query again to verify where clause compilation can handle RowVersion custom type.
 			int key = 1;
+			var contract = _dbService.Query<TCededContract>().FirstOrDefault(c => c.CededContractPkey == key);
 			var sql =
 				@"select c.ceded_contract_pkey, c.ceded_contract_num " +
 				@"from t_ceded_contract c " +
 				@"where c.ceded_contract_pkey = @key and c.version = @ver";
 
-			IDictionary<string, object> output;
-			var resultSet = _dbService.ExecuteCommand()
-					.SetCommand(sql)
-					.SetParameters(
-						("key", key, ParameterDirection.Input),
-						("ver", version, ParameterDirection.Input)
-					)
-					.Execute(out output)
-					;
+			var version = contract.Version;
+			var resultSet = this.ExecuteRawQuery(sql, ("key", key), ("ver", version));
 			Assert.IsNotNull(resultSet);
 			Assert.AreEqual(1, resultSet.Count());
 			Assert.AreEqual(100, resultSet.First().ceded_contract_num);
+
+			RowVersion? nullableVersion = contract.Version;
+			var resultSetWithNullableVersion = this.ExecuteRawQuery(sql, ("key", key), ("ver", nullableVersion));
+			Assert.IsNotNull(resultSetWithNullableVersion);
+			Assert.AreEqual(1, resultSetWithNullableVersion.Count());
+			Assert.AreEqual(100, resultSetWithNullableVersion.First().ceded_contract_num);
+		}
+		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
+		{
+			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();
+			IDictionary<string, object> output;
+			var resultSet = _dbService.ExecuteCommand()
+							.SetCommand(query)
+							.SetParameters(inputParameters)
+							.Execute(out output);
+			return resultSet;
 		}
 	}
 }

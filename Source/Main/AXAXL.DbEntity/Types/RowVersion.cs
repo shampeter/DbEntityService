@@ -43,6 +43,11 @@ namespace System
 		{
 			return value.internalValue;
 		}
+		public static implicit operator long(RowVersion value)
+		{
+			return unchecked((long)value.internalValue);
+		}
+
 		private static byte[] ToByteArray(ulong value)
 		{
 			var b = new byte[8];
@@ -72,10 +77,7 @@ namespace System
 				((ulong)bytes[7]);
 			return unsignedLong;
 		}
-		public static explicit operator long(RowVersion value)
-		{
-			return unchecked((long)value.internalValue);
-		}
+
 		public static bool operator ==(RowVersion leftOperand, RowVersion rightOperand)
 		{
 			return leftOperand.Equals(rightOperand);

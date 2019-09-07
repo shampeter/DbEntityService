@@ -132,6 +132,8 @@ namespace AXAXL.DbEntity.MSSql
 				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
 
 				var entityProperty = Expression.Property(entity, column.PropertyName);
+			/* After introduction of RowVersion, the assignment failed because the expression doesn't accept direct assignment from byte[] to RowVersion.
+			 * Thus change to always cast the reader result to the property type.
 				Expression dbReaderMethod = Expression.Invoke(
 					SqlTypeToReaderMap[dbType],
 					dataReader,
@@ -141,6 +143,16 @@ namespace AXAXL.DbEntity.MSSql
 				{
 					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
 				}
+			*/
+				Expression dbReaderMethod = Expression.Convert(
+					Expression.Invoke(
+						SqlTypeToReaderMap[dbType],
+						dataReader,
+						Expression.Constant(i)
+						), 
+					column.PropertyType
+					);
+				
 				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
 				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
 
@@ -193,11 +205,17 @@ namespace AXAXL.DbEntity.MSSql
 				p =>
 				{
 					var parameterName = p.Name.StartsWith('@') ? p.Name : "@" + p.Name;
-					return new SqlParameter()
+					var sqlParameter = new SqlParameter()
 					{
 						ParameterName = parameterName,
 						Direction = p.Direction
 					};
+					if (p.Value != null)
+					{
+						var dbType = this.GetSqlDbTypeFromCSType(p.Value.GetType());
+						sqlParameter.SqlDbType = dbType;
+					}
+					return sqlParameter;
 				});
 			resultBuffer = resultBuffer ?? new Dictionary<string, SqlParameter>();
 			if (resultBuffer.Any(kv => kv.Value.Direction == ParameterDirection.ReturnValue) == false)
