@@ -4,9 +4,12 @@ using System.Data.SqlClient;
 using System.Data;
 using System.Linq.Expressions;
 using AXAXL.DbEntity.EntityGraph;
+using Autofac.Extras.DynamicProxy;
+using AXAXL.DbEntity.MSSql.Autofac;
 
 namespace AXAXL.DbEntity.MSSql
 {
+	[Intercept(MSSqlGeneratorResponseCache.C_MS_SQL_GENERATOR_CACHE_INTERCEPTOR_NAME)]
 	public interface IMSSqlGenerator
 	{
 		SqlDbType GetSqlDbTypeFromCSType(Type csType);
