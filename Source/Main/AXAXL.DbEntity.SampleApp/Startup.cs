@@ -13,6 +13,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Swashbuckle.AspNetCore.Swagger;
+using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.SampleApp
 {
@@ -33,28 +35,46 @@ namespace AXAXL.DbEntity.SampleApp
 					dbOption => dbOption
 								.AddOrUpdateConnection("BookDb", Configuration["ConnectionString:BooksDB"])
 								.SetAsDefaultConnection("BookDb")
+								.PrintNodeMapToFile(Configuration.GetValue<string>(@"DbEntity:NodeMapExport"))
 				)
 				.AddScoped<IDataRepository<Author>, AuthorDataManager>()
 				.AddScoped<IDataRepository<Book>, BookDataManager>()
 				.AddScoped<IDataRepository<Publisher>, PublisherDataManager>()
+				.AddSwaggerGen(
+					c => c.SwaggerDoc("v1", new Info
+					{
+						Title = "Distributed Transactions Feasibility Study API",
+						Version = "v1",
+						Description = "Sample App using AXAXL.DbEntity library",
+						TermsOfService = "None"
+					})
+				)
+				;
+			services
 				.AddMvc()
 				.AddJsonOptions(
 					options => options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
 				)
 				.SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
 				;
-            //services.AddDbContext<BookStoreContext>(opts => opts.UseSqlServer(Configuration["ConnectionString:BooksDB"]));
-            //services.AddScoped<IDataRepository<Author, AuthorDto>, AuthorDataManager>();
-            //services.AddScoped<IDataRepository<Book, BookDto>, BookDataManager>();
-            //services.AddScoped<IDataRepository< Publisher, PublisherDto>, PublisherDataManager>();
-        }
+		}
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             if (env.IsDevelopment())
             {
-                app.UseDeveloperExceptionPage();
+                app
+					.UseDeveloperExceptionPage()
+					.UseSwagger()
+					.UseSwaggerUI(
+						c =>
+						{
+							c.SwaggerEndpoint("/swagger/v1/swagger.json", "DbEntity Sample App API v1");
+							c.RoutePrefix = string.Empty;
+						}
+					)
+					;
             }
             else
             {
@@ -64,6 +84,13 @@ namespace AXAXL.DbEntity.SampleApp
 
             app.UseHttpsRedirection();
             app.UseMvc();
+
+			var dbService = app.ApplicationServices
+				.GetService<IDbService>()
+				.Bootstrap(
+					//new[] { typeof(AXAXL.DbEntity.SampleApp.Models.Author).Assembly },
+					//new[] { @"AXAXL.DbEntity.SampleApp.Models" }
+				);
         }
     }
 }

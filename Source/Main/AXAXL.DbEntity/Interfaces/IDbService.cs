@@ -19,7 +19,7 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="assemblies">list of assemblies to scan.  If none, full assemblies loaded will be used. <see cref="AppDomain.CurrentDomain"/></param>
 		/// <param name="assemblyNamePrefixes">Assembely name prefixes.</param>
 		/// <returns></returns>
-		IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes);
+		IDbService Bootstrap(Assembly[] assemblies = null, string[] assemblyNamePrefixes = null);
 		/// <summary>
 		/// Obtain an instance of IQuery to execute query on entity of type <typeparamref name="T"/>.
 		/// </summary>

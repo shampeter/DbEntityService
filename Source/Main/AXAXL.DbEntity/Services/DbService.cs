@@ -28,7 +28,7 @@ namespace AXAXL.DbEntity.Services
 			this.Driver = dbDriver;
 			this.NodeMap = nodeMap;
 		}
-		public IDbService Bootstrap(Assembly[] assemblies, string[] assemblyNamePrefixes)
+		public IDbService Bootstrap(Assembly[] assemblies = null, string[] assemblyNamePrefixes = null)
 		{
 			this.NodeMap.BuildNodes(assemblies, assemblyNamePrefixes, this.ServiceOption.NodeMapPrintFilename);
 			return this;
