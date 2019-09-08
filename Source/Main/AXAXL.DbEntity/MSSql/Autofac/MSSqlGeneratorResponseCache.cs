@@ -13,7 +13,14 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 {
 	public class MSSqlGeneratorResponseCache : IInterceptor
 	{
+		/// <summary>
+		/// Name used in InterceptAttribute and AutofModule to relate Interceptor with the Service to be intercepted.
+		/// See Autofac reference at <![CDATA[https://autofaccn.readthedocs.io/en/latest/advanced/interceptors.html#associate-interceptors-with-types-to-be-intercepted]]>
+		/// </summary>
 		public const string C_MS_SQL_GENERATOR_CACHE_INTERCEPTOR_NAME = @"SqlGeneratorCache";
+		/// <summary>
+		/// SubClass to determining which method will be intercepted.  Will use <see cref="_methodResponseToBeCached"/> to determine which method to intercept.
+		/// </summary>
 		public class MethodSelectionHookForSQLGenCache : IProxyGenerationHook
 		{
 			public void MethodsInspected()
@@ -30,18 +37,22 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 				return MSSqlGeneratorResponseCache._methodResponseToBeCached.ContainsKey(methodName);
 			}
 		}
-
+		/// <summary>
+		/// This map control which method will be intercepted and also provides the corresponding delegate to calculate the method signature of each invocation at runtime. 
+		/// </summary>
 		internal static readonly IDictionary<string, Func<string, IInvocation, string>> _methodResponseToBeCached = new Dictionary<string, Func<string, IInvocation, string>>
 		{
 			[nameof(IMSSqlGenerator.ExtractPrimaryKeyAndConcurrencyControlColumns)] = SignatureForExtractPrimaryKeyAndConcurrencyControlColumns,
 			[nameof(IMSSqlGenerator.CreateSelectComponent)] = SignatureForCreateSelectComponent,
-			[nameof(IMSSqlGenerator.CreateSqlParameters)] = SignatureForCreateSqlParameters,
 			[nameof(IMSSqlGenerator.CreateWhereClause)] = SignatureForCreateWhereClause,
 			[nameof(IMSSqlGenerator.CreateOutputComponent)] = SignatureForCreateOutputComponent,
 			[nameof(IMSSqlGenerator.CreateUpdateAssignmentComponent)] = SignatureForCreateUpdateAssignmentComponent,
 			[nameof(IMSSqlGenerator.CreateInsertComponent)] = SignatureForCreateInsertComponent,
 			[nameof(IMSSqlGenerator.CreateDeleteClause)] = SignatureForCreateDeleteClause,
 			[nameof(IMSSqlGenerator.CreatePropertyValueReaderMap)] = SignatureForCreatePropertyValueReaderMap
+			//	2019-09-08.  Found out that SqlParameters cannot be cached as it can only belong to one instance of query.
+			//  see https://forums.asp.net/t/1302676.aspx?Error+The+SqlParameter+is+already+contained+by+another+SqlParameterCollection
+			//	[nameof(IMSSqlGenerator.CreateSqlParameters)] = SignatureForCreateSqlParameters,
 		};
 
 		private ILogger Log { get; set; }
@@ -52,6 +63,12 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 			this.Log = factory.CreateLogger<MSSqlGeneratorResponseCache>();
 			this.Cache = cache;
 		}
+		/// <summary>
+		/// Interceptor method.  Use <see cref="IInvocation"/> to determine method signature and parameter values at runtime.
+		/// This method will check <see cref="_methodResponseToBeCached"/> dictionary to get the delegate that calculate the method signature at runtime.
+		/// The signature includes the method name and the runtime parameter value as strings.
+		/// </summary>
+		/// <param name="invocation">Method invocation data at runtime.</param>
 		public void Intercept(IInvocation invocation)
 		{
 			var name = invocation.Method.Name;
@@ -121,7 +138,7 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 		{
 			var nodeSign = SignatureForNode(invocation.GetArgumentValue(0));
 			var columnsSign = SignatureForNodeProperties(invocation.GetArgumentValue(1));
-			var prefixSign = invocation.GetArgumentValue(2).ToString();
+			var prefixSign = invocation.GetArgumentValue(2)?.ToString() ?? C_NA;
 			return $"{methodName}:{nodeSign},{columnsSign},{prefixSign}";
 		}
 
@@ -129,7 +146,7 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 		{
 			var nodeSign = SignatureForNode(invocation.GetArgumentValue(0));
 			var columnsSign = SignatureForNodeProperties(invocation.GetArgumentValue(1));
-			var prefixSign = invocation.GetArgumentValue(2).ToString();
+			var prefixSign = invocation.GetArgumentValue(2)?.ToString() ?? C_NA;
 			return $"{methodName}:{nodeSign},{columnsSign},{prefixSign}";
 		}
 

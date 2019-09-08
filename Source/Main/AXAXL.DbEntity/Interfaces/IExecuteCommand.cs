@@ -46,7 +46,7 @@ namespace AXAXL.DbEntity.Interfaces
 
 		/// <summary>
 		/// Assign command timeout time.  If none is specified, default is 30 seconds,
-		/// according to https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2.
+		/// according to <![CDATA[https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2.]]>
 		/// </summary>
 		/// <param name="timeoutDurationInSeconds">Timeout in seconds</param>
 		/// <returns>Return itself for method call chaining.</returns>

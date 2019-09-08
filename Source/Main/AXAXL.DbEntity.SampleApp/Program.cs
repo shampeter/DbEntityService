@@ -7,6 +7,7 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Autofac.Extensions.DependencyInjection;
 
 namespace AXAXL.DbEntity.SampleApp
 {
@@ -18,7 +19,9 @@ namespace AXAXL.DbEntity.SampleApp
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
-            WebHost.CreateDefaultBuilder(args)
-                .UseStartup<Startup>();
+            WebHost
+			.CreateDefaultBuilder(args)
+			.ConfigureServices(services => services.AddAutofac())
+            .UseStartup<Startup>();
     }
 }
