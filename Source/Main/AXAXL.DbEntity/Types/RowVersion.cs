@@ -5,8 +5,8 @@ namespace System
 	/// serialization become tricky.  Having a custom value type would tie up custome handling nicely together.
 	/// 
 	/// Idea drawn from 
-	/// 1. https://entityframework.net/knowledge-base/31163205/rowversion-gets-mapped-to-byte-8--in-entityframe-work-but-when-manually-casting-it-s-byte-18-
-	/// 2. https://gist.github.com/jnm2/929d194c87df8ad0438f6cab0139a0a6
+	/// 1. <![CDATA[https://entityframework.net/knowledge-base/31163205/rowversion-gets-mapped-to-byte-8--in-entityframe-work-but-when-manually-casting-it-s-byte-18-]]>
+	/// 2. <![CDATA[https://gist.github.com/jnm2/929d194c87df8ad0438f6cab0139a0a6]]>
 	/// </summary>
 	public struct RowVersion : IComparable, IEquatable<RowVersion>, IComparable<RowVersion>, IConvertible
 	{

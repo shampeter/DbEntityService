@@ -27,7 +27,8 @@ namespace AXAXL.DbEntity.Services
 			this.NodeMap = nodeMap;
 			this.Exclusion = new Dictionary<Node, NodeProperty[]>();
 			this.Driver = driver;
-			// According to https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2, default Sql server query timeout is 30 seconds.
+			// According to https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2,
+			// default Sql server query timeout is 30 seconds.
 			this.TimeoutDurationInSeconds = 30;
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)

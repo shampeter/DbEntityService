@@ -41,6 +41,7 @@ namespace AXAXL.DbEntity.SampleApp.Models
 
 		[Column("Version")]
 		[ConcurrencyCheck]
+		[DatabaseGenerated(DatabaseGeneratedOption.Computed)]
 		public RowVersion Version { get; set; }
 	}
 }
