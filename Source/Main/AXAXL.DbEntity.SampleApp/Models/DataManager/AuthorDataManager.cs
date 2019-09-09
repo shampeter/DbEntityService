@@ -19,12 +19,18 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
         {
             return _dbService
 					.Query<Author>()
+					.Exclude<AuthorContact>(c => c.Author)
+					.Exclude<BookAuthors>(ba => ba.Author)
 					.ToList();
         }
 
 		public Author Get(long id)
 		{
-			return _dbService.Query<Author>().FirstOrDefault((a) => a.Id == id);
+			return _dbService
+					.Query<Author>()
+					.Exclude<AuthorContact>(c => c.Author)
+					.Exclude<BookAuthors>(ba => ba.Author)
+					.FirstOrDefault((a) => a.Id == id);
 		}
 
 		public Author Get(long id, RowVersion version)
@@ -48,8 +54,8 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
             existingEntityFromDb.Contact.Address = entityReturnedFromClient.Contact?.Address;
             existingEntityFromDb.Contact.ContactNumber = entityReturnedFromClient.Contact?.ContactNumber;
 
-            var deletedBooks = existingEntityFromDb.BookAuthors.Except(entityReturnedFromClient.BookAuthors).ToList();
-            var addedBooks = entityReturnedFromClient.BookAuthors.Except(existingEntityFromDb.BookAuthors).ToList();
+			var deletedBooks = existingEntityFromDb.BookAuthors.Except(entityReturnedFromClient.BookAuthors, BookAuthors._equalityComparer).ToList();
+            var addedBooks = entityReturnedFromClient.BookAuthors.Except(existingEntityFromDb.BookAuthors, BookAuthors._equalityComparer).ToList();
 
 			foreach(var deleted in deletedBooks)
 			{
