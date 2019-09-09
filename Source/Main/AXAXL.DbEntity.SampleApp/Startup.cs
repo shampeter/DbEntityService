@@ -43,6 +43,7 @@ namespace AXAXL.DbEntity.SampleApp
 				.AddScoped<IDataRepository<Author>, AuthorDataManager>()
 				.AddScoped<IDataRepository<Book>, BookDataManager>()
 				.AddScoped<IDataRepository<Publisher>, PublisherDataManager>()
+				.AddScoped<IDataRepository<BookCategory>, BookCategoryDataManager>()
 				.AddSwaggerGen(
 					c => c.SwaggerDoc("v1", new Info
 					{

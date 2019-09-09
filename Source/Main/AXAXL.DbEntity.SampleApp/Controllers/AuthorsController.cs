@@ -51,8 +51,8 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
                 return BadRequest();
             }
 
-            _dataRepository.Add(author);
-            return CreatedAtRoute("GetAuthor", new { Id = author.Id }, null);
+            var added = _dataRepository.Add(author);
+            return CreatedAtRoute(new { Id = added.Id }, null);
         }
 
         // PUT: api/Authors/5
@@ -70,7 +70,12 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
                 return NotFound("The Employee record couldn't be found.");
             }
 
-            _dataRepository.Update(authorToUpdate, author);
+			if (!ModelState.IsValid)
+			{
+				return BadRequest();
+			}
+
+			_dataRepository.Update(authorToUpdate, author);
             return NoContent();
         }
     }

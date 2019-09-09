@@ -17,7 +17,10 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 
         public IEnumerable<Publisher> GetAll()
         {
-			return _dbService.Query<Publisher>().ToArray();
+			return _dbService
+					.Query<Publisher>()
+					.Exclude(p => p.Books)
+					.ToArray();
         }
 
         public Publisher Get(long id)
@@ -30,6 +33,7 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 		}
         public Publisher Add(Publisher entity)
         {
+			entity.EntityStatus = EntityStatusEnum.New;
 			_dbService.Persist().Submit(p => p.Save(entity)).Commit();
 			return entity;
         }
