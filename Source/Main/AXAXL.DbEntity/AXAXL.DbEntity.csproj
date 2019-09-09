@@ -14,7 +14,10 @@
     <RepositoryUrl>http://stadb1478.r02.xlgs.local:8080/DefaultCollection/AXAXL.ReIns.Framework</RepositoryUrl>
     <RepositoryType>Team Foundation Server</RepositoryType>
     <PackageTags>Database; Sqlserver; ORM</PackageTags>
-    <PackageReleaseNotes>1.0.0 initial release</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0 initial release
+1.1.0 added select all with no where clause and select top ## functionalities.
+1.2.0 added RowVersion class for Sql rowversion column and corresponding Json converter.</PackageReleaseNotes>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
