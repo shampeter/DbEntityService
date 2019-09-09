@@ -74,7 +74,7 @@ namespace AXAXL.DbEntity.SampleApp
 						c =>
 						{
 							c.SwaggerEndpoint("/swagger/v1/swagger.json", "DbEntity Sample App API v1");
-							c.RoutePrefix = string.Empty;
+							//c.RoutePrefix = string.Empty;
 						}
 					)
 					;
