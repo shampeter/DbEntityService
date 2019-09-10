@@ -22,5 +22,25 @@ namespace AXAXL.DbEntity.SampleApp.Models
 		[InverseProperty(nameof(Models.Book.BookAuthors))]
 		[ForeignKey(nameof(BookId))]
         public virtual Book Book { get; set; }
+
+		public static IEqualityComparer<BookAuthors> _equalityComparer = new BookAuthors.BookAuthorsComparer();
+
+		public class BookAuthorsComparer : IEqualityComparer<BookAuthors>
+		{
+			public bool Equals(BookAuthors x, BookAuthors y)
+			{
+				return x.AuthorId == y.AuthorId && x.BookId == y.BookId;
+			}
+
+			public int GetHashCode(BookAuthors obj)
+			{
+				var hashCode = 0;
+				if (obj != null)
+				{
+					hashCode = HashCode.Combine<long, long>(obj.AuthorId, obj.BookId);
+				}
+				return hashCode;
+			}
+		}
 	}
 }

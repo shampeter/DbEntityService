@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using System.IO;
 using AXAXL.DbEntity.SampleApp.Models;
 using AXAXL.DbEntity.SampleApp.Models.DataManager;
 using AXAXL.DbEntity.SampleApp.Models.Repository;
@@ -15,8 +15,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.Swagger;
 using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.Types.NewtonsoftConverters;
 using Autofac;
 using AXAXL.DbEntity.SampleApp.Autofac;
+using Newtonsoft.Json;
 
 namespace AXAXL.DbEntity.SampleApp
 {
@@ -32,6 +34,7 @@ namespace AXAXL.DbEntity.SampleApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+			var filePath = Path.Combine(System.AppContext.BaseDirectory, "AXAXL.DbEntity.SampleApp.xml");
 			services
 				// If Autofac is not used, the following will install DbEntitySerivces into the IoC container.
 				//.AddSqlDbEntityService(
@@ -45,19 +48,34 @@ namespace AXAXL.DbEntity.SampleApp
 				.AddScoped<IDataRepository<Publisher>, PublisherDataManager>()
 				.AddScoped<IDataRepository<BookCategory>, BookCategoryDataManager>()
 				.AddSwaggerGen(
-					c => c.SwaggerDoc("v1", new Info
+					c =>
 					{
-						Title = "Distributed Transactions Feasibility Study API",
-						Version = "v1",
-						Description = "Sample App using AXAXL.DbEntity library",
-						TermsOfService = "None"
-					})
+						c.SwaggerDoc("v1", new Info
+						{
+							Title = "Distributed Transactions Feasibility Study API",
+							Version = "v1",
+							Description = "Sample App using AXAXL.DbEntity library",
+							TermsOfService = "None"
+						});
+						c.IncludeXmlComments(filePath);
+					}
 				)
 				;
 			services
 				.AddMvc()
 				.AddJsonOptions(
-					options => options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+					options => 
+					{
+						options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+						if (options.SerializerSettings.Converters != null)
+						{
+							options.SerializerSettings.Converters.Add(new RowVersionConverter());
+						}
+						else
+						{
+							options.SerializerSettings.Converters = new[] { new RowVersionConverter() };
+						}
+					}
 				)
 				.SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
 				;

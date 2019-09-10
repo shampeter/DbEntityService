@@ -10,6 +10,7 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
     [ApiController]
     public class PublishersController : ControllerBase
     {
+		private const string C_GET_PUBLISHER_BY_ID = "GetPublisher";
         private readonly IDataRepository<Publisher> _dataRepository;
 
         public PublishersController(IDataRepository<Publisher> dataRepository)
@@ -23,6 +24,17 @@ namespace AXAXL.DbEntity.SampleApp.Controllers
 		{
 			var publishers = _dataRepository.GetAll();
 			return Ok(publishers);
+		}
+		// Get: api/publishers/5
+		[HttpGet("{id}", Name = C_GET_PUBLISHER_BY_ID)]
+		public IActionResult Get(long id)
+		{
+			var publisher = _dataRepository.Get(id);
+			if (publisher == null)
+			{
+				return NotFound("The Publisher record couldn't be found.");
+			}
+			return Ok(publisher);
 		}
 		// POST: api/publishers
 		[HttpPost]

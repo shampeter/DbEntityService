@@ -17,12 +17,18 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 
         public IEnumerable<Book> GetAll()
         {
-			return _dbService.Query<Book>().ToArray();
+			return _dbService
+					.Query<Book>()
+					.Exclude<BookAuthors>(ba => ba.Book)
+					.ToArray();
         }
         
         public Book Get(long id)
         {
-			return _dbService.Query<Book>().FirstOrDefault(b => b.Id == id);
+			return _dbService
+					.Query<Book>()
+					.Exclude<BookAuthors>(ba => ba.Book)
+					.FirstOrDefault(b => b.Id == id);
         }
 
 		public Book Get(long id, RowVersion version)
@@ -44,7 +50,13 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 			existingEntityFromDb.PublisherId = entityReturnedFromClient.PublisherId;
 			existingEntityFromDb.Title = entityReturnedFromClient.Title;
 
-			_dbService.Persist().Submit(c => c.Save(existingEntityFromDb)).Commit();
+			_dbService.Persist()
+				.Submit(
+					c => c
+						.Exclude<Book>(b => b.BookAuthors)
+						.Save(existingEntityFromDb)
+				)
+				.Commit();
 
 			return existingEntityFromDb;
         }
