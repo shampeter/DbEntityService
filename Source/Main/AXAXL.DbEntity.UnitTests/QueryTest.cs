@@ -206,8 +206,27 @@ namespace AXAXL.DbEntity.UnitTests
 		[Description("Query with OrderBy and Max row return")]
 		public void QueryWithOrderByAndMaxReturn()
 		{
-			var companies = _dbService.Query<TCompany>().OrderBy(c => c.CompanyName).ToArray(200);
-			// TODO: Complete this test case.
+			var companyNamesInAscOrderAsInDb = new [] {
+						@"AON Benefield",
+						@"Guy Carpentar",
+						@"State Farm",
+						@"Travellers",
+						@"XL Reinsurance America",
+						@"XL Reinsurance Bermuda"
+					};
+			var companyInOrder = _dbService.Query<TCompany>().OrderBy(c => c.CompanyName).ToArray(200);
+			Assert.AreEqual(6, companyInOrder.Length);
+			for (int i = 0; i < companyNamesInAscOrderAsInDb.Length; i++)
+			{
+				Assert.AreEqual(companyNamesInAscOrderAsInDb[i], companyInOrder[i].CompanyName);
+			}
+			var companyUnordered = _dbService.Query<TCompany>().ToArray(200);
+			Assert.AreEqual(6, companyUnordered.Length);
+			var companyOrderedByLinq = companyUnordered.OrderBy(c => c.CompanyName).ToArray();
+			for (int i = 0; i < companyOrderedByLinq.Length; i++)
+			{
+				Assert.AreEqual(companyOrderedByLinq[i].CompanyName, companyInOrder[i].CompanyName);
+			}
 		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
