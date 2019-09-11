@@ -201,6 +201,14 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.AreEqual(1, resultSetWithNullableVersion.Count());
 			Assert.AreEqual(100, resultSetWithNullableVersion.First().ceded_contract_num);
 		}
+
+		[TestMethod]
+		[Description("Query with OrderBy and Max row return")]
+		public void QueryWithOrderByAndMaxReturn()
+		{
+			var companies = _dbService.Query<TCompany>().OrderBy(c => c.CompanyName).ToArray(200);
+			// TODO: Complete this test case.
+		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
 			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();

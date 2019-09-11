@@ -35,7 +35,11 @@ namespace AXAXL.DbEntity.MSSql
 		(string InsertColumnsClause, string InsertValueClause, NodeProperty[] InsertColumns) CreateInsertComponent(Node node);
 
 		string CreateDeleteClause(Node node);
+		
 		IDictionary<string, Func<dynamic, dynamic>> CreatePropertyValueReaderMap(Node node, NodeProperty[] columns);
+		
+		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy);
+		
 		string FormatTableName(Node node);
 	}
 }
