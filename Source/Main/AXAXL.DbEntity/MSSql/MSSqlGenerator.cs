@@ -118,54 +118,6 @@ namespace AXAXL.DbEntity.MSSql
 			return (selectClause, lambdaFunc.Compile());
 		}
 
-		private Expression[] CreateSqlReaderFetchingExpressions(NodeProperty[] columns, ParameterExpression dataReader, Expression entity)
-		{
-			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
-			List<Expression> exprBuffer = new List<Expression>();
-
-			for (int i = 0; i < columns.Length; i++)
-			{
-				SqlDbType dbType;
-				var column = columns[i];
-
-				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
-				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
-
-				var entityProperty = Expression.Property(entity, column.PropertyName);
-			/* After introduction of RowVersion, the assignment failed because the expression doesn't accept direct assignment from byte[] to RowVersion.
-			 * Thus change to always cast the reader result to the property type.
-				Expression dbReaderMethod = Expression.Invoke(
-					SqlTypeToReaderMap[dbType],
-					dataReader,
-					Expression.Constant(i)
-				);
-				if (column.IsNullable == true)
-				{
-					dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
-				}
-			*/
-				Expression dbReaderMethod = Expression.Convert(
-					Expression.Invoke(
-						SqlTypeToReaderMap[dbType],
-						dataReader,
-						Expression.Constant(i)
-						), 
-					column.PropertyType
-					);
-				
-				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
-				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
-
-				var conditional = Expression.IfThenElse(
-					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
-					assignmentIfDbNull,
-					assignmentIfNotDbNull
-				);
-				exprBuffer.Add(conditional);
-			}
-			return exprBuffer.ToArray();
-		}
-
 		public IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null)
 		{
 			Debug.Assert(columns != null && columns.Length > 0 && columns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
@@ -279,6 +231,29 @@ namespace AXAXL.DbEntity.MSSql
 
 			return columns.ToDictionary(k => k.PropertyName, v => this.CreatePropertyValueReaderFunc(node, v));
 		}
+
+		public string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy)
+		{
+			var orderByClause = string.Empty;
+			if (orderBy != null && orderBy.Length > 0)
+			{
+				orderByClause = 
+					" ORDER BY " 
+					+
+					string.Join(
+						", ",
+						orderBy.Select(
+							o =>
+							{
+								var columnName = o.Property.DbColumnName;
+								var asc = o.IsAscending ? "ASC" : "DESC";
+								return $"{o.Property.DbColumnName} {asc}";
+							})
+					);
+			}
+			return orderByClause;
+		}
+
 		public string FormatTableName(Node node)
 		{
 			Debug.Assert(node != null, $"Input node is null!");
@@ -287,6 +262,54 @@ namespace AXAXL.DbEntity.MSSql
 		#endregion
 
 		#region Private methods
+
+		private Expression[] CreateSqlReaderFetchingExpressions(NodeProperty[] columns, ParameterExpression dataReader, Expression entity)
+		{
+			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
+			List<Expression> exprBuffer = new List<Expression>();
+
+			for (int i = 0; i < columns.Length; i++)
+			{
+				SqlDbType dbType;
+				var column = columns[i];
+
+				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
+				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
+
+				var entityProperty = Expression.Property(entity, column.PropertyName);
+				/* After introduction of RowVersion, the assignment failed because the expression doesn't accept direct assignment from byte[] to RowVersion.
+				 * Thus change to always cast the reader result to the property type.
+					Expression dbReaderMethod = Expression.Invoke(
+						SqlTypeToReaderMap[dbType],
+						dataReader,
+						Expression.Constant(i)
+					);
+					if (column.IsNullable == true)
+					{
+						dbReaderMethod = Expression.Convert(dbReaderMethod, column.PropertyType);
+					}
+				*/
+				Expression dbReaderMethod = Expression.Convert(
+					Expression.Invoke(
+						SqlTypeToReaderMap[dbType],
+						dataReader,
+						Expression.Constant(i)
+						),
+					column.PropertyType
+					);
+
+				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
+				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
+
+				var conditional = Expression.IfThenElse(
+					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+					assignmentIfDbNull,
+					assignmentIfNotDbNull
+				);
+				exprBuffer.Add(conditional);
+			}
+			return exprBuffer.ToArray();
+		}
 
 		private Func<object, dynamic> CreatePropertyValueReaderFunc(Node node, NodeProperty column)
 		{

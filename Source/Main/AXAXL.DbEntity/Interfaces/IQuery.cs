@@ -31,6 +31,13 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns>Return itself for method call chaining.</returns>
 		IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions);
 		/// <summary>
+		/// Order resultset according to the specified property and ordering
+		/// </summary>
+		/// <param name="property">Lambda expression that specify an entity property</param>
+		/// <param name="isAscending">Order. Assume ascending</param>
+		/// <returns>Return itself for method call chaining.</returns>
+		IQuery<T> OrderBy(Expression<Func<T, dynamic>> property, bool isAscending = true);
+		/// <summary>
 		/// Assign query timeout time.  If none is specified, default is 30 seconds,
 		/// according to <![CDATA[https://docs.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlcommand.commandtimeout?view=netcore-2.2.]]>
 		/// </summary>

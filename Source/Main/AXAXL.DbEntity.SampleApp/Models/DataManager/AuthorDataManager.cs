@@ -21,6 +21,7 @@ namespace AXAXL.DbEntity.SampleApp.Models.DataManager
 					.Query<Author>()
 					.Exclude<AuthorContact>(c => c.Author)
 					.Exclude<BookAuthors>(ba => ba.Author)
+					.OrderBy(a => a.Name)
 					.ToList();
         }
 

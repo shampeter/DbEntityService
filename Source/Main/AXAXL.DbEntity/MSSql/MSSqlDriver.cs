@@ -52,13 +52,15 @@ namespace AXAXL.DbEntity.MSSql
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
 			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(node, whereClause) : (WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
 			var select = this.sqlGenerator.CreateSelectComponent(node, maxNumOfRow);
-			var cmd = new SqlCommand(select.SelectClause + where.WhereClause);
+			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
+			var sqlCmd = select.SelectClause + where.WhereClause + orderByClause;
+			var cmd = new SqlCommand(sqlCmd);
 			foreach (var parameter in where.SqlParameters)
 			{
 				cmd.Parameters.Add(parameter.Invoke());
