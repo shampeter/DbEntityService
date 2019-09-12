@@ -16,8 +16,10 @@
     <PackageTags>Database; Sqlserver; ORM</PackageTags>
     <PackageReleaseNotes>1.0.0 initial release
 1.1.0 added select all with no where clause and select top ## functionalities.
-1.2.0 added RowVersion class for Sql rowversion column and corresponding Json converter.</PackageReleaseNotes>
-    <Version>1.2.0</Version>
+1.2.0 added RowVersion class for Sql rowversion column and corresponding Json converter.
+1.21. added OrderBy in IQuery.</PackageReleaseNotes>
+    <Version>1.2.1</Version>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
