@@ -19,14 +19,6 @@ namespace AXAXL.DbEntity.MSSql
 		private Node node = null;
 		private IDictionary<Type, SqlDbType> csharp2SqlTypeMap = null;
 		private IQueryExtensionForSqlOperators extensions = null;
-		internal WhereClauseVisitor(ILogger log, Node node, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
-		{
-			this.log = log;
-			this.node = node;
-			this.csharp2SqlTypeMap = typeMap;
-			this.buffer = new StringBuilder(@" WHERE ");
-			this.extensions = extensions;
-		}
 		private StringBuilder buffer = null;
 		private List<(string parameter, Type exprResultType, Expression expression)> captured = new List<(string, Type, Expression)>();
 		private readonly IDictionary<ExpressionType, string> operators = new Dictionary<ExpressionType, string>
@@ -39,7 +31,23 @@ namespace AXAXL.DbEntity.MSSql
 			[ExpressionType.NotEqual] = @" <> "
 		};
 		private int seq = 0;
-		public Func<SqlParameter> CreateSqlParameterFromCaptured((string parameter, Type exprResultType, Expression expression) captured)
+		internal WhereClauseVisitor(int runningSeq, ILogger log, Node node, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
+		{
+			this.log = log;
+			this.node = node;
+			this.csharp2SqlTypeMap = typeMap;
+			this.buffer = new StringBuilder(@" WHERE ");
+			this.extensions = extensions;
+			this.seq = runningSeq;
+		}
+		internal (int runningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
+		{
+			this.Visit(whereClause);
+			var where = this.buffer.ToString();
+			var sqlParameters = this.captured.Select(p => this.CreateSqlParameterFromCaptured(p)).ToArray();
+			return (this.seq, where, sqlParameters);
+		}
+		private Func<SqlParameter> CreateSqlParameterFromCaptured((string parameter, Type exprResultType, Expression expression) captured)
 		{
 			var sqlParameterVariable = Expression.Variable(typeof(SqlParameter), "sqlParam");
 			var parameterName = Expression.Property(sqlParameterVariable, "ParameterName");
@@ -110,8 +118,11 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected override Expression VisitMember(MemberExpression member)
 		{
-			var parent = member.Member.DeclaringType;
-			if (parent.IsAssignableFrom(typeof(T)) == false)
+			var names = new List<string>();
+			var isFromParameter = this.IsComingFromParameter(member, names);
+			//var parent = member.Member.DeclaringType;
+			//if (parent.IsAssignableFrom(typeof(T)) == false)
+			if (! isFromParameter)
 			{
 				var parameterName = $"@Parameter{++seq}";
 				buffer.Append(parameterName);
@@ -181,12 +192,17 @@ namespace AXAXL.DbEntity.MSSql
 
 			return newExpr;
 		}
-		internal (string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
+		private bool IsComingFromParameter(MemberExpression member, IList<string> names)
 		{
-			this.Visit(whereClause);
-			var where = this.buffer.ToString();
-			var sqlParameters = this.captured.Select(p => this.CreateSqlParameterFromCaptured(p)).ToArray();
-			return (where, sqlParameters);
+			if (member.Expression is MemberExpression parent)
+			{
+				names.Add(parent.Member.Name);
+				return this.IsComingFromParameter(parent, names);
+			}
+			else
+			{
+				return member.Expression is ParameterExpression;
+			}
 		}
 	}
 }

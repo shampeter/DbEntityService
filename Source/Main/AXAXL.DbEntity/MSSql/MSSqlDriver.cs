@@ -56,7 +56,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(node, whereClause) : (WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(0, node, whereClause) : (ParameterSequence: 0, WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
 			var select = this.sqlGenerator.CreateSelectComponent(node, maxNumOfRow);
 			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
 			var sqlCmd = select.SelectClause + where.WhereClause + orderByClause;

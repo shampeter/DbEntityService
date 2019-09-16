@@ -298,6 +298,19 @@ namespace AXAXL.DbEntity.UnitTests
 			);
 		}
 
+		[TestMethod]
+		[Description("Filter by parent entity properties")]
+		public void FilterByParentEntityProperties()
+		{
+			var gcLayers = _dbService
+							.Query<TCededContractLayer>()
+							.Where(l => l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
+							.ToArray()
+							;
+			Assert.IsTrue(
+				gcLayers.All(l => l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
+				);
+		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
 			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();
