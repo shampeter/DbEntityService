@@ -8,7 +8,7 @@ using System.Data;
 using System.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.EntityGraph;
-using AXAXL.DbEntity.Extensions;
+using AXAXL.DbEntity.Interfaces;
 using ExpressionToString;
 
 namespace AXAXL.DbEntity.MSSql
@@ -18,12 +18,14 @@ namespace AXAXL.DbEntity.MSSql
 		private ILogger log = null;
 		private Node node = null;
 		private IDictionary<Type, SqlDbType> csharp2SqlTypeMap = null;
-		internal WhereClauseVisitor(ILogger log, Node node, IDictionary<Type, SqlDbType> typeMap)
+		private IQueryExtensionForSqlOperators extensions = null;
+		internal WhereClauseVisitor(ILogger log, Node node, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
 		{
 			this.log = log;
 			this.node = node;
 			this.csharp2SqlTypeMap = typeMap;
-			this.buffer = new StringBuilder(@"WHERE ");
+			this.buffer = new StringBuilder(@" WHERE ");
+			this.extensions = extensions;
 		}
 		private StringBuilder buffer = null;
 		private List<(string parameter, Type exprResultType, Expression expression)> captured = new List<(string, Type, Expression)>();
@@ -133,18 +135,37 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected override Expression VisitMethodCall(MethodCallExpression method)
 		{
-			var arguments = method.Arguments;
-			if (arguments.Count > 1 && arguments.Any(a => a.NodeType == ExpressionType.MemberAccess && (a as MemberExpression).Member.DeclaringType == typeof(T)))
+			if (this.extensions.IsSupported(method))
 			{
-				throw new ArgumentException($"Does not support method with multiple arguments with on of them is a property");
+				var translation = this.extensions.Translate(method);
+				if (translation.LeftNode != null)
+				{
+					this.Visit(translation.LeftNode);
+				}
+				this.buffer.Append(translation.SqlOperator);
+				if (translation.RightNode != null)
+				{
+					this.Visit(translation.RightNode);
+				}
 			}
-			buffer.Append($"{method.Method.Name}(");
-			foreach (var eachArgument in method.Arguments)
+			else
 			{
-				this.Visit(eachArgument);
-			}
-			buffer.Append($")");
+				var arguments = method.Arguments;
+				if (arguments.Count > 1 && arguments.Any(a => a.NodeType == ExpressionType.MemberAccess && (a as MemberExpression).Member.DeclaringType == typeof(T)))
+				{
+					throw new ArgumentException($"Does not support method with multiple arguments with on of them is a property");
+				}
+				// buffer.Append($"{method.Method.Name}(");
+				// foreach (var eachArgument in method.Arguments)
+				// {
+				//	this.Visit(eachArgument);
+				// }
+				// buffer.Append($")");
 
+				var parameterName = $"@Parameter{++seq}";
+				buffer.Append(parameterName);
+				this.captured.Add((parameterName, method.Type, method));
+			}
 			return method;
 		}
 		protected override Expression VisitNew(NewExpression newExpr)
