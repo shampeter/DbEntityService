@@ -55,8 +55,14 @@ namespace AXAXL.DbEntity.MSSql
 		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-			var innerJoinMap = new OrderedDictionary() { ["-"] = 0 };
+
 			var tablePrefix = @"t";
+			var tableAliasFirstIdx = 0;
+
+			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
+			var innerJoinMap = new OrderedDictionary();
+			innerJoinMap.Add("-", topLevelJoin);
+
 			var where = whereClause != null ? 
 								this.sqlGenerator.CompileWhereClause<T>(
 									node, 
@@ -65,10 +71,10 @@ namespace AXAXL.DbEntity.MSSql
 									innerJoinMap, 
 									whereClause
 									) : 
-									(ParameterSequence: 0, WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
-			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, maxNumOfRow);
+									(ParameterSequence: 0, WhereClause: string.Empty, InnerJoinsClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, maxNumOfRow);
 			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
-			var sqlCmd = select.SelectClause + where.WhereClause + orderByClause;
+			var sqlCmd = select.SelectClause + where.InnerJoinsClause + where.WhereClause + orderByClause;
 			var cmd = new SqlCommand(sqlCmd);
 			foreach (var parameter in where.SqlParameters)
 			{

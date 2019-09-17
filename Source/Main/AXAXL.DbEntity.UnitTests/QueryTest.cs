@@ -304,11 +304,11 @@ namespace AXAXL.DbEntity.UnitTests
 		{
 			var gcLayers = _dbService
 							.Query<TCededContractLayer>()
-							.Where(l => l.AttachmentPoint > 0 && l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
+							.Where(l => l.AttachmentPoint > 0 && l.CededContract.CedantCompany.CompanyName == @"State Farm")
 							.ToArray()
 							;
 			Assert.IsTrue(
-				gcLayers.All(l => l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
+				gcLayers.All(l => l.CededContract.CedantCompany.CompanyName == @"State Farm")
 				);
 		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)

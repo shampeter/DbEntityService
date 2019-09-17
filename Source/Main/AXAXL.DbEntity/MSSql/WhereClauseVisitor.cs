@@ -18,12 +18,14 @@ namespace AXAXL.DbEntity.MSSql
 	public class WhereClauseVisitor<T> : ExpressionVisitor
 	{
 		private ILogger log = null;
-		private Node startingPoint = null;
+		private Node startingNode = null;
 		private IOrderedDictionary innerJoinMap = null;
 		private IDictionary<Type, SqlDbType> csharp2SqlTypeMap = null;
 		private IQueryExtensionForSqlOperators extensions = null;
 		private StringBuilder buffer = null;
 		private List<(string parameter, Type exprResultType, Expression expression)> captured = new List<(string, Type, Expression)>();
+		private int sqlParameterRunningSeq = 0;
+		private string tableAliasPrefix;
 		private readonly IDictionary<ExpressionType, string> operators = new Dictionary<ExpressionType, string>
 		{
 			[ExpressionType.Equal] = @" = ",
@@ -33,23 +35,32 @@ namespace AXAXL.DbEntity.MSSql
 			[ExpressionType.LessThanOrEqual] = @" <= ",
 			[ExpressionType.NotEqual] = @" <> "
 		};
-		private int seq = 0;
-		internal WhereClauseVisitor(Node startingPoint, int runningSeq, ILogger log, IOrderedDictionary innerJoinMap, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
+		internal WhereClauseVisitor(
+			Node startingNode, 
+			int sqlParameterRunningSeq, 
+			string tableAliasPrefix, 
+			ILogger log, 
+			IOrderedDictionary innerJoinMap, 
+			IDictionary<Type, SqlDbType> typeMap, 
+			IQueryExtensionForSqlOperators extensions
+			)
 		{
 			this.log = log;
 			this.innerJoinMap = innerJoinMap;
 			this.csharp2SqlTypeMap = typeMap;
 			this.buffer = new StringBuilder(@" WHERE ");
 			this.extensions = extensions;
-			this.seq = runningSeq;
-			this.startingPoint = startingPoint;
+			this.sqlParameterRunningSeq = sqlParameterRunningSeq;
+			this.startingNode = startingNode;
+			this.tableAliasPrefix = tableAliasPrefix;
 		}
-		internal (int runningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
+		internal (int SqlParameterRunningSeq, string WhereClause, string InnerJoinClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
 		{
 			this.Visit(whereClause);
 			var where = this.buffer.ToString();
+			var innerJoins = this.ComputeInnerJoins(this.innerJoinMap);
 			var sqlParameters = this.captured.Select(p => this.CreateSqlParameterFromCaptured(p)).ToArray();
-			return (this.seq, where, sqlParameters);
+			return (this.sqlParameterRunningSeq, where, innerJoins, sqlParameters);
 		}
 		private Func<SqlParameter> CreateSqlParameterFromCaptured((string parameter, Type exprResultType, Expression expression) captured)
 		{
@@ -115,7 +126,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected override Expression VisitConstant(ConstantExpression constant)
 		{
-			var parameterName = $"@Parameter{++seq}";
+			var parameterName = $"@Parameter{++sqlParameterRunningSeq}";
 			buffer.Append(parameterName);
 			this.captured.Add((parameterName, constant.Type, constant));
 			return constant;
@@ -123,21 +134,23 @@ namespace AXAXL.DbEntity.MSSql
 		protected override Expression VisitMember(MemberExpression member)
 		{
 			var names = new Stack<string>();
-			var isFromParameter = this.IsComingFromParameter(member, names);
+			var isAnEntityProperty = this.IsAnEntityProperty(member, names);
 			//var parent = member.Member.DeclaringType;
 			//if (parent.IsAssignableFrom(typeof(T)) == false)
-			if (! isFromParameter)
+			if (! isAnEntityProperty)
 			{
-				var parameterName = $"@Parameter{++seq}";
+				var parameterName = $"@Parameter{++sqlParameterRunningSeq}";
 				buffer.Append(parameterName);
 				this.captured.Add((parameterName, member.Type, member));
 			}
 			else
 			{
 				var propertyName = member.Member.Name;
+				
 				//var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
 				//Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
-				var columnName = this.GetDbColumnName(this.startingPoint, propertyName, names, this.innerJoinMap);
+
+				var columnName = this.GetDbColumnName(this.startingNode, @"-", propertyName, names, this.innerJoinMap);
 				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}'");
 				buffer.Append(columnName);
 			}
@@ -145,7 +158,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected override Expression VisitUnary(UnaryExpression unary)
 		{
-			var parameterName = $"@Parameter{++seq}";
+			var parameterName = $"@Parameter{++sqlParameterRunningSeq}";
 			buffer.Append(parameterName);
 			this.captured.Add((parameterName, unary.Type, unary));
 			return unary;
@@ -179,7 +192,7 @@ namespace AXAXL.DbEntity.MSSql
 				// }
 				// buffer.Append($")");
 
-				var parameterName = $"@Parameter{++seq}";
+				var parameterName = $"@Parameter{++sqlParameterRunningSeq}";
 				buffer.Append(parameterName);
 				this.captured.Add((parameterName, method.Type, method));
 			}
@@ -192,50 +205,142 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				throw new ArgumentException($"Does not support creating new target object within where clause");
 			}
-			var parameterName = $"@Parameter{++seq}";
+			var parameterName = $"@Parameter{++sqlParameterRunningSeq}";
 			buffer.Append(parameterName);
 			this.captured.Add((parameterName, newExpr.Type, newExpr));
 
 			return newExpr;
 		}
-		private bool IsComingFromParameter(MemberExpression member, Stack<string> names)
+		private bool IsAnEntityProperty(MemberExpression member, Stack<string> names)
 		{
 			if (member.Expression is MemberExpression parent)
 			{
 				names.Push(parent.Member.Name);
-				return this.IsComingFromParameter(parent, names);
+				return this.IsAnEntityProperty(parent, names);
 			}
 			else
 			{
 				return member.Expression is ParameterExpression;
 			}
 		}
-		private string GetDbColumnName(Node current, string currentName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
+		private string GetDbColumnName(Node current, string edgeName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
 		{
 			if (path.Count() <= 0)
 			{
-				return current.GetDbColumnNameFromPropertyName(propertyName);
+				var aliasIdx = ((ValueTuple<int, int, NodeEdge>)innerJoinMap[edgeName]).Item1;
+				var dbColumnName = current.GetDbColumnNameFromPropertyName(propertyName);
+				return $"{this.tableAliasPrefix}{aliasIdx}.[{dbColumnName}]";
 			}
 			else
 			{
 				var entityRef = path.Pop();
-				var parentRefOnChild = current.GetPropertyFromNode(entityRef);
+				var edge = this.AddEdgeToInnerJoin(innerJoinMap, current, edgeName, entityRef);
+				return this.GetDbColumnName(edge.ParentNode, entityRef, propertyName, path, innerJoinMap);
+			}
+		}
+		private NodeEdge AddEdgeToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string currentEdgeName, string newJoin)
+		{
+			NodeEdge edge = null;
 
+			if (! innerJoins.Contains(newJoin))
+			{
+				var parentRefOnChild = currentNode.GetPropertyFromNode(newJoin);
 				Debug.Assert(parentRefOnChild != null);
 				Debug.Assert(parentRefOnChild.IsEdge);
 
-				AddToInnerJoin(innerJoinMap, current, currentName, entityRef);
+				int currentIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[currentEdgeName]).Item1;
+				int lastIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[innerJoins.Count - 1]).Item1;
+				edge = currentNode.GetEdgeToParent(parentRefOnChild);
+				(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) innerJoin = (ParentTableAliasIdx: ++lastIdx, ChildTableAliasIdx: currentIdx, Edge: edge);
 
-				return this.GetDbColumnName(current.GetEdgeToParent(parentRefOnChild).ParentNode, propertyName, path, innerJoinMap);
+				innerJoins.Add(newJoin, innerJoin);
 			}
-		}
-		private static void AddToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string currentName, string newJoin)
-		{
-			if (! innerJoins.Contains(newJoin))
+			else
 			{
-				(int Index, string[] ParentKeyColumns, string[] ChildKeyColumns) last = (int, string[], string[])(innerJoins[innerJoins.Count - 1]);
-				innerJoins.Add(newJoin, ++last);
+				edge = ((ValueTuple<int, int, NodeEdge>)innerJoins[newJoin]).Item3;
 			}
+			return edge;
+		}
+
+		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap)
+		{
+			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) eachEdge;
+			StringBuilder buffer = new StringBuilder();
+			var enumerator = innerJoinsMap.GetEnumerator();
+			while (enumerator.MoveNext())
+			{
+				eachEdge = (ValueTuple<int, int, NodeEdge>)enumerator.Value;
+
+				if (eachEdge.Edge == null) continue;
+
+				var parentAlias = $"{this.tableAliasPrefix}{eachEdge.ParentTableAliasIdx}";
+				var childAlias = $"{this.tableAliasPrefix}{eachEdge.ChildTableAliasIdx}";
+				var nodeEdge = eachEdge.Edge;
+				var parentTable = FormatTableName(nodeEdge.ParentNode, parentAlias);
+				var childTable = FormatTableName(nodeEdge.ChildNode, childAlias);
+				var parentKeys = nodeEdge.ParentNodePrimaryKeys;
+				var childKeys = nodeEdge.ChildNodeForeignKeys;
+				var keyIdx = 0;
+
+				buffer
+					.Append(@" INNER JOIN ")
+					.Append(parentTable)
+					.Append(@" ON ")
+					;
+
+				for (; keyIdx < parentKeys.Length; keyIdx++)
+				{
+					if (keyIdx > 0) buffer.Append(@" AND ");
+					buffer.Append($"{parentAlias}.[{parentKeys[keyIdx].DbColumnName}] = {childAlias}.[{childKeys[keyIdx].DbColumnName}]");
+				}
+				for (; keyIdx < childKeys.Length; keyIdx++)
+				{
+					Debug.Assert(childKeys[keyIdx].IsConstant == true, $"There are more foreign keys than primary key on edge {nodeEdge.ParentNode.Name} -> {nodeEdge.ChildNode.Name}");
+					buffer.Append(@" AND ");
+					buffer.Append($"{childAlias}.[{childKeys[keyIdx].DbColumnName}] = {PrintConstantValueAsSqlCondition(childKeys[keyIdx])}");
+				}
+			}
+			return buffer.ToString();
+		}
+		/// <summary>
+		/// Format table name from Node data.
+		/// </summary>
+		/// <remarks>
+		/// Straightly copied from <see cref="MSSqlGenerator"/>. Need to find a way to share this code.
+		/// </remarks>
+		/// <param name="node">target node</param>
+		/// <param name="tableAlias">table alias to be used in SQL</param>
+		/// <returns></returns>
+		private static string FormatTableName(Node node, string tableAlias = null)
+		{
+			Debug.Assert(node != null, $"Input node is null!");
+			var tableName = string.IsNullOrEmpty(node.DbSchemaName) ? $"[{node.DbTableName}]" : $"[{node.DbSchemaName}].[{node.DbTableName}]";
+			return tableAlias == null ? $"{tableName}" : $"{tableName} AS {tableAlias}";
+		}
+		private static string PrintConstantValueAsSqlCondition(NodeProperty property)
+		{
+			Debug.Assert(property.IsConstant);
+			var constantValue = property.ConstantValue;
+			var propertyType = property.PropertyType;
+			string formattedValue = null;
+
+			if (propertyType.IsValueType)
+			{
+				if (propertyType.IsAssignableFrom(typeof(DateTime)))
+				{
+					var date = (DateTime)constantValue;
+					formattedValue = $"'{date.ToString(QueryExtensionForSqlOperators.C_DATE_FORMAT_FOR_SQL)}'";
+				}
+				else
+				{
+					formattedValue = constantValue.ToString();
+				}
+			}
+			else
+			{
+				formattedValue = $"'{constantValue.ToString()}'";
+			}
+			return formattedValue;
 		}
 	}
 }

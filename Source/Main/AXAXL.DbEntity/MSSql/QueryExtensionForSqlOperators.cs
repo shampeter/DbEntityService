@@ -27,7 +27,7 @@ namespace AXAXL.DbEntity.MSSql
 		#region Private and internal implementation
 
 		// Note that the date format is not taking care of time zone.
-		private const string C_DATE_FORMAT_FOR_SQL = "yyyy-MM-dd HH:mm:ss.fff";
+		internal const string C_DATE_FORMAT_FOR_SQL = "yyyy-MM-dd HH:mm:ss.fff";
 		private static readonly Type _tyEnumOfInt = typeof(IEnumerable<int>);
 		private static readonly Type _tyEnumOfLong = typeof(IEnumerable<long>);
 		private static readonly Type _tyEnumOfDateTime = typeof(IEnumerable<DateTime>);
