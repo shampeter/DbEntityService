@@ -63,8 +63,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public NodeEdge CompileChildAddingAction(bool saveExpressionToStringForDebug = false)
 		{
-			Expression<Action<object, IEnumerable<object>>> lambda = null;
-
+			Expression<Action<object, IEnumerable<object>>> lambda;
 			if (this.ChildReferenceOnParentNode != null)
 			{
 				lambda = this.ChildReferenceOnParentNode.CreateCollectionFillingAction();
@@ -84,8 +83,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public NodeEdge CompileChildRemoveAction(bool saveExpressionToStringForDebug = false)
 		{
-			Expression<Action<object, object>> lambda = null;
-
+			Expression<Action<object, object>> lambda;
 			if (this.ChildReferenceOnParentNode != null)
 			{
 				lambda = this.ChildReferenceOnParentNode.CreateCollectionRemovingAction();
@@ -105,8 +103,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public NodeEdge CompileParentSettingAction(bool saveExpressionToStringForDebug = false)
 		{
-			Expression<Action<object, object>> lambda = null;
-
+			Expression<Action<object, object>> lambda;
 			if (this.ParentReferenceOnChildNode != null)
 			{
 				lambda = this.ParentReferenceOnChildNode.CreateObjectAssignmentAction();

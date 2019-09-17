@@ -17,7 +17,6 @@ namespace AXAXL.DbEntity.EntityGraph
 	/// </summary>
 	public static class EntityGraphExtensions
 	{
-		private static readonly string NL = Environment.NewLine;
 		public static Expression<Func<object, dynamic>> CreatePropertyValueReaderFunc(this Node node, NodeProperty column)
 		{
 			var inputParameter = Expression.Parameter(typeof(object), "entity");
@@ -123,7 +122,6 @@ namespace AXAXL.DbEntity.EntityGraph
 			var entityInput = Expression.Parameter(typeof(object), "entity");
 			var childInput = Expression.Parameter(typeof(object), "child");
 			var property = Expression.Parameter(childRefPropertyType, "collection");
-			var breakLabel = Expression.Label(typeof(void));
 
 			var block = Expression.Block(
 				new[] { property },
