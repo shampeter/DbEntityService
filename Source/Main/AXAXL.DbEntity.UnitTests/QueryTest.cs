@@ -304,7 +304,7 @@ namespace AXAXL.DbEntity.UnitTests
 		{
 			var gcLayers = _dbService
 							.Query<TCededContractLayer>()
-							.Where(l => l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
+							.Where(l => l.AttachmentPoint > 0 && l.CededContract.CedantCompany.CompanyName == @"Guy Carpentar")
 							.ToArray()
 							;
 			Assert.IsTrue(

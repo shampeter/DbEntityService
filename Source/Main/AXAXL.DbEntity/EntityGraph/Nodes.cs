@@ -288,5 +288,10 @@ namespace AXAXL.DbEntity.EntityGraph
 				return this._allDbColumns;
 			}
 		}
+
+		public override int GetHashCode()
+		{
+			return this.NodeType.GetHashCode();
+		}
 	}
 }

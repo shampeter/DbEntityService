@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Text;
 using System.Linq;
 using System.Linq.Expressions;
@@ -16,7 +18,8 @@ namespace AXAXL.DbEntity.MSSql
 	public class WhereClauseVisitor<T> : ExpressionVisitor
 	{
 		private ILogger log = null;
-		private Node node = null;
+		private Node startingPoint = null;
+		private IOrderedDictionary innerJoinMap = null;
 		private IDictionary<Type, SqlDbType> csharp2SqlTypeMap = null;
 		private IQueryExtensionForSqlOperators extensions = null;
 		private StringBuilder buffer = null;
@@ -31,14 +34,15 @@ namespace AXAXL.DbEntity.MSSql
 			[ExpressionType.NotEqual] = @" <> "
 		};
 		private int seq = 0;
-		internal WhereClauseVisitor(int runningSeq, ILogger log, Node node, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
+		internal WhereClauseVisitor(Node startingPoint, int runningSeq, ILogger log, IOrderedDictionary innerJoinMap, IDictionary<Type, SqlDbType> typeMap, IQueryExtensionForSqlOperators extensions)
 		{
 			this.log = log;
-			this.node = node;
+			this.innerJoinMap = innerJoinMap;
 			this.csharp2SqlTypeMap = typeMap;
 			this.buffer = new StringBuilder(@" WHERE ");
 			this.extensions = extensions;
 			this.seq = runningSeq;
+			this.startingPoint = startingPoint;
 		}
 		internal (int runningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
 		{
@@ -118,7 +122,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		protected override Expression VisitMember(MemberExpression member)
 		{
-			var names = new List<string>();
+			var names = new Stack<string>();
 			var isFromParameter = this.IsComingFromParameter(member, names);
 			//var parent = member.Member.DeclaringType;
 			//if (parent.IsAssignableFrom(typeof(T)) == false)
@@ -131,8 +135,10 @@ namespace AXAXL.DbEntity.MSSql
 			else
 			{
 				var propertyName = member.Member.Name;
-				var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
-				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
+				//var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
+				//Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
+				var columnName = this.GetDbColumnName(this.startingPoint, propertyName, names, this.innerJoinMap);
+				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}'");
 				buffer.Append(columnName);
 			}
 			return member;
@@ -192,16 +198,43 @@ namespace AXAXL.DbEntity.MSSql
 
 			return newExpr;
 		}
-		private bool IsComingFromParameter(MemberExpression member, IList<string> names)
+		private bool IsComingFromParameter(MemberExpression member, Stack<string> names)
 		{
 			if (member.Expression is MemberExpression parent)
 			{
-				names.Add(parent.Member.Name);
+				names.Push(parent.Member.Name);
 				return this.IsComingFromParameter(parent, names);
 			}
 			else
 			{
 				return member.Expression is ParameterExpression;
+			}
+		}
+		private string GetDbColumnName(Node current, string currentName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
+		{
+			if (path.Count() <= 0)
+			{
+				return current.GetDbColumnNameFromPropertyName(propertyName);
+			}
+			else
+			{
+				var entityRef = path.Pop();
+				var parentRefOnChild = current.GetPropertyFromNode(entityRef);
+
+				Debug.Assert(parentRefOnChild != null);
+				Debug.Assert(parentRefOnChild.IsEdge);
+
+				AddToInnerJoin(innerJoinMap, current, currentName, entityRef);
+
+				return this.GetDbColumnName(current.GetEdgeToParent(parentRefOnChild).ParentNode, propertyName, path, innerJoinMap);
+			}
+		}
+		private static void AddToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string currentName, string newJoin)
+		{
+			if (! innerJoins.Contains(newJoin))
+			{
+				(int Index, string[] ParentKeyColumns, string[] ChildKeyColumns) last = (int, string[], string[])(innerJoins[innerJoins.Count - 1]);
+				innerJoins.Add(newJoin, ++last);
 			}
 		}
 	}

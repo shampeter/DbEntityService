@@ -1,8 +1,8 @@
 using System;
-using System.Text;
 using System.Diagnostics;
 using System.Data;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
@@ -30,7 +30,7 @@ namespace AXAXL.DbEntity.MSSql
 				$"Dictionary contains key which is not present in the given node."
 				);
 
-			var select = this.sqlGenerator.CreateSelectComponent(node, -1);
+			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, -1);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns);
@@ -55,9 +55,18 @@ namespace AXAXL.DbEntity.MSSql
 		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-
-			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(0, node, whereClause) : (ParameterSequence: 0, WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
-			var select = this.sqlGenerator.CreateSelectComponent(node, maxNumOfRow);
+			var innerJoinMap = new OrderedDictionary() { ["-"] = 0 };
+			var tablePrefix = @"t";
+			var where = whereClause != null ? 
+								this.sqlGenerator.CompileWhereClause<T>(
+									node, 
+									0, 
+									tablePrefix, 
+									innerJoinMap, 
+									whereClause
+									) : 
+									(ParameterSequence: 0, WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, maxNumOfRow);
 			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
 			var sqlCmd = select.SelectClause + where.WhereClause + orderByClause;
 			var cmd = new SqlCommand(sqlCmd);
