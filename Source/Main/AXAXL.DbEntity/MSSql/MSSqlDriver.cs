@@ -1,8 +1,8 @@
 using System;
-using System.Text;
 using System.Diagnostics;
 using System.Data;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
@@ -30,7 +30,7 @@ namespace AXAXL.DbEntity.MSSql
 				$"Dictionary contains key which is not present in the given node."
 				);
 
-			var select = this.sqlGenerator.CreateSelectComponent(node, -1);
+			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, -1);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns);
@@ -56,10 +56,25 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			var where = whereClause != null ? this.sqlGenerator.CompileWhereClause<T>(node, whereClause) : (WhereClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
-			var select = this.sqlGenerator.CreateSelectComponent(node, maxNumOfRow);
+			var tablePrefix = @"t";
+			var tableAliasFirstIdx = 0;
+
+			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
+			var innerJoinMap = new OrderedDictionary();
+			innerJoinMap.Add("-", topLevelJoin);
+
+			var where = whereClause != null ? 
+								this.sqlGenerator.CompileWhereClause<T>(
+									node, 
+									0, 
+									tablePrefix, 
+									innerJoinMap, 
+									whereClause
+									) : 
+									(ParameterSequence: 0, WhereClause: string.Empty, InnerJoinsClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, maxNumOfRow);
 			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
-			var sqlCmd = select.SelectClause + where.WhereClause + orderByClause;
+			var sqlCmd = select.SelectClause + where.InnerJoinsClause + where.WhereClause + orderByClause;
 			var cmd = new SqlCommand(sqlCmd);
 			foreach (var parameter in where.SqlParameters)
 			{

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data.SqlClient;
 using System.Data;
 using System.Linq.Expressions;
@@ -14,13 +15,13 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		SqlDbType GetSqlDbTypeFromCSType(Type csType);
 
-		(string WhereClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node node, Expression<Func<T, bool>> whereClause);
+		(int ParameterSequence, string WhereClause, string InnerJoinsClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause);
 
 		NodeProperty[] ExtractPrimaryKeyAndConcurrencyControlColumns(Node node);
 
 		NodeProperty[] ExtractColumnByPropertyName(Node node, params string[] propertyNames);
 
-		(string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node, int maxNumOfRow);
+		(string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node, int maxNumOfRow);
 
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 
@@ -40,6 +41,6 @@ namespace AXAXL.DbEntity.MSSql
 		
 		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy);
 		
-		string FormatTableName(Node node);
+		string FormatTableName(Node node, string tableAlias = null);
 	}
 }

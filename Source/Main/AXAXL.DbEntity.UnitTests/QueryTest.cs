@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Linq;
 using System.Data;
 using System.Collections.Generic;
@@ -228,6 +229,122 @@ namespace AXAXL.DbEntity.UnitTests
 				Assert.AreEqual(companyOrderedByLinq[i].CompanyName, companyInOrder[i].CompanyName);
 			}
 		}
+
+		[TestMethod]
+		[Description("Query with LIKE operator")]
+		public void QueryWithLIKESqlOp()
+		{
+			var searchingFor = @"LOSS";
+			var sqlPattern = $"%{searchingFor}%";
+			var regExPattern = $"^.*{searchingFor}.*$";
+			var regex = new Regex(regExPattern, RegexOptions.IgnoreCase);
+
+			var lookupWithDescLikeLoss = _dbService.Query<TLookups>().Where(l => l.Description.Like(sqlPattern)).ToArray();
+
+			Console.WriteLine("Lookup description returned from pattern {0} are: {1}", sqlPattern, string.Join(", ", lookupWithDescLikeLoss.Select(l => l.Description)));
+
+			Assert.AreEqual(2, lookupWithDescLikeLoss.Length);
+
+			var allMatches = lookupWithDescLikeLoss.All(l => regex.IsMatch(l.Description));
+			Assert.AreEqual(true, allMatches, $"Not all description returned matcth '{sqlPattern}'!");
+
+			var allLookups = _dbService.Query<TLookups>().ToArray();
+			var allLookupsFiltered = allLookups.Where(l => regex.IsMatch(l.Description)).ToArray();
+
+			var comparer = new GenericEqualityComparer<TLookups>(
+									(a, b) => a?.LookupsPkey == b?.LookupsPkey, 
+									(t) => t.LookupsPkey.GetHashCode()
+									);
+			var emptySet = allLookupsFiltered.Except(lookupWithDescLikeLoss, comparer).ToArray();
+
+			Assert.AreEqual(0, emptySet.Length);
+		}
+
+		[TestMethod]
+		[Description("Query with IN operator")]
+		public void QueryWithINSqlOp()
+		{
+			var companyComparer = new GenericEqualityComparer<TCompany>(
+							(a, b) => a?.CompanyPkey == b?.CompanyPkey,
+							(c) => c.CompanyPkey.GetHashCode()
+						);
+			var cedantAndBroker1 = _dbService.Query<TCompany>().Where(c => c.CompanyTypeFkey.In(new[] { 101, 102 })).ToArray();
+			Assert.AreEqual(4, cedantAndBroker1.Length);
+
+			Assert.IsTrue(cedantAndBroker1.All(c => new[] { 101, 102 }.Contains(c.CompanyTypeFkey)), $"Returned company are not all of type 101 or 102");
+
+			var cedantAndBrokerTypes = new [] { 101, 102 };
+			var cedantAndBroker2 = _dbService.Query<TCompany>().Where(c => c.CompanyTypeFkey.In(cedantAndBrokerTypes)).ToArray();
+			Assert.AreEqual(4, cedantAndBroker2.Length);
+
+			Assert.IsTrue(cedantAndBroker2.All(c => cedantAndBrokerTypes.Contains(c.CompanyTypeFkey)), $"Returned company are not all of type 101 or 102");
+
+			var allCedantAndBrokers = _dbService.Query<TCompany>().ToArray();
+			var cedantAndBrokersFilteredFromAll = allCedantAndBrokers
+													.Where(c => cedantAndBrokerTypes.Contains(c.CompanyTypeFkey)).ToArray();
+			Assert.AreEqual(
+				0, 
+				cedantAndBrokersFilteredFromAll.Except(
+					cedantAndBroker1,
+					companyComparer
+					)
+				.ToArray()
+				.Length
+				);
+			Assert.IsTrue(
+				allCedantAndBrokers
+					.Except(cedantAndBroker2, companyComparer)
+					.All(c => c.CompanyTypeFkey != 101 && c.CompanyTypeFkey != 102)
+			);
+		}
+
+		[TestMethod]
+		[Description("Filter by parent entity properties")]
+		public void FilterByParentEntityProperties()
+		{
+			var resultSet1 = _dbService
+							.Query<TCededContractLayer>()
+							.Where(
+								l => 
+									l.AttachmentPoint > 0 && 
+									(
+										l.CededContract.CedantCompany.CompanyName == @"State Farm" ||
+										l.CededContract.CedantCompany.CompanyName == @"Travellers"
+									)
+							)
+							.ToArray()
+							;
+			Assert.IsTrue(
+				resultSet1.All(l => 
+					l.CededContract.CedantCompany.CompanyName == @"State Farm" || 
+					l.CededContract.CedantCompany.CompanyName == @"Travellers")
+				);
+			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
+
+			var cedents = new[] { "State Farm", "Travellers" };
+			var resultSet2 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.In(cedents)
+				)
+				.ToArray()
+				;
+			Assert.AreEqual(5, resultSet2.Length, $"Actual number of rows returned = {resultSet2.Length}");
+
+			var stateFarm = @"%State%";
+			var resultSet3 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.Like(stateFarm)
+				)
+				.ToArray()
+				;
+			Assert.AreEqual(3, resultSet3.Length, $"Actual number of rows returned = {resultSet3.Length}");
+		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
 			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();
@@ -237,6 +354,30 @@ namespace AXAXL.DbEntity.UnitTests
 							.SetParameters(inputParameters)
 							.Execute(out output);
 			return resultSet;
+		}
+		/// <summary>
+		/// Insight of this utility class was drawn from https://social.msdn.microsoft.com/Forums/en-US/25c182ee-e68c-48a2-af89-6a215d2de828/iequalitycomparer-to-lambdaanonymous?forum=csharplanguage
+		/// </summary>
+		/// <typeparam name="T">target type</typeparam>
+		private class GenericEqualityComparer<T> : IEqualityComparer<T>
+		{
+			private Func<T, T, bool> equals;
+			private Func<T, int> hash;
+			public GenericEqualityComparer(Func<T, T, bool> equals, Func<T, int> hash)
+			{
+				this.equals = equals;
+				this.hash = hash;
+			}
+
+			public bool Equals(T x, T y)
+			{
+				return this.equals.Invoke(x, y);
+			}
+
+			public int GetHashCode(T obj)
+			{
+				return this.hash.Invoke(obj);
+			}
 		}
 	}
 }

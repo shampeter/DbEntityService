@@ -2,10 +2,11 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data;
 using System.Data.SqlClient;
 using AXAXL.DbEntity.EntityGraph;
-using System.Text;
+using AXAXL.DbEntity.Interfaces;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +15,8 @@ namespace AXAXL.DbEntity.MSSql
 	public partial class MSSqlGenerator : IMSSqlGenerator
 	{
 		private ILogger log = null;
+		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
+
 		public MSSqlGenerator(ILoggerFactory factory)
 		{
 			this.log = factory.CreateLogger<MSSqlGenerator>();
@@ -21,9 +24,9 @@ namespace AXAXL.DbEntity.MSSql
 
 		#region IMSSqlGenerator Implementation
 
-		public (string WhereClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node node, Expression<Func<T, bool>> whereClause)
+		public (int ParameterSequence, string WhereClause, string InnerJoinsClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause)
 		{
-			var visitor = new WhereClauseVisitor<T>(this.log, node, MSSqlGenerator.CSTypeToSqlTypeMap);
+			var visitor = new WhereClauseVisitor<T>(startingPoint, parameterSeq, tableAliasPrefix, this.log, innerJoinMap, MSSqlGenerator.CSTypeToSqlTypeMap, _extensions);
 			return visitor.Compile(whereClause);
 		}
 
@@ -81,14 +84,14 @@ namespace AXAXL.DbEntity.MSSql
 			return (outputClause, lambdaFunc.Compile());
 		}
 
-		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(Node node, int maxNumOfRow)
+		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node, int maxNumOfRow)
 		{
-			var tableName = this.FormatTableName(node);
+			var tableName = this.FormatTableName(node, tableAlias);
 			var allColumns = node.AllDbColumns;
 
 			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
 
-			var selectColumns = string.Join(", ", allColumns.Select(p => $"{p.DbColumnName}"));
+			var selectColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
 			var selectClause = string.Format(@"SELECT {0}{1} FROM {2}", maxNumOfRow <= 0 ? string.Empty : $" TOP {maxNumOfRow} ", selectColumns, tableName);
 
 			var exprBuffer = new List<Expression>();
@@ -187,11 +190,11 @@ namespace AXAXL.DbEntity.MSSql
 						string condition = null;
 						if (p.IsConstant)
 						{
-							condition = $"{p.DbColumnName} = " + this.FormatConstantValueAsParameterValue(node, p);
+							condition = $"[{p.DbColumnName}] = " + this.FormatConstantValueAsParameterValue(node, p);
 						}
 						else
 						{
-							condition = $"{p.DbColumnName} = @{parameterPrefix ?? string.Empty}{p.PropertyName}";
+							condition = $"[{p.DbColumnName}] = @{parameterPrefix ?? string.Empty}{p.PropertyName}";
 						}
 						return condition;
 					}));
@@ -247,17 +250,18 @@ namespace AXAXL.DbEntity.MSSql
 							{
 								var columnName = o.Property.DbColumnName;
 								var asc = o.IsAscending ? "ASC" : "DESC";
-								return $"{o.Property.DbColumnName} {asc}";
+								return $"[{o.Property.DbColumnName}] {asc}";
 							})
 					);
 			}
 			return orderByClause;
 		}
 
-		public string FormatTableName(Node node)
+		public string FormatTableName(Node node, string tableAlias = null)
 		{
 			Debug.Assert(node != null, $"Input node is null!");
-			return string.IsNullOrEmpty(node.DbSchemaName) ? $"[{node.DbTableName}]" : $"[{node.DbSchemaName}].[{node.DbTableName}]";
+			var tableName = string.IsNullOrEmpty(node.DbSchemaName) ? $"[{node.DbTableName}]" : $"[{node.DbSchemaName}].[{node.DbTableName}]";
+			return tableAlias == null ? $"{tableName}" : $"{tableName} AS {tableAlias}";
 		}
 		#endregion
 
