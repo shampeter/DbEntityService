@@ -302,14 +302,48 @@ namespace AXAXL.DbEntity.UnitTests
 		[Description("Filter by parent entity properties")]
 		public void FilterByParentEntityProperties()
 		{
-			var gcLayers = _dbService
+			var resultSet1 = _dbService
 							.Query<TCededContractLayer>()
-							.Where(l => l.AttachmentPoint > 0 && l.CededContract.CedantCompany.CompanyName == @"State Farm")
+							.Where(
+								l => 
+									l.AttachmentPoint > 0 && 
+									(
+										l.CededContract.CedantCompany.CompanyName == @"State Farm" ||
+										l.CededContract.CedantCompany.CompanyName == @"Travellers"
+									)
+							)
 							.ToArray()
 							;
 			Assert.IsTrue(
-				gcLayers.All(l => l.CededContract.CedantCompany.CompanyName == @"State Farm")
+				resultSet1.All(l => 
+					l.CededContract.CedantCompany.CompanyName == @"State Farm" || 
+					l.CededContract.CedantCompany.CompanyName == @"Travellers")
 				);
+			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
+
+			var cedents = new[] { "State Farm", "Travellers" };
+			var resultSet2 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.In(cedents)
+				)
+				.ToArray()
+				;
+			Assert.AreEqual(5, resultSet2.Length, $"Actual number of rows returned = {resultSet2.Length}");
+
+			var stateFarm = @"%State%";
+			var resultSet3 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.Like(stateFarm)
+				)
+				.ToArray()
+				;
+			Assert.AreEqual(3, resultSet3.Length, $"Actual number of rows returned = {resultSet3.Length}");
 		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{

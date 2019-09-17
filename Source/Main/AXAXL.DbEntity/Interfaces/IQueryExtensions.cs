@@ -37,7 +37,7 @@ namespace AXAXL.DbEntity.Interfaces
 		{
 			return true;
 		}
-		public static bool In(string target, IEnumerable<string> list)
+		public static bool In(this string target, IEnumerable<string> list)
 		{
 			return true;
 		}
