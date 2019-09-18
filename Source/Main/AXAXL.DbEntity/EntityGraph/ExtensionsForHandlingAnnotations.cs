@@ -53,17 +53,17 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		internal static IDictionary<TypeCode, Func<string, (bool Success, object Converted)>> _constantValueParserMap = new Dictionary<TypeCode, Func<string, (bool, object)>>
 		{
-			[TypeCode.Boolean] = (string input) => { bool output; var success = Boolean.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Byte] = (string input) => { byte output; var success = Byte.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Char] = (string input) => { char output; var success = Char.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.DateTime] = (string input) => { DateTime output; var success = DateTime.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Decimal] = (string input) => { decimal output; var success = Decimal.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Double] = (string input) => { double output; var success = Double.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Int16] = (string input) => { short output; var success = Int16.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Int32] = (string input) => { int output; var success = Int32.TryParse(input, out output); return (success, (object)output); },
-			[TypeCode.Int64] = (string input) => { long output; var success = Int64.TryParse(input, out output); return (success, (object)output); },
+			[TypeCode.Boolean] = (string input) => { var success = Boolean.TryParse(input, out bool output); return (success, (object)output); },
+			[TypeCode.Byte] = (string input) => { var success = Byte.TryParse(input, out byte output); return (success, (object)output); },
+			[TypeCode.Char] = (string input) => { var success = Char.TryParse(input, out char output); return (success, (object)output); },
+			[TypeCode.DateTime] = (string input) => { var success = DateTime.TryParse(input, out DateTime output); return (success, (object)output); },
+			[TypeCode.Decimal] = (string input) => { var success = Decimal.TryParse(input, out decimal output); return (success, (object)output); },
+			[TypeCode.Double] = (string input) => { var success = Double.TryParse(input, out double output); return (success, (object)output); },
+			[TypeCode.Int16] = (string input) => { var success = Int16.TryParse(input, out short output); return (success, (object)output); },
+			[TypeCode.Int32] = (string input) => { var success = Int32.TryParse(input, out int output); return (success, (object)output); },
+			[TypeCode.Int64] = (string input) => { var success = Int64.TryParse(input, out long output); return (success, (object)output); },
 			[TypeCode.String] = (string input) => (true, input),
-			[TypeCode.Single] = (string input) => { Single output; var success = Single.TryParse(input, out output); return (success, (object)output); }
+			[TypeCode.Single] = (string input) => { var success = Single.TryParse(input, out Single output); return (success, (object)output); }
 			// [TypeCode.DBNull] = (string input) => { bool output; var success = DBNull.TryParse(input, out output); return (success, (object)output); },
 			// [TypeCode.Empty] = (string input) => { bool output; var success = Empty.TryParse(input, out output); return (success, (object)output); },
 			// [TypeCode.Object] = (string input) => { bool output; var success = Object.TryParse(input, out output); return (success, (object)output); },
@@ -87,10 +87,10 @@ namespace AXAXL.DbEntity.EntityGraph
 			var underlyingType = Nullable.GetUnderlyingType(type);
 			type = underlyingType ?? type;
 
-			var converted = _constantValueParserMap[Type.GetTypeCode(type)].Invoke(constantValue);
-			Debug.Assert(converted.Success, $"Cannot convert constant value {constantValue} into {property.PropertyType.Name}");
+			var (Success, Converted) = _constantValueParserMap[Type.GetTypeCode(type)].Invoke(constantValue);
+			Debug.Assert(Success, $"Cannot convert constant value {constantValue} into {property.PropertyType.Name}");
 
-			node.ConstantValue = converted.Converted;
+			node.ConstantValue = Converted;
 			node.ConstantValueSetterAction = property.SetValue;
 
 			return node;
@@ -179,9 +179,8 @@ namespace AXAXL.DbEntity.EntityGraph
 		internal static NodeProperty FindForeignKeyForParentReferenceOnChild(this Node node, string parentRefPropNameOnChild)
 		{
 			Debug.Assert(string.IsNullOrEmpty(parentRefPropNameOnChild) == false, $"Parameter {nameof(parentRefPropNameOnChild)} of method {nameof(FindForeignKeyForParentReferenceOnChild)} cannot be blank or null");
-			NodeProperty parentRefPropOnChild = null;
 			NodeProperty foreignKey = null;
-			var found = node.DataColumns.TryGetValue(parentRefPropNameOnChild, out parentRefPropOnChild);
+			var found = node.DataColumns.TryGetValue(parentRefPropNameOnChild, out NodeProperty parentRefPropOnChild);
 			Debug.Assert(found, $"Property {parentRefPropNameOnChild} is not found class {node.NodeType.Name}");
 			var attr = parentRefPropOnChild.PropertyType.GetCustomAttribute<ForeignKeyAttribute>();
 			if (attr == null)

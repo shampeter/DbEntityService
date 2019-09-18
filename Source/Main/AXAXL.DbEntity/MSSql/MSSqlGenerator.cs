@@ -24,7 +24,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		#region IMSSqlGenerator Implementation
 
-		public (int ParameterSequence, string WhereClause, string InnerJoinsClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause)
+		public (int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause)
 		{
 			var visitor = new WhereClauseVisitor<T>(startingPoint, parameterSeq, tableAliasPrefix, this.log, innerJoinMap, MSSqlGenerator.CSTypeToSqlTypeMap, _extensions);
 			return visitor.Compile(whereClause);

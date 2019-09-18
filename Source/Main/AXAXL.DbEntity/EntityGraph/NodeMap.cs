@@ -13,8 +13,8 @@ namespace AXAXL.DbEntity.EntityGraph
 {
 	public class NodeMap : INodeMap
 	{
-		private IDictionary<Type, Node> _nodeMap = new ConcurrentDictionary<Type, Node>();
-		private ILogger log = null;
+		private readonly IDictionary<Type, Node> _nodeMap = new ConcurrentDictionary<Type, Node>();
+		private readonly ILogger log = null;
 		private IDatabaseDriver driver = null;
 		private IServiceProvider serviceProvider;
 		public NodeMap(ILoggerFactory factory, IDatabaseDriver driver, IServiceProvider serviceProvider)

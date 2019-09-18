@@ -345,6 +345,38 @@ namespace AXAXL.DbEntity.UnitTests
 				;
 			Assert.AreEqual(3, resultSet3.Length, $"Actual number of rows returned = {resultSet3.Length}");
 		}
+		[TestMethod]
+		[Description("Multiple Where() and And() Call test")]
+		public void MultiWhereCall()
+		{
+			var resultSet1 = _dbService
+							.Query<TCededContractLayer>()
+							.Where(l => l.AttachmentPoint > 0)
+							.And(l => l.CededContract.CedantCompany.CompanyName.Like("%State%"))
+							.ToArray()
+							;
+			Assert.AreEqual(3, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
+		}
+		[TestMethod]
+		[Description("Query with Or() test")]
+		public void MultiOrCall()
+		{
+			var resultSet1 = _dbService
+							.Query<TCededContractLayer>()
+							.Where(l =>	l.AttachmentPoint > 0)
+							.Or(
+								l => l.CededContract.CedantCompany.CompanyName == @"State Farm",
+								l => l.CededContract.CedantCompany.CompanyName == @"Travellers"
+							)
+							.ToArray()
+							;
+			Assert.IsTrue(
+				resultSet1.All(l =>
+					l.CededContract.CedantCompany.CompanyName == @"State Farm" ||
+					l.CededContract.CedantCompany.CompanyName == @"Travellers")
+				);
+			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
+		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
 			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();

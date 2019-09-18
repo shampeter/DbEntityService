@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Diagnostics;
 using System.Data;
 using System.Collections.Generic;
@@ -52,31 +53,66 @@ namespace AXAXL.DbEntity.MSSql
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, Expression<Func<T, bool>> whereClause, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(string connectionString, Node node, IList<Expression<Func<T, bool>>> whereClauses, IList<Expression<Func<T, bool>>[]> orClausesGroup, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
+			var sqlParameterRunningSeq = 0;
+			List<string> whereStatements = new List<string>();
+			List<Func<SqlParameter>> sqlParameterList = new List<Func<SqlParameter>>();
 
+			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
 			var innerJoinMap = new OrderedDictionary();
 			innerJoinMap.Add("-", topLevelJoin);
 
-			var where = whereClause != null ? 
-								this.sqlGenerator.CompileWhereClause<T>(
-									node, 
-									0, 
-									tablePrefix, 
-									innerJoinMap, 
-									whereClause
-									) : 
-									(ParameterSequence: 0, WhereClause: string.Empty, InnerJoinsClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+			//var emptyWhere = (ParameterSequence: 0, WhereClause: string.Empty, InnerJoinsClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
+
+			foreach(var where in whereClauses)
+			{
+				var compilationResult = this.sqlGenerator
+									.CompileWhereClause<T>(
+										node,
+										sqlParameterRunningSeq,
+										tablePrefix,
+										innerJoinMap,
+										where
+										);
+				sqlParameterRunningSeq = compilationResult.parameterSequence;
+				whereStatements.Add(compilationResult.whereClause);
+				sqlParameterList.AddRange(compilationResult.sqlParameters);
+			}
+			foreach(var orClauses in orClausesGroup)
+			{
+				List<string> orConditions = new List<string>();
+				foreach(var or in orClauses)
+				{
+					var compilationResult = this.sqlGenerator
+										.CompileWhereClause<T>(
+											node,
+											sqlParameterRunningSeq,
+											tablePrefix,
+											innerJoinMap,
+											or
+											);
+					sqlParameterRunningSeq = compilationResult.parameterSequence;
+					orConditions.Add(compilationResult.whereClause);
+					sqlParameterList.AddRange(compilationResult.sqlParameters);
+				}
+				if (orConditions.Count() > 0)
+				{
+					whereStatements.Add(@"( " + string.Join(" OR ", orConditions) + @" )");
+				}
+			}
 			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, maxNumOfRow);
 			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
-			var sqlCmd = select.SelectClause + where.InnerJoinsClause + where.WhereClause + orderByClause;
+			var whereStatement = whereStatements.Count() > 0 ? @" WHERE " + string.Join(@" AND ", whereStatements) : string.Empty;
+			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
+ 			var sqlCmd = select.SelectClause + innerJoinStatement + whereStatement + orderByClause;
 			var cmd = new SqlCommand(sqlCmd);
-			foreach (var parameter in where.SqlParameters)
+			foreach (var parameter in sqlParameterList)
 			{
 				cmd.Parameters.Add(parameter.Invoke());
 			}
@@ -394,6 +430,72 @@ namespace AXAXL.DbEntity.MSSql
 
 			return lambda.Compile();
 		}
+
+		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap, string tableAliasPrefix)
+		{
+			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) eachEdge;
+			StringBuilder buffer = new StringBuilder();
+			var enumerator = innerJoinsMap.GetEnumerator();
+			while (enumerator.MoveNext())
+			{
+				eachEdge = (ValueTuple<int, int, NodeEdge>)enumerator.Value;
+
+				if (eachEdge.Edge == null) continue;
+
+				var parentAlias = $"{tableAliasPrefix}{eachEdge.ParentTableAliasIdx}";
+				var childAlias = $"{tableAliasPrefix}{eachEdge.ChildTableAliasIdx}";
+				var nodeEdge = eachEdge.Edge;
+				var parentTable = this.sqlGenerator.FormatTableName(nodeEdge.ParentNode, parentAlias);
+				var childTable = this.sqlGenerator.FormatTableName(nodeEdge.ChildNode, childAlias);
+				var parentKeys = nodeEdge.ParentNodePrimaryKeys;
+				var childKeys = nodeEdge.ChildNodeForeignKeys;
+				var keyIdx = 0;
+
+				buffer
+					.Append(@" INNER JOIN ")
+					.Append(parentTable)
+					.Append(@" ON ")
+					;
+
+				for (; keyIdx < parentKeys.Length; keyIdx++)
+				{
+					if (keyIdx > 0) buffer.Append(@" AND ");
+					buffer.Append($"{parentAlias}.[{parentKeys[keyIdx].DbColumnName}] = {childAlias}.[{childKeys[keyIdx].DbColumnName}]");
+				}
+				for (; keyIdx < childKeys.Length; keyIdx++)
+				{
+					Debug.Assert(childKeys[keyIdx].IsConstant == true, $"There are more foreign keys than primary key on edge {nodeEdge.ParentNode.Name} -> {nodeEdge.ChildNode.Name}");
+					buffer.Append(@" AND ");
+					buffer.Append($"{childAlias}.[{childKeys[keyIdx].DbColumnName}] = {PrintConstantValueAsSqlCondition(childKeys[keyIdx])}");
+				}
+			}
+			return buffer.ToString();
+		}
+		private static string PrintConstantValueAsSqlCondition(NodeProperty property)
+		{
+			Debug.Assert(property.IsConstant);
+			var constantValue = property.ConstantValue;
+			var propertyType = property.PropertyType;
+			string formattedValue = null;
+
+			if (propertyType.IsValueType)
+			{
+				if (propertyType.IsAssignableFrom(typeof(DateTime)))
+				{
+					var date = (DateTime)constantValue;
+					formattedValue = $"'{date.ToString(QueryExtensionForSqlOperators.C_DATE_FORMAT_FOR_SQL)}'";
+				}
+				else
+				{
+					formattedValue = constantValue.ToString();
+				}
+			}
+			else
+			{
+				formattedValue = $"'{constantValue.ToString()}'";
+			}
+			return formattedValue;
+		}
 		[Conditional("DEBUG")]
 		private void LogSql(string message, Node node, SqlCommand cmd)
 		{
@@ -413,7 +515,5 @@ namespace AXAXL.DbEntity.MSSql
 						);
 			this.log.LogDebug("| {0} | {1} | {2} | {3} |", message, node?.Name, sql, parameters);
 		}
-
-
 	}
 }
