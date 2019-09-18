@@ -21,9 +21,24 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <summary>
 		/// Specify the where clause of the query by a Lambda expression.
 		/// </summary>
-		/// <param name="whereClause"></param>
-		/// <returns></returns>
+		/// <param name="whereClause">Lambda expresson that returns boolean.</param>
+		/// <returns>Return itself for method call chaining.</returns>
 		IQuery<T> Where(Expression<Func<T, bool>> whereClause);
+		/// <summary>
+		/// Specify additional where clause.  This and the where clause from <see cref="Where(Expression{Func{T, bool}})"/>
+		/// will be connected with an "AND" operator.
+		/// </summary>
+		/// <param name="whereClause">Lambda expression that returns boolean</param>
+		/// <returns>Return itself for method call chaining.</returns>
+		IQuery<T> And(Expression<Func<T, bool>> whereClause);
+		/// <summary>
+		/// A group of conditions evaluated together by an "OR" operator.  This and other conditions supplied by
+		/// <see cref="Where(Expression{Func{T, bool}})"/> and <see cref="And(Expression{Func{T, bool}})"/> will be evaluated together
+		/// by "AND" sql operators.
+		/// </summary>
+		/// <param name="orClauses">a list of Lambda expressions which will return boolean</param>
+		/// <returns>Return itself for method call chaining.</returns>
+		IQuery<T> Or(params Expression<Func<T, bool>>[] orClauses);
 		/// <summary>
 		/// Excluding the childset by naming them in the Lambda expression.
 		/// </summary>

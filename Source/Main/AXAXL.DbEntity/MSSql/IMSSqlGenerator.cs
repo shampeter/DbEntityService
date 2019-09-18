@@ -15,7 +15,7 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		SqlDbType GetSqlDbTypeFromCSType(Type csType);
 
-		(int ParameterSequence, string WhereClause, string InnerJoinsClause, Func<SqlParameter>[] SqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause);
+		(int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause);
 
 		NodeProperty[] ExtractPrimaryKeyAndConcurrencyControlColumns(Node node);
 

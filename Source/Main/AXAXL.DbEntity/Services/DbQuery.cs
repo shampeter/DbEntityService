@@ -20,7 +20,8 @@ namespace AXAXL.DbEntity.Services
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
 		private IDatabaseDriver Driver { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
-		private Expression<Func<T, bool>> WhereClause { get; set; }
+		private IList<Expression<Func<T, bool>>> WhereClauses { get; set; }
+		private IList<Expression<Func<T, bool>>[]> OrClausesGroup { get; set; }
 		private IList<(NodeProperty Column, bool IsAscending)> Ordering { get; set; }
 		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
@@ -33,6 +34,8 @@ namespace AXAXL.DbEntity.Services
 			// default Sql server query timeout is 30 seconds.
 			this.TimeoutDurationInSeconds = 30;
 			this.Ordering = new List<(NodeProperty Column, bool IsAscending)>();
+			this.WhereClauses = new List<Expression<Func<T, bool>>>();
+			this.OrClausesGroup = new List<Expression<Func<T, bool>>[]>();
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
@@ -81,7 +84,18 @@ namespace AXAXL.DbEntity.Services
 
 		public IQuery<T> Where(Expression<Func<T, bool>> whereClause)
 		{
-			this.WhereClause = whereClause;
+			this.WhereClauses.Add(whereClause);
+			return this;
+		}
+		public IQuery<T> And(Expression<Func<T, bool>> whereClause)
+		{
+			this.WhereClauses.Add(whereClause);
+			return this;
+		}
+		public IQuery<T> Or(params Expression<Func<T, bool>>[] orClauses)
+		{
+			Debug.Assert(orClauses != null && orClauses.Length > 1);
+			this.OrClausesGroup.Add(orClauses);
 			return this;
 		}
 		private IEnumerable<T> ExecuteQuery(Type entityType, int maxNumOfRow)
@@ -89,7 +103,7 @@ namespace AXAXL.DbEntity.Services
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
-			var queryResult = this.Driver.Select(connection, node, this.WhereClause, maxNumOfRow, this.Ordering.ToArray(), this.TimeoutDurationInSeconds);
+			var queryResult = this.Driver.Select(connection, node, this.WhereClauses, this.OrClausesGroup, maxNumOfRow, this.Ordering.ToArray(), this.TimeoutDurationInSeconds);
 			foreach(var eachEntity in queryResult)
 			{
 				director.Build<T>(eachEntity, true, true);

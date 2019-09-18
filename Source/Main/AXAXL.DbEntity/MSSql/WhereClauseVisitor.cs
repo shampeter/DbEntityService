@@ -48,19 +48,21 @@ namespace AXAXL.DbEntity.MSSql
 			this.log = log;
 			this.innerJoinMap = innerJoinMap;
 			this.csharp2SqlTypeMap = typeMap;
-			this.buffer = new StringBuilder(@" WHERE ");
+			this.buffer = new StringBuilder();
 			this.extensions = extensions;
 			this.sqlParameterRunningSeq = sqlParameterRunningSeq;
 			this.startingNode = startingNode;
 			this.tableAliasPrefix = tableAliasPrefix;
 		}
-		internal (int SqlParameterRunningSeq, string WhereClause, string InnerJoinClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
+		//internal (int SqlParameterRunningSeq, string WhereClause, string InnerJoinClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
+		internal (int SqlParameterRunningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
 		{
 			this.Visit(whereClause);
 			var where = this.buffer.ToString();
-			var innerJoins = this.ComputeInnerJoins(this.innerJoinMap);
+			//var innerJoins = this.ComputeInnerJoins(this.innerJoinMap);
 			var sqlParameters = this.captured.Select(p => this.CreateSqlParameterFromCaptured(p)).ToArray();
-			return (this.sqlParameterRunningSeq, where, innerJoins, sqlParameters);
+			//return (this.sqlParameterRunningSeq, where, innerJoins, sqlParameters);
+			return (this.sqlParameterRunningSeq, where, sqlParameters);
 		}
 		private Func<SqlParameter> CreateSqlParameterFromCaptured((string parameter, Type exprResultType, Expression expression) captured)
 		{
@@ -262,7 +264,7 @@ namespace AXAXL.DbEntity.MSSql
 			return edge;
 		}
 
-		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap)
+/*		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap)
 		{
 			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) eachEdge;
 			StringBuilder buffer = new StringBuilder();
@@ -341,6 +343,6 @@ namespace AXAXL.DbEntity.MSSql
 				formattedValue = $"'{constantValue.ToString()}'";
 			}
 			return formattedValue;
-		}
+		}*/
 	}
 }
