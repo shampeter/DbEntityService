@@ -33,7 +33,7 @@ namespace AXAXL.DbEntity.Services
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
-		public T Build<T>(T entity, bool isMovingTowardsParent, bool isMovingTowardsChild) where T : class, new()
+		public T Build<T>(T entity, bool isMovingTowardsParent, bool isMovingTowardsChild, IList<ValueTuple<NodeEdge, Expression>> childWhereClauses, IList<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup) where T : class, new()
 		{
 			Node node = this.NodeMap.GetNode(entity.GetType());
 
@@ -42,6 +42,8 @@ namespace AXAXL.DbEntity.Services
 				foreach (var eachParentToChild in node.AllChildEdgeNames())
 				{
 					var edge = node.GetEdgeToChildren(eachParentToChild);
+					var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == edge).Select(w => w.Item2).ToArray();
+					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
 
 /* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
  					var edgeSignature = this.GetEdgeSignature(edge);
@@ -67,13 +69,22 @@ namespace AXAXL.DbEntity.Services
 						i++;
 					}
 					var connection = this.GetConnectionString(edge.ChildNode);
-					var children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, this.TimeoutDurationInSeconds);
+					IEnumerable<object> children = null;
+					// The result of the shorter select call can be cached as it pretty much fixed.  Thus don't want to mix these 2 calls.
+					if ((additionalWhereClause != null && additionalWhereClause.Length > 0 )|| (additionalOrClauses != null && additionalOrClauses.Count > 0))
+					{
+						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, this.TimeoutDurationInSeconds);
+					}
+					else
+					{
+						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, this.TimeoutDurationInSeconds);
+					}
 					edge.ChildAddingAction(entity, children);
 
 					foreach (var eachChild in children)
 					{
 						edge.ParentSettingAction(eachChild, entity);
-						this.Build(eachChild, true, true);
+						this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup);
 					}
 				}
 			}
@@ -100,7 +111,7 @@ namespace AXAXL.DbEntity.Services
 					var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys, this.TimeoutDurationInSeconds).FirstOrDefault();
 					edge.ParentSettingAction(entity, parent);
 					edge.ChildAddingAction(parent, new[] { entity });
-					this.Build(parent, true, false);
+					this.Build(parent, true, false, childWhereClauses, childOrClausesGroup);
 				}
 			}
 			return entity;

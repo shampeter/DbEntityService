@@ -46,7 +46,7 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
 		/// <param name="maxNumOfRow">Specific maximum number of rows to be returned.  Set as <= 0 to return all rows.</param>
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
-		IEnumerable<T> Select<T>(string connectionString, Node node, IList<Expression<Func<T, bool>>> whereClauses, IList<Expression<Func<T, bool>>[]> orClausesGroup, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new();
+		IEnumerable<T> Select<T>(string connectionString, Node node, IEnumerable<Expression<Func<T, bool>>> whereClauses, IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new();
 		/// <summary>
 		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.
 		/// </summary>
@@ -57,6 +57,18 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
 		IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30) where T : class, new();
+		/// <summary>
+		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.
+		/// </summary>
+		/// <typeparam name="T">Entity object type</typeparam>
+		/// <param name="connectionString">Database connection string</param>
+		/// <param name="node">The <see cref="Node"/> representing the meta data and object-to-relational database mapping of the entity class.</param>
+		/// <param name="parameters">Dictionary of name to value representing the where condition, assuming AND operation on all key-value pairs.</param>
+		/// <param name="whereClauses">Additonal where clause in addition to the <paramref name="parameters"/></param>
+		/// <param name="orClausesGroup">Additional or clauses in addition to the <paramref name="parameters"/></param>
+		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
+		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
+		IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, IEnumerable<Expression> whereClauses, IEnumerable<Expression[]> orClausesGroup, int timeoutDurationInSeconds = 30) where T : class, new();
 		/// <summary>
 		/// Execute sql command using values from <paramref name="parameters"/> as parameter value for sql command.
 		/// </summary>

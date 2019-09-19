@@ -152,7 +152,7 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.EdgeToParent[property] = edge;
 			}
 		}
-		public Node LocateEdges()
+		internal Node LocateEdges()
 		{
 			// case 1: InversePropertyAttribute found on property of type object or collection.
 			// case 2: ForeignKeyAttribute found on property of type object or collection.

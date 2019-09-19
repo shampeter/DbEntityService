@@ -198,7 +198,7 @@ namespace AXAXL.DbEntity.MSSql
 						}
 						return condition;
 					}));
-			return string.IsNullOrEmpty(whereClause) ? string.Empty : @" WHERE " + whereClause;
+			return string.IsNullOrEmpty(whereClause) ? string.Empty : whereClause;
 		}
 
 		public NodeProperty[] ExtractColumnByPropertyName(Node node, params string[] propertyNames)

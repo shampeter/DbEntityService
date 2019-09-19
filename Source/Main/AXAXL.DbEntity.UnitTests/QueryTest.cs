@@ -377,6 +377,38 @@ namespace AXAXL.DbEntity.UnitTests
 				);
 			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
 		}
+		[TestMethod]
+		[Description("Query with child filtering")]
+		public void QueryWithChildFiltering()
+		{
+			// Return all contracts but select only text file t_doc under contract and gif file t_doc uner layer, which is none.
+			var query = _dbService
+								.Query<TCededContract>()
+								;
+			query.Where<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"));
+			query.Where<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.gif"));
+
+			var allContracts = query.ToArray();
+
+			var contract1 = allContracts.Where(c => c.CededContractPkey == 1).FirstOrDefault();
+			var contract2 = allContracts.Where(c => c.CededContractPkey == 2).FirstOrDefault();
+
+			// Sanity check.  There should be 2 layers on contract 1 and 3 layers on contract 2.
+			Assert.AreEqual(2, contract1.CededContractLayers.Count);
+			Assert.AreEqual(3, contract2.CededContractLayers.Count);
+			Assert.AreEqual(@"XL Reinsurance America", contract1.XlCompany.CompanyName);
+			Assert.AreEqual(@"XL Reinsurance Bermuda", contract2.XlCompany.CompanyName);
+
+			// There should be 1 text file t_doc under each contract
+			Assert.AreEqual(1, contract1.CededContractDocs.Count);
+			Assert.AreEqual(1, contract2.CededContractDocs.Count);
+			Assert.IsTrue(contract1.CededContractDocs[0].Filename.EndsWith(".txt"));
+			Assert.IsTrue(contract2.CededContractDocs[0].Filename.EndsWith(".txt"));
+
+			// There should be no t_doc retrieved under layer because the condition returns none.
+			Assert.IsTrue(contract1.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 0);
+			Assert.IsTrue(contract2.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 0);
+		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
 			var inputParameters = parameters.Select(p => (p.Name, p.Value, ParameterDirection.Input)).ToArray();
