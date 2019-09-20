@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Transactions;
 using AXAXL.DbEntity.Interfaces;
+using AXAXL.DbEntity.EntityGraph;
 using Microsoft.Extensions.Logging;
 
 namespace AXAXL.DbEntity.Services
@@ -16,18 +18,20 @@ namespace AXAXL.DbEntity.Services
 		private string CommandText { get; set; }
 		private bool IsStoredProcedure { get; set; }
 		private string ConnectionName { get; set; }
+		private INodeMap NodeMap { get; set; }
 		private (string Name, object Value, ParameterDirection Direction)[] Parameters { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
 		private bool isolationChanged;
 		private bool scopeOptionChanged;
 
-		internal ExecuteCommand(ILogger log, IDbServiceOption serviceOption, IDatabaseDriver driver)
+		internal ExecuteCommand(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
 			this.Log = log;
 			this.ServiceOption = serviceOption;
 			this.Driver = driver;
 			this.isolationChanged = false;
 			this.scopeOptionChanged = false;
+			this.NodeMap = nodeMap;
 		}
 		private TransactionScopeOption ScopeOption { get; set; }
 
@@ -57,6 +61,37 @@ namespace AXAXL.DbEntity.Services
 			else
 			{
 				resultSet = this.Driver.ExecuteCommand(connectionString, this.IsStoredProcedure, this.CommandText, this.Parameters, out parameters, this.TimeoutDurationInSeconds);
+			}
+			return resultSet;
+		}
+
+		public IEnumerable<T> Execute<T>(out IDictionary<string, object> parameters) where T : class, new()
+		{
+			Debug.Assert(this.NodeMap.ContainsNode(typeof(T)));
+			var connectionString = string.IsNullOrEmpty(this.ConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(this.ConnectionName);
+			var node = this.NodeMap.GetNode(typeof(T));
+
+			IEnumerable<T> resultSet = null;
+			if (this.isolationChanged || this.scopeOptionChanged)
+			{
+				if (!scopeOptionChanged)
+				{
+					this.ScopeOption = TransactionScopeOption.Required;
+				}
+				if (!isolationChanged)
+				{
+					this.Isolation = System.Transactions.IsolationLevel.ReadCommitted;
+				}
+				var option = new TransactionOptions() { IsolationLevel = this.Isolation };
+				using (var transaction = new TransactionScope(this.ScopeOption, option))
+				{
+					resultSet = this.Driver.ExecuteCommand<T>(connectionString, node, this.IsStoredProcedure, this.CommandText, this.Parameters, out parameters, this.TimeoutDurationInSeconds);
+					transaction.Complete();
+				}
+			}
+			else
+			{
+				resultSet = this.Driver.ExecuteCommand<T>(connectionString, node, this.IsStoredProcedure, this.CommandText, this.Parameters, out parameters, this.TimeoutDurationInSeconds);
 			}
 			return resultSet;
 		}

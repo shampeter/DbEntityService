@@ -21,7 +21,9 @@ namespace AXAXL.DbEntity.Services
 		private IDatabaseDriver Driver { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<Expression<Func<T, bool>>> WhereClauses { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression>> ChildWhereClauses { get; set; }
 		private IList<Expression<Func<T, bool>>[]> OrClausesGroup { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression[]>> ChildOrClausesGroup { get; set; }
 		private IList<(NodeProperty Column, bool IsAscending)> Ordering { get; set; }
 		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
@@ -36,6 +38,8 @@ namespace AXAXL.DbEntity.Services
 			this.Ordering = new List<(NodeProperty Column, bool IsAscending)>();
 			this.WhereClauses = new List<Expression<Func<T, bool>>>();
 			this.OrClausesGroup = new List<Expression<Func<T, bool>>[]>();
+			this.ChildWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
+			this.ChildOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
@@ -87,15 +91,36 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
+		public IQuery<T> Where<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		{
+			var childEdge = this.LocateChildEdge<TParent, TChild>();
+
+			this.ChildWhereClauses.Add((childEdge, whereClause));
+
+			return this;
+		}
 		public IQuery<T> And(Expression<Func<T, bool>> whereClause)
 		{
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
+		public IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		{
+			return this.Where<TParent, TChild>(whereClause);
+		}
 		public IQuery<T> Or(params Expression<Func<T, bool>>[] orClauses)
 		{
 			Debug.Assert(orClauses != null && orClauses.Length > 1);
 			this.OrClausesGroup.Add(orClauses);
+			return this;
+		}
+		public IQuery<T> Or<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		{
+			Debug.Assert(orClauses != null && orClauses.Length > 1);
+
+			var childEdge = this.LocateChildEdge<TParent, TChild>();
+			this.ChildOrClausesGroup.Add((childEdge, orClauses));
+
 			return this;
 		}
 		private IEnumerable<T> ExecuteQuery(Type entityType, int maxNumOfRow)
@@ -106,7 +131,7 @@ namespace AXAXL.DbEntity.Services
 			var queryResult = this.Driver.Select(connection, node, this.WhereClauses, this.OrClausesGroup, maxNumOfRow, this.Ordering.ToArray(), this.TimeoutDurationInSeconds);
 			foreach(var eachEntity in queryResult)
 			{
-				director.Build<T>(eachEntity, true, true);
+				director.Build<T>(eachEntity, true, true, this.ChildWhereClauses, this.ChildOrClausesGroup);
 			}
 			return queryResult;
 		}
@@ -118,6 +143,23 @@ namespace AXAXL.DbEntity.Services
 			{
 				this.Exclusion.Add(node, excludedProperties);
 			}
+		}
+		private NodeEdge LocateChildEdge<TParent, TChild>()
+		{
+			var parentType = typeof(TParent);
+			var childType = typeof(TChild);
+
+			Debug.Assert(this.NodeMap.ContainsNode(parentType));
+			Debug.Assert(this.NodeMap.ContainsNode(childType));
+
+			var parent = this.NodeMap.GetNode(parentType);
+			var propertyToChild = parent.AllChildEdgeNames().SingleOrDefault(c => parent.GetEdgeToChildren(c).ChildNode.NodeType == childType);
+
+			Debug.Assert(propertyToChild != null, $"Parent node {parentType.Name} does not contain a reference to child of type {childType.Name}");
+
+			var childEdge = parent.GetEdgeToChildren(propertyToChild);
+
+			return childEdge;
 		}
 	}
 }

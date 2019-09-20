@@ -65,5 +65,16 @@ namespace AXAXL.DbEntity.Interfaces
 		/// The column name in the data row returned will be the property names of the <see cref="System.Dynamic.ExpandoObject"/> object.
 		/// </returns>
 		IEnumerable<dynamic> Execute(out IDictionary<string, object> parameters);
+		/// <summary>
+		/// Execute the command or stored procedure assigned.
+		/// </summary>
+		/// <typeparam name="T">Entity type being used to store result data.</typeparam>
+		/// <param name="parameters">
+		/// Dictionary of output or returned parameters with their name and value.  
+		/// Parameters as specified in <seealso cref="SetParameters((string Name, object Value, ParameterDirection Direction)[])"/>
+		/// with direction being not <see cref="ParameterDirection.Input"/> will be returned in this dictionary.
+		/// </param>
+		/// <returns>IEnumerable of <typeparamref name="T"/></returns>
+		IEnumerable<T> Execute<T>(out IDictionary<string, object> parameters) where T : class, new();
 	}
 }
