@@ -417,6 +417,47 @@ namespace AXAXL.DbEntity.UnitTests
 			// There should be no t_doc retrieved under layer because the condition returns none.
 			Assert.IsTrue(contract1.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 0);
 			Assert.IsTrue(contract2.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 0);
+
+			// Now query that search for GIF file for t_doc under layer so.  There should be 1.
+			allContracts = _dbService
+							.Query<TCededContract>()
+							.Where<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"))
+							.Where<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+							.ToArray();
+
+			contract1 = allContracts.Where(c => c.CededContractPkey == 1).FirstOrDefault();
+			contract2 = allContracts.Where(c => c.CededContractPkey == 2).FirstOrDefault();
+
+			// Sanity check.  There should be 2 layers on contract 1 and 3 layers on contract 2.
+			Assert.AreEqual(2, contract1.CededContractLayers.Count);
+			Assert.AreEqual(3, contract2.CededContractLayers.Count);
+			Assert.AreEqual(@"XL Reinsurance America", contract1.XlCompany.CompanyName);
+			Assert.AreEqual(@"XL Reinsurance Bermuda", contract2.XlCompany.CompanyName);
+
+			// There should be 1 text file t_doc under each contract
+			Assert.AreEqual(1, contract1.CededContractDocs.Count);
+			Assert.AreEqual(1, contract2.CededContractDocs.Count);
+			Assert.IsTrue(contract1.CededContractDocs[0].Filename.EndsWith(".txt"));
+			Assert.IsTrue(contract2.CededContractDocs[0].Filename.EndsWith(".txt"));
+
+			// Just want to see it with my own eyes.
+			Console.WriteLine("Contract: {0} / Doc: {1} / Filename: {2}", contract1.CededContractPkey, contract1.CededContractDocs[0].DocGuid, contract1.CededContractDocs[0].Filename);
+			Console.WriteLine("Contract: {0} / Doc: {1} / Filename: {2}", contract2.CededContractPkey, contract2.CededContractDocs[0].DocGuid, contract2.CededContractDocs[0].Filename);
+
+			// There should be no t_doc retrieved under layer because the condition returns none.
+			Assert.IsTrue(contract1.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 1);
+			Assert.IsTrue(contract2.CededContractLayers.Count(l => l.CededContractLayerDocs.Count > 0) == 0);
+
+			var contractLayer1 = contract1.CededContractLayers.FirstOrDefault(l => l.CededContractLayerPkey == 1);
+			Assert.IsTrue(contractLayer1.CededContractLayerDocs.FirstOrDefault()?.Filename.EndsWith(".txt") ?? false);
+
+			Console.WriteLine(
+				"Contract: {0} / Layer: {1} / Doc: {2} / Filename: {3}", 
+				contract1.CededContractPkey, 
+				contractLayer1.CededContractLayerPkey, 
+				contractLayer1.CededContractLayerDocs.FirstOrDefault().DocGuid,
+				contractLayer1.CededContractLayerDocs.FirstOrDefault().Filename
+				);
 		}
 		private IEnumerable<dynamic> ExecuteRawQuery(string query, params (string Name, object Value)[] parameters)
 		{
