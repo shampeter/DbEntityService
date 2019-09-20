@@ -25,6 +25,11 @@
     <AssemblyVersion>1.2.4.0</AssemblyVersion>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>$(TargetDir)AXAXL.DbEntity.xml</DocumentationFile>
+    <OutputPath>$(TargetDir)</OutputPath>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Autofac" Version="4.9.4" />
     <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="4.4.0" />
