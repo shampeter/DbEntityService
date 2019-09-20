@@ -51,7 +51,7 @@ namespace AXAXL.DbEntity.Services
 
 		public IExecuteCommand ExecuteCommand()
 		{
-			return new ExecuteCommand(this.Log, this.ServiceOption, this.Driver);
+			return new ExecuteCommand(this.Log, this.ServiceOption, this.NodeMap, this.Driver);
 		}
 		/* Functionality has moved to IExecuteCommand
 		 * 

@@ -19,6 +19,8 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		private ILogger log = null;
 		private IMSSqlGenerator sqlGenerator = null;
+		private static readonly MethodInfo enumerableCastMethodInfo = typeof(Enumerable).GetMethod("Cast", BindingFlags.Public | BindingFlags.Static);
+		private static readonly MethodInfo compileConditionsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileConditions), BindingFlags.NonPublic | BindingFlags.Instance);
 		public MSSqlDriver(ILoggerFactory factory, IMSSqlGenerator sqlGenerator)
 		{
 			this.log = factory.CreateLogger<MSSqlDriver>();
@@ -37,11 +39,11 @@ namespace AXAXL.DbEntity.MSSql
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns);
 			var cmd = new SqlCommand(
-							select.SelectClause + 
-							(! string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
+							select.SelectClause +
+							(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
 							);
 
-			var parameterWithValue = 
+			var parameterWithValue =
 				queryParameters
 					.Select(kv => {
 						var whereParameterValue = parameters[kv.Key];
@@ -67,54 +69,30 @@ namespace AXAXL.DbEntity.MSSql
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
 
+			// The following prepare where clause and sql parameter from the dictionary of values.  Regular stuff.
 			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, -1);
 			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
 			var primaryWhereClause = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns);
 
-			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
+			// The following compile the additional where and or conditions.
 			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
 			var innerJoinMap = new OrderedDictionary();
 			innerJoinMap.Add("-", topLevelJoin);
 
-			//List<string> additonalWhereStatements;
-			//List<Func<SqlParameter>> additionalSqlParameters;
+			Type typeOfAdditionalWhereClauses;
+			Type typeOfAdditionalOrClauses;
 
-			//var castedWhereClauses = additionalWhereClauses != null && additionalWhereClauses.Count() > 0 ? 
-			//							additionalWhereClauses.Cast<Expression<Func<T, bool>>>().ToArray() :
-			//							new Expression<Func<T, bool>>[0]
-			//							;
-			//var castedOrClauses = additionalOrClauses != null && additionalOrClauses.Count() > 0 ?
-			//							additionalOrClauses.Cast<Expression<Func<T, bool>>[]>().ToList() :
-			//							new List<Expression<Func<T, bool>>[]>()
-			//							;
+			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
+			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
+			var compileConditionsDelegate = this.MakeCompileWithRightType(node, typeOfAdditionalWhereClauses, typeOfAdditionalOrClauses);
 
-
-			typeof(Func<T1, T2>).
-			var compileMethod = this.GetType()
-								.GetMethod(nameof(CompileConditions), BindingFlags.NonPublic | BindingFlags.Instance)
-								;
-			var (additonalWhereStatements, additionalSqlParameters) = 
-				(ValueTuple < List<string>, List < Func < SqlParameter >>>) compileMethod
-					.MakeGenericMethod(node.NodeType)
-					.Invoke(this, new object[] { node, additionalWhereClauses, additionalOrClauses, tablePrefix, innerJoinMap })
-					;
-
-			//Func<Node, IEnumerable<Expression>, IEnumerable<Expression[]>, string, OrderedDictionary, (List<string>, List<Func<SqlParameter>>)> constructedDelegate = 
-			//	(Func<Node, IEnumerable<Expression>, IEnumerable<Expression[]>, string, OrderedDictionary, ValueTuple<List<string>, List<Func<SqlParameter>>>>)
-			//					compileMethod
-			//					.MakeGenericMethod(node.NodeType)
-			//					.CreateDelegate(
-			//						typeof(Func<Node, IEnumerable<Expression>, IEnumerable<Expression[]>, string, OrderedDictionary, ValueTuple<List<string>, List<Func<SqlParameter>>>>), 
-			//						this
-			//					)
-			//					;
-			//var (additonalWhereStatements, additionalSqlParameters) = constructedDelegate.Invoke(node, additionalWhereClauses, additionalOrClauses, tablePrefix, innerJoinMap);
-			//this.CompileConditions(node, castedWhereClauses, castedOrClauses, tablePrefix, innerJoinMap, out additonalWhereStatements, out additionalSqlParameters);
+			var (additonalWhereStatements, additionalSqlParameters) = (ValueTuple<List<string>, List<Func<SqlParameter>>>)compileConditionsDelegate.DynamicInvoke(node, restoredWhereClauses, restoredOrClauses, tablePrefix, innerJoinMap);
 
 			var additionalWhereClause = additonalWhereStatements.Count() > 0 ? @" AND " + string.Join(@" AND ", additonalWhereStatements) : string.Empty;
 			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
 
+			// Put them together to create the SQL command.
 			var sqlCmd = string.Format("{0}{1} WHERE {2}{3}", select.SelectClause, innerJoinStatement, primaryWhereClause, additionalWhereClause);
 			var cmd = new SqlCommand(sqlCmd);
 			var parameterWithValue =
@@ -162,8 +140,67 @@ namespace AXAXL.DbEntity.MSSql
 			this.LogSql("Select<T> with where expression", node, cmd);
 			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
-
-		private 
+		/// <summary>
+		/// Restore IEnumerable of Expression to IEnumerable of Expression&lt;Func&lt;T, bool&gt;&gt;.
+		/// </summary>
+		/// <param name="node">Type of this node will be the type of the delegate to be restored.</param>
+		/// <param name="whereClauses">list of expression</param>
+		/// <param name="restoredType">type of the original expression</param>
+		/// <returns>Restored expression of the right type</returns>
+		private object RestoreWhereClause(Node node, IEnumerable<Expression> whereClauses, out Type restoredType)
+		{
+			var originalWhereClauseType = typeof(Func<,>).MakeGenericType(node.NodeType, typeof(bool));
+			var originalWhereExprType = typeof(Expression<>).MakeGenericType(originalWhereClauseType);
+			restoredType = typeof(IEnumerable<>).MakeGenericType(originalWhereExprType);
+			var typeCastDelegateType = typeof(Func<,>).MakeGenericType(whereClauses.GetType(), restoredType);
+			var typeCastDeleage = enumerableCastMethodInfo
+									.MakeGenericMethod(originalWhereExprType)
+									.CreateDelegate(typeCastDelegateType);
+			return typeCastDeleage.DynamicInvoke(whereClauses);
+		}
+		/// <summary>
+		/// Restore IEnumerable of Expression[] to IEnumerable of Expression&lt;Func&lt;T, bool&gt;&gt;[].
+		/// </summary>
+		/// <param name="node">Type of this node will be the type of the delegate to be restored.</param>
+		/// <param name="orClauses">list of expression[]</param>
+		/// <param name="restoredType">type of the original expression</param>
+		/// <returns>Restored expression of the right type</returns>
+		private object RestoreOrClauses(Node node, IEnumerable<Expression[]> orClauses, out Type restoredType)
+		{
+			var originalWhereClauseType = typeof(Func<,>).MakeGenericType(node.NodeType, typeof(bool));
+			var originalWhereExprType = typeof(Expression<>).MakeGenericType(originalWhereClauseType);
+			var originalOrExprArrayType = originalWhereExprType.MakeArrayType();
+			restoredType = typeof(IEnumerable<>).MakeGenericType(originalOrExprArrayType);
+			var typeCastDelegateType = typeof(Func<,>).MakeGenericType(orClauses.GetType(), restoredType);
+			var typeCastDeleage = enumerableCastMethodInfo
+									.MakeGenericMethod(originalOrExprArrayType)
+									.CreateDelegate(typeCastDelegateType);
+			return typeCastDeleage.DynamicInvoke(orClauses);
+		}
+		/// <summary>
+		/// Construct delegate of <seealso cref="CompileConditions{TEntity}(Node, IEnumerable{Expression{Func{TEntity, bool}}}, IEnumerable{Expression{Func{TEntity, bool}}[]}, string, OrderedDictionary)"/>
+		/// with the right type for its generic type parameter.
+		/// </summary>
+		/// <param name="node">Node type will be used as the type parameter of the generic method <see cref="CompileConditions{TEntity}(Node, IEnumerable{Expression{Func{TEntity, bool}}}, IEnumerable{Expression{Func{TEntity, bool}}[]}, string, OrderedDictionary)"/></param>
+		/// <param name="whereClausesType">type of the where clauses</param>
+		/// <param name="orClausesType">type of the or clauses</param>
+		/// <returns>delegate to call the CompileConditions method</returns>
+		private Delegate MakeCompileWithRightType(Node node, Type whereClausesType, Type orClausesType)
+		{
+			var resultingValueTupleType = typeof(ValueTuple<List<string>, List<Func<SqlParameter>>>);
+			var compileConditionsDelegateType = typeof(Func<,,,,,>)
+													.MakeGenericType(
+														typeof(Node), 
+														whereClausesType, 
+														orClausesType, 
+														typeof(string), 
+														typeof(OrderedDictionary),
+														resultingValueTupleType
+														);
+			var delegateHandle = compileConditionsMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(compileConditionsDelegateType, this);
+			return delegateHandle;
+		}
+		private
 			(List<string> whereStatements, List<Func<SqlParameter>> sqlParameterList) 
 			CompileConditions<TEntity>
 		(
@@ -223,18 +260,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			parameters = parameters ?? new (string, object, ParameterDirection)[0];
-			var cmdParameters = this.sqlGenerator.CreateSqlParametersForRawSqlParameters(parameters);
-			foreach(var input in parameters)
-			{
-				if (cmdParameters.ContainsKey(input.Name))
-				{
-					cmdParameters[input.Name].Value = input.Value ?? DBNull.Value;
-				}
-			}
-			var cmd = new SqlCommand(rawSqlCommand);
-			cmd.CommandType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
-			cmd.Parameters.AddRange(cmdParameters.Values.ToArray());
+			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
 
 			this.LogSql("Execute command", null, cmd);
 			IEnumerable<dynamic> result = null;
@@ -262,6 +288,25 @@ namespace AXAXL.DbEntity.MSSql
 									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
 								);
 			return result;
+		}
+		public IEnumerable<T> ExecuteCommand<T>(string connectionString, Node node, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30) where T : class, new()
+		{
+			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+
+			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
+			// Note that the SelectClause variable is not used.  We are just borrowing the call to create the data reader fetching func.
+			var (SelectClause, DataReaderToEntityFunc) = this.sqlGenerator.CreateSelectComponent(string.Empty, node, -1);
+			this.LogSql("Execute command", null, cmd);
+
+			var resultSet = this.ExecuteQuery<T>(connectionString, DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+
+			outputParameters = cmdParameters
+								.Where(kv => kv.Value.Direction != ParameterDirection.Input)
+								.ToDictionary(
+									k => k.Key,
+									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
+								);
+			return resultSet;
 		}
 
 		public T Delete<T>(string connectionString, T entity, Node node) where T: class, ITrackable
@@ -482,7 +527,23 @@ namespace AXAXL.DbEntity.MSSql
 			}
 			return resultSet;
 		}
+		private SqlCommand PrepareCommandFromRawSql(bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, SqlParameter> cmdParameters)
+		{
+			parameters = parameters ?? new (string, object, ParameterDirection)[0];
+			cmdParameters = this.sqlGenerator.CreateSqlParametersForRawSqlParameters(parameters);
+			foreach (var input in parameters)
+			{
+				if (cmdParameters.ContainsKey(input.Name))
+				{
+					cmdParameters[input.Name].Value = input.Value ?? DBNull.Value;
+				}
+			}
+			var cmd = new SqlCommand(rawSqlCommand);
+			cmd.CommandType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+			cmd.Parameters.AddRange(cmdParameters.Values.ToArray());
 
+			return cmd;
+		}
 		private string PrintParameters(SqlParameter[] parameters)
 		{
 			var parameterValues = 

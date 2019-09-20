@@ -73,11 +73,26 @@ namespace AXAXL.DbEntity.Interfaces
 		/// Execute sql command using values from <paramref name="parameters"/> as parameter value for sql command.
 		/// </summary>
 		/// <param name="connectionString">Database connection string</param>
+		/// <param name="isStoredProcedure">true if command string is a stored procedure name</param>
 		/// <param name="rawSqlCommand">Raw sql query</param>
 		/// <param name="parameters">Array of value tuple which has parameter name, value and direction.</param>
+		/// <param name="outputParameters">value returned for those paraeters marked as OUTPUT</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
 		/// <returns>List of <see cref="System.Dynamic.ExpandoObject"/> of any resultset returned.</returns>
 		IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30);
+		/// <summary>
+		/// Execute sql command using values from <paramref name="parameters"/> as parameter value for sql command.
+		/// </summary>
+		/// <typeparam name="T">Entity type used to store returned result set.</typeparam>
+		/// <param name="connectionString">Database connection string</param>
+		/// <param name="node">Node of <typeparamref name="T"/></param>
+		/// <param name="isStoredProcedure">true if command string is a stored procedure name</param>
+		/// <param name="rawSqlCommand">Raw sql query</param>
+		/// <param name="parameters">Array of value tuple which has parameter name, value and direction.</param>
+		/// <param name="outputParameters">value returned for those paraeters marked as OUTPUT</param>
+		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
+		/// <returns>Enumerable of <typeparamref name="T"/></returns>
+		IEnumerable<T> ExecuteCommand<T>(string connectionString, Node node, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30) where T : class, new();
 		/// <summary>
 		/// Return corresponding <see cref="System.Data.SqlDbType"/> for a C# object type.
 		/// </summary>

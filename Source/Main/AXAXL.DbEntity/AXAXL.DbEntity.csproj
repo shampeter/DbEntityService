@@ -19,9 +19,10 @@
 1.2.0 added RowVersion class for Sql rowversion column and corresponding Json converter.
 1.21. added OrderBy in IQuery.
 1.2.2 added support to sql op IN and LIKE
-1.2.3 added inner join to parent for filtering and incremental AND/OR condition to IQuery.</PackageReleaseNotes>
-    <Version>1.2.3</Version>
-    <AssemblyVersion>1.2.3.0</AssemblyVersion>
+1.2.3 added inner join to parent for filtering and incremental AND/OR condition to IQuery.
+1.2.4 added childset filtering by lambda where and raw sql read into entity.</PackageReleaseNotes>
+    <Version>1.2.4</Version>
+    <AssemblyVersion>1.2.4.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

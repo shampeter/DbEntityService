@@ -116,6 +116,15 @@ namespace AXAXL.DbEntity.UnitTests
 			var stateFarm = resultSet.Where(r => r.company_name == "State Farm").FirstOrDefault();
 			Assert.IsNotNull(stateFarm);
 			Assert.AreEqual("Cedant Company", stateFarm.description);
+
+			var resultSet2 = _dbService
+							.ExecuteCommand()
+							.SetCommand("select * from t_ceded_contract order by ceded_contract_pkey")
+							.Execute<TCededContract>(out output)
+							.ToArray();
+			Assert.AreEqual(2, resultSet2.Length);
+			Assert.AreEqual(100, resultSet2[0].CededContractNum);
+			Assert.AreEqual(101, resultSet2[1].CededContractNum);
 		}
 
 		[TestMethod]
