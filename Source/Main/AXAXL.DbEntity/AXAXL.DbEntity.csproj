@@ -44,7 +44,7 @@
   </ItemGroup>
 	
 	<Target Name="nugetpack">
-		<Exec Command="msbuild /t:pack /p:IncludeSymbols=true /p:IncludeReferencedProjects=true /p:Configuration=Release &quot;$(ProjectPath)&quot;" />
+		<Exec Command="msbuild /t:pack /p:IncludeSymbols=true /p:IncludeSource=true /p:IncludeReferencedProjects=true /p:Configuration=Debug &quot;$(ProjectPath)&quot;" />
 	</Target>
 
 </Project>
