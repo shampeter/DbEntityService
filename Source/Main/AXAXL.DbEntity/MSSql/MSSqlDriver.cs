@@ -669,7 +669,8 @@ namespace AXAXL.DbEntity.MSSql
 								.Select(p =>
 								{
 									var name = p.ParameterName;
-									var value = p.Value?.ToString() ?? @"null";
+									var value = p.Value?.ToString();
+									value = string.IsNullOrEmpty(value) ? @"null" : value;
 									return $"{name} = {value}";
 								})
 						);

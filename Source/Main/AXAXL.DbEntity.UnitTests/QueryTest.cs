@@ -390,6 +390,14 @@ namespace AXAXL.DbEntity.UnitTests
 		[Description("Query with child filtering")]
 		public void QueryWithChildFiltering()
 		{
+			// Test DBNull setting in SQL parameter.  Should return no t_doc under contract.
+			var contractWithNullFile = _dbService
+					.Query<TCededContract>()
+					.Where<TCededContract, TCededContractDoc>(d => d.Filename == null)
+					.ToArray();
+
+			Assert.IsTrue(contractWithNullFile.Any(c => c.CededContractDocs.Count > 0) == false);
+
 			// Return all contracts but select only text file t_doc under contract and gif file t_doc uner layer, which is none.
 			var query = _dbService
 								.Query<TCededContract>()

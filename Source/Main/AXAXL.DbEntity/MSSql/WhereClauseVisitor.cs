@@ -76,7 +76,14 @@ namespace AXAXL.DbEntity.MSSql
 			expressions[0] = Expression.Assign(sqlParameterVariable, Expression.New(typeof(SqlParameter)));
 			expressions[1] = Expression.Assign(parameterName, Expression.Constant(captured.parameter, typeof(string)));
 			expressions[2] = Expression.Assign(parameterType, Expression.Constant(dbType, typeof(SqlDbType)));
-			expressions[3] = Expression.Assign(parameterValue, Expression.Convert(captured.expression, typeof(object)));
+			expressions[3] = Expression.Assign(
+									parameterValue,
+									Expression.MakeBinary(
+										ExpressionType.Coalesce,
+										Expression.Convert(captured.expression, typeof(object)),
+										Expression.Constant(DBNull.Value)
+										)
+									);
 			expressions[4] = Expression.Label(returnLabel, sqlParameterVariable);
 			var block = Expression.Block(new[] { sqlParameterVariable }, expressions);
 			var func = Expression.Lambda<Func<SqlParameter>>(block);
@@ -88,7 +95,7 @@ namespace AXAXL.DbEntity.MSSql
 		[Conditional("DEBUG")]
 		private void LoqSqlParameterCreationExpression(Expression argExpr)
 		{
-			this.log.LogDebug("Sql Parameter Creation ... ", argExpr.ToString("C#"));
+			this.log.LogDebug("Sql Parameter Creation ... {0}", argExpr.ToString("C#"));
 		}
 		protected override Expression VisitBinary(BinaryExpression node)
 		{
