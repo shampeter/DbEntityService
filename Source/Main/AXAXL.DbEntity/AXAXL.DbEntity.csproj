@@ -27,7 +27,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>$(TargetDir)AXAXL.DbEntity.xml</DocumentationFile>
+    <DocumentationFile></DocumentationFile>
     <OutputPath>$(TargetDir)</OutputPath>
   </PropertyGroup>
 
