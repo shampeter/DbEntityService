@@ -220,6 +220,14 @@ namespace AXAXL.DbEntity.MSSql
 
 			return newExpr;
 		}
+		/// <summary>
+		/// Push the propery names involed in an memeber expression into a stack (FILO).  The member expression will be visited
+		/// from right to left recursively, that means, the last element visited will tell if this member expression is originated from
+		/// a parameter (i.e. a model node) or not.
+		/// </summary>
+		/// <param name="member">member expression</param>
+		/// <param name="names">a first-in-last-out stack</param>
+		/// <returns>true if this member expression starts from a node.</returns>
 		private bool IsAnEntityProperty(MemberExpression member, Stack<string> names)
 		{
 			if (member.Expression is MemberExpression parent)
@@ -232,6 +240,17 @@ namespace AXAXL.DbEntity.MSSql
 				return member.Expression is ParameterExpression;
 			}
 		}
+		/// <summary>
+		/// By walking through the <paramref name="path"/> which is a first-in-last-out stack, the code can, on one hand, establish the "inner join"
+		/// required to reach the parent reference from the current node, and on the other hand, recursively walk the stack and reach the node with the
+		/// target property in query and thus return the proper column name for where condition.
+		/// </summary>
+		/// <param name="current">current node</param>
+		/// <param name="edgeName"></param>
+		/// <param name="propertyName"></param>
+		/// <param name="path"></param>
+		/// <param name="innerJoinMap"></param>
+		/// <returns></returns>
 		private string GetDbColumnName(Node current, string edgeName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
 		{
 			if (path.Count() <= 0)
