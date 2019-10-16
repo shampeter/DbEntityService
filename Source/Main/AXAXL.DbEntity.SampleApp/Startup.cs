@@ -34,7 +34,7 @@ namespace AXAXL.DbEntity.SampleApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-			var filePath = Path.Combine(System.AppContext.BaseDirectory, "AXAXL.DbEntity.SampleApp.xml");
+			//var filePath = Path.Combine(System.AppContext.BaseDirectory, "AXAXL.DbEntity.SampleApp.xml");
 			services
 				// If Autofac is not used, the following will install DbEntitySerivces into the IoC container.
 				//.AddSqlDbEntityService(
@@ -57,7 +57,7 @@ namespace AXAXL.DbEntity.SampleApp
 							Description = "Sample App using AXAXL.DbEntity library",
 							TermsOfService = "None"
 						});
-						c.IncludeXmlComments(filePath);
+						//c.IncludeXmlComments(filePath);
 					}
 				)
 				;
