@@ -69,8 +69,16 @@ namespace AXAXL.DbEntity.UnitTests
 
 			var contractAfterRefresh = _dbService.Query<TCededContract>().Where(c => c.CededContractPkey == 2).ToArray().FirstOrDefault();
 
-			var layerAfterRefresh = contract.CededContractLayers.Where(l => l.Description == @"This is test layer 4").FirstOrDefault();
-			Assert.AreEqual(layerAfterInsert, layerAfterRefresh);
+			var layerAfterRefresh = contractAfterRefresh.CededContractLayers.Where(l => l.Description == @"This is test layer 4").FirstOrDefault();
+			Assert.AreEqual(layerAfterInsert.CededContractLayerPkey, layerAfterRefresh.CededContractLayerPkey);
+			Assert.AreEqual(layerAfterInsert.CededContractFkey, layerAfterRefresh.CededContractFkey);
+			Assert.AreEqual(layerAfterInsert.AttachmentPoint, layerAfterRefresh.AttachmentPoint);
+			Assert.AreEqual(layerAfterInsert.AddedDate.ToString(), layerAfterRefresh.AddedDate.ToString());
+			Assert.AreEqual(layerAfterInsert.AddedBy, layerAfterRefresh.AddedBy);
+			Assert.AreEqual(layerAfterInsert.ModifyDate.ToString(), layerAfterRefresh.ModifyDate.ToString());
+			Assert.AreEqual(layerAfterInsert.LayerTypeFkey, layerAfterRefresh.LayerTypeFkey);
+			Assert.AreEqual(layerAfterInsert.Version, layerAfterRefresh.Version);
+			Assert.AreEqual(layerAfterInsert.Description, layerAfterRefresh.Description);
 		}
 	}
 }
