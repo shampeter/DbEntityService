@@ -442,6 +442,14 @@ namespace AXAXL.DbEntity.MSSql
 						return param;
 					})
 					.ToArray();
+			foreach (var eachAction in allActions)
+			{
+				eachAction(entity);
+			}
+			foreach (var eachInj in allFuncInj)
+			{
+				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
+			}
 			var updateParmeterWithValues = updateParameters.Select(
 					kv =>
 					{
@@ -451,14 +459,6 @@ namespace AXAXL.DbEntity.MSSql
 						return param;
 					}
 				).ToArray();
-			foreach (var eachAction in allActions)
-			{
-				eachAction(entity);
-			}
-			foreach (var eachInj in allFuncInj)
-			{
-				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
-			}
 			var withNoOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == true;
 			var updateSql = string.Format(
 				@"UPDATE {0} SET {1}{2} WHERE {3}", 

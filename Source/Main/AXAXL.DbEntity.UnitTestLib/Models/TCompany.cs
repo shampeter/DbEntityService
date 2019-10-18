@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using AXAXL.DbEntity.Annotation;
+using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.UnitTestLib.Models
 {
 	[Table("t_company")]
-    public partial class TCompany
+    public class TCompany : ITrackable
     {
         public TCompany()
         {
@@ -46,5 +47,7 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 
         [ForeignKey("CompanyTypeFkey")]
         public virtual TLookups CompanyTypeFkeyNavigation { get; set; }
+
+		public EntityStatusEnum EntityStatus { get; set; }
 	}
 }

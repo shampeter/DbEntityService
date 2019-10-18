@@ -21,9 +21,10 @@
 1.2.2 added support to sql op IN and LIKE
 1.2.3 added inner join to parent for filtering and incremental AND/OR condition to IQuery.
 1.2.4 added childset filtering by lambda where and raw sql read into entity.
-1.2.5 bug fix.  WhereClauseVisitor not checking null parameter value and set DBNull instead.  Fixed.</PackageReleaseNotes>
-    <Version>1.2.5</Version>
-    <AssemblyVersion>1.2.5.0</AssemblyVersion>
+1.2.5 bug fix.  WhereClauseVisitor not checking null parameter value and set DBNull instead.  Fixed.
+1.2.6 bug fix.  Update injected value into object before forming sql update parameters.  Thus object was updated but not database.  Test case was not correct also.  Fixed accordingly and added one more test cases.</PackageReleaseNotes>
+    <Version>1.2.6</Version>
+    <AssemblyVersion>1.2.6.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
