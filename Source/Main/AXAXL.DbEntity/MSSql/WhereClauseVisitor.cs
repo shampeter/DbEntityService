@@ -155,11 +155,11 @@ namespace AXAXL.DbEntity.MSSql
 			else
 			{
 				var propertyName = member.Member.Name;
-				
+
 				//var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
 				//Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
-
-				var columnName = this.GetDbColumnName(this.startingNode, @"-", propertyName, names, this.innerJoinMap);
+				var edgeKey = $"{this.startingNode.Name}.-";
+				var columnName = this.GetDbColumnName(this.startingNode, edgeKey, propertyName, names, this.innerJoinMap);
 				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}'");
 				buffer.Append(columnName);
 			}
@@ -246,46 +246,46 @@ namespace AXAXL.DbEntity.MSSql
 		/// target property in query and thus return the proper column name for where condition.
 		/// </summary>
 		/// <param name="current">current node</param>
-		/// <param name="edgeName"></param>
-		/// <param name="propertyName"></param>
-		/// <param name="path"></param>
-		/// <param name="innerJoinMap"></param>
-		/// <returns></returns>
-		private string GetDbColumnName(Node current, string edgeName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
+		/// <param name="edgeKey">key for inner join map.  Key of previous level join so that we can get the right table alias.</param>
+		/// <param name="propertyName">rightmost name of an expression of which we want to locate the column name.</param>
+		/// <param name="path">name of parent reference on an expression from left to right.</param>
+		/// <param name="innerJoinMap">inner join map used to keep track of tables among inner joins.</param>
+		/// <returns>column name of the target <paramref name="propertyName"/></returns>
+		private string GetDbColumnName(Node current, string edgeKey, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
 		{
 			if (path.Count() <= 0)
 			{
-				var aliasIdx = ((ValueTuple<int, int, NodeEdge>)innerJoinMap[edgeName]).Item1;
+				var aliasIdx = ((ValueTuple<int, int, NodeEdge>)innerJoinMap[edgeKey]).Item1;
 				var dbColumnName = current.GetDbColumnNameFromPropertyName(propertyName);
 				return $"{this.tableAliasPrefix}{aliasIdx}.[{dbColumnName}]";
 			}
 			else
 			{
 				var entityRef = path.Pop();
-				var edge = this.AddEdgeToInnerJoin(innerJoinMap, current, edgeName, entityRef);
-				return this.GetDbColumnName(edge.ParentNode, entityRef, propertyName, path, innerJoinMap);
+				var newEdgeKey = $"{current.Name}.{entityRef}";
+				var edge = this.AddEdgeToInnerJoin(innerJoinMap, current, entityRef, edgeKey, newEdgeKey);
+				return this.GetDbColumnName(edge.ParentNode, newEdgeKey, propertyName, path, innerJoinMap);
 			}
 		}
-		private NodeEdge AddEdgeToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string currentEdgeName, string newJoin)
+		private NodeEdge AddEdgeToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string entityRef, string currentEdgeKey, string newEdgeKey)
 		{
 			NodeEdge edge = null;
-
-			if (! innerJoins.Contains(newJoin))
+			if (! innerJoins.Contains(newEdgeKey))
 			{
-				var parentRefOnChild = currentNode.GetPropertyFromNode(newJoin);
+				var parentRefOnChild = currentNode.GetPropertyFromNode(entityRef);
 				Debug.Assert(parentRefOnChild != null);
 				Debug.Assert(parentRefOnChild.IsEdge);
 
-				int currentIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[currentEdgeName]).Item1;
+				int currentIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[currentEdgeKey]).Item1;
 				int lastIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[innerJoins.Count - 1]).Item1;
 				edge = currentNode.GetEdgeToParent(parentRefOnChild);
 				(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) innerJoin = (ParentTableAliasIdx: ++lastIdx, ChildTableAliasIdx: currentIdx, Edge: edge);
 
-				innerJoins.Add(newJoin, innerJoin);
+				innerJoins.Add(newEdgeKey, innerJoin);
 			}
 			else
 			{
-				edge = ((ValueTuple<int, int, NodeEdge>)innerJoins[newJoin]).Item3;
+				edge = ((ValueTuple<int, int, NodeEdge>)innerJoins[newEdgeKey]).Item3;
 			}
 			return edge;
 		}

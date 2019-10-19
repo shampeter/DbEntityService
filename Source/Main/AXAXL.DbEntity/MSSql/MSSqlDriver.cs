@@ -78,7 +78,7 @@ namespace AXAXL.DbEntity.MSSql
 			// The following compile the additional where and or conditions.
 			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
 			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add("-", topLevelJoin);
+			innerJoinMap.Add($"{node.Name}.-", topLevelJoin);
 
 			Type typeOfAdditionalWhereClauses;
 			Type typeOfAdditionalOrClauses;
@@ -123,7 +123,7 @@ namespace AXAXL.DbEntity.MSSql
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
 			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add("-", topLevelJoin);
+			innerJoinMap.Add($"{node.Name}.-", topLevelJoin);
 
 			var (whereStatements, sqlParameterList) = this.CompileConditions<T>(node, whereClauses, orClausesGroup, tablePrefix, innerJoinMap);
 
