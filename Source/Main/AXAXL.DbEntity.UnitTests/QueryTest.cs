@@ -393,7 +393,7 @@ namespace AXAXL.DbEntity.UnitTests
 			// Test DBNull setting in SQL parameter.  Should return no t_doc under contract.
 			var contractWithNullFile = _dbService
 					.Query<TCededContract>()
-					.Where<TCededContract, TCededContractDoc>(d => d.Filename == null)
+					.LeftOuterJoin<TCededContract, TCededContractDoc>(d => d.Filename == null)
 					.ToArray();
 
 			Assert.IsTrue(contractWithNullFile.Any(c => c.CededContractDocs.Count > 0) == false);
@@ -402,8 +402,8 @@ namespace AXAXL.DbEntity.UnitTests
 			var query = _dbService
 								.Query<TCededContract>()
 								;
-			query.Where<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"));
-			query.Where<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.gif"));
+			query.LeftOuterJoin<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"));
+			query.LeftOuterJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.gif"));
 
 			var allContracts = query.ToArray();
 
@@ -429,8 +429,8 @@ namespace AXAXL.DbEntity.UnitTests
 			// Now query that search for GIF file for t_doc under layer so.  There should be 1.
 			allContracts = _dbService
 							.Query<TCededContract>()
-							.Where<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"))
-							.Where<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+							.LeftOuterJoin<TCededContract, TCededContractDoc>(d => d.Filename.Like("%.txt"))
+							.LeftOuterJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
 							.ToArray();
 
 			contract1 = allContracts.Where(c => c.CededContractPkey == 1).FirstOrDefault();

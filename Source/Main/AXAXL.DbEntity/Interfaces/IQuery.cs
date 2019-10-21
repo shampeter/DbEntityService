@@ -25,13 +25,21 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns>Return itself for method call chaining.</returns>
 		IQuery<T> Where(Expression<Func<T, bool>> whereClause);
 		/// <summary>
-		/// Specify where clause for child set filtering
+		/// Specify where clause for child set filtering.  Inner join between <typeparamref name="TParent"/> and <typeparamref name="TChild"/>.
 		/// </summary>
 		/// <typeparam name="TParent">Parent entity type.  Together with <typeparamref name="TChild"/> type helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <typeparam name="TChild">Child entity type.  Together with <typeparamref name="TParent"/> helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <param name="whereClause">Lambda expresson that returns boolean.</param>
 		/// <returns>Return itself for method call chaining.</returns>
 		IQuery<T> Where<TParent, TChild>(Expression<Func<TChild, bool>> whereClause);
+		/// <summary>
+		/// Specify where clause for child set filtering.  Left outer join between <typeparamref name="TParent"/> and <typeparamref name="TChild"/>
+		/// </summary>
+		/// <typeparam name="TParent">Parent entity type.  Together with <typeparamref name="TChild"/> type helps identify the parent-child relation that this where clause is going to filter</typeparam>
+		/// <typeparam name="TChild">Child entity type.  Together with <typeparamref name="TParent"/> helps identify the parent-child relation that this where clause is going to filter</typeparam>
+		/// <param name="whereClause">Lambda expresson that returns boolean.</param>
+		/// <returns>Return itself for method call chaining.</returns>
+		IQuery<T> LeftOuterJoin<TParent, TChild>(Expression<Func<TChild, bool>> whereClause);
 		/// <summary>
 		/// Specify additional where clause.  This and the where clause from <see cref="Where(Expression{Func{T, bool}})"/>
 		/// will be connected with an "AND" operator.
@@ -45,8 +53,9 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <typeparam name="TParent">Parent entity type.  Together with <typeparamref name="TChild"/> type helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <typeparam name="TChild">Child entity type.  Together with <typeparamref name="TParent"/> helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <param name="whereClause">Lambda expresson that returns boolean.</param>
+		/// <param name="isOuterJoin">True if join between <typeparamref name="TParent"/> and <typeparamref name="TChild"/> should be a Left Outer Join.</param>
 		/// <returns>Return itself for method call chaining.</returns>
-		IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause);
+		IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause, bool isOuterJoin = true);
 		/// <summary>
 		/// A group of conditions evaluated together by an "OR" operator.  This and other conditions supplied by
 		/// <see cref="Where(Expression{Func{T, bool}})"/> and <see cref="And(Expression{Func{T, bool}})"/> will be evaluated together
@@ -59,12 +68,24 @@ namespace AXAXL.DbEntity.Interfaces
 		/// A group of conditions evaluated together by an "OR" operator.  This and other conditions supplied by
 		/// <see cref="Where(Expression{Func{T, bool}})"/> and <see cref="And(Expression{Func{T, bool}})"/> will be evaluated together
 		/// by "AND" sql operators.
+		/// Left out join is assumed between <typeparamref name="TParent"/> and <typeparamref name="TChild"/>.
 		/// </summary>
 		/// <typeparam name="TParent">Parent entity type.  Together with <typeparamref name="TChild"/> type helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <typeparam name="TChild">Child entity type.  Together with <typeparamref name="TParent"/> helps identify the parent-child relation that this where clause is going to filter</typeparam>
 		/// <param name="orClauses">a list of Lambda expressions which will return boolean</param>
 		/// <returns>Return itself for method call chaining.</returns>
 		IQuery<T> Or<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses);
+		/// <summary>
+		/// A group of conditions evaluated together by an "OR" operator.  This and other conditions supplied by
+		/// <see cref="Where(Expression{Func{T, bool}})"/> and <see cref="And(Expression{Func{T, bool}})"/> will be evaluated together
+		/// by "AND" sql operators.
+		/// </summary>
+		/// <typeparam name="TParent">Parent entity type.  Together with <typeparamref name="TChild"/> type helps identify the parent-child relation that this where clause is going to filter</typeparam>
+		/// <typeparam name="TChild">Child entity type.  Together with <typeparamref name="TParent"/> helps identify the parent-child relation that this where clause is going to filter</typeparam>
+		/// <param name="orClauses">a list of Lambda expressions which will return boolean</param>
+		/// <param name="isOuterJoin">True if join between <typeparamref name="TParent"/> and <typeparamref name="TChild"/> should be a Left Outer Join.</param>
+		/// <returns>Return itself for method call chaining.</returns>
+		IQuery<T> Or<TParent, TChild>(bool isOuterJoin, params Expression<Func<TChild, bool>>[] orClauses);
 		/// <summary>
 		/// Excluding the childset by naming them in the Lambda expression.
 		/// </summary>

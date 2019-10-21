@@ -59,7 +59,16 @@ namespace AXAXL.DbEntity.MSSql
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, IEnumerable<Expression> additionalWhereClauses, IEnumerable<Expression[]> additionalOrClauses, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(
+			string connectionString, 
+			Node node, 
+			IDictionary<string, object> parameters, 
+			IEnumerable<Expression> additionalWhereClauses, 
+			IEnumerable<Expression[]> additionalOrClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 			Debug.Assert(
@@ -112,7 +121,17 @@ namespace AXAXL.DbEntity.MSSql
 			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, IEnumerable<Expression<Func<T, bool>>> whereClauses, IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(
+			string connectionString, 
+			Node node, 
+			IEnumerable<Expression<Func<T, bool>>> whereClauses, 
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+			int maxNumOfRow, 
+			(NodeProperty Property, bool IsAscending)[] orderBy, 
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
