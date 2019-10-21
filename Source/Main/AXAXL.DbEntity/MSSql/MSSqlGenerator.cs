@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	public partial class MSSqlGenerator : IMSSqlGenerator
+	internal partial class MSSqlGenerator : IMSSqlGenerator
 	{
 		private ILogger log = null;
 		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
@@ -24,7 +24,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		#region IMSSqlGenerator Implementation
 
-		public (int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause)
+		public (int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IInnerJoinMap innerJoinMap, Expression<Func<T, bool>> whereClause)
 		{
 			var visitor = new WhereClauseVisitor<T>(startingPoint, parameterSeq, tableAliasPrefix, this.log, innerJoinMap, MSSqlGenerator.CSTypeToSqlTypeMap, _extensions);
 			return visitor.Compile(whereClause);

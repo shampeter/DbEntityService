@@ -10,7 +10,7 @@ using AXAXL.DbEntity.Interfaces;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	public partial class MSSqlGenerator : IMSSqlGenerator
+	internal partial class MSSqlGenerator : IMSSqlGenerator
 	{
 		#region Debug only code with Conditional defined.
 		[Conditional("DEBUG")]

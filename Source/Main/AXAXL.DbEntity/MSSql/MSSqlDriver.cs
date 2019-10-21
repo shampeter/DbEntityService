@@ -15,7 +15,7 @@ using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	public class MSSqlDriver : IDatabaseDriver
+	internal class MSSqlDriver : IDatabaseDriver
 	{
 		private ILogger log = null;
 		private IMSSqlGenerator sqlGenerator = null;
@@ -76,9 +76,8 @@ namespace AXAXL.DbEntity.MSSql
 			var primaryWhereClause = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns);
 
 			// The following compile the additional where and or conditions.
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
-			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add($"{node.Name}.-", topLevelJoin);
+			var innerJoinMap = new InnerJoinMap();
+			innerJoinMap.Init(node, tableAliasFirstIdx);
 
 			Type typeOfAdditionalWhereClauses;
 			Type typeOfAdditionalOrClauses;
@@ -121,9 +120,8 @@ namespace AXAXL.DbEntity.MSSql
 			var tableAliasFirstIdx = 0;
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
-			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add($"{node.Name}.-", topLevelJoin);
+			var innerJoinMap = new InnerJoinMap();
+			var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
 
 			var (whereStatements, sqlParameterList) = this.CompileConditions<T>(node, whereClauses, orClausesGroup, tablePrefix, innerJoinMap);
 
@@ -194,7 +192,7 @@ namespace AXAXL.DbEntity.MSSql
 														whereClausesType, 
 														orClausesType, 
 														typeof(string), 
-														typeof(OrderedDictionary),
+														typeof(IInnerJoinMap),
 														resultingValueTupleType
 														);
 			var delegateHandle = compileConditionsMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(compileConditionsDelegateType, this);
@@ -208,7 +206,7 @@ namespace AXAXL.DbEntity.MSSql
 			IEnumerable<Expression<Func<TEntity, bool>>> whereClauses, 
 			IEnumerable<Expression<Func<TEntity, bool>>[]> orClausesGroup, 
 			string tablePrefix, 
-			OrderedDictionary innerJoinMap
+			IInnerJoinMap innerJoinMap
 		) where TEntity : class, new()
 		{
 			var sqlParameterRunningSeq = 0;
@@ -591,17 +589,11 @@ namespace AXAXL.DbEntity.MSSql
 			return lambda.Compile();
 		}
 
-		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap, string tableAliasPrefix)
+		private string ComputeInnerJoins(IInnerJoinMap innerJoinsMap, string tableAliasPrefix)
 		{
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) eachEdge;
 			StringBuilder buffer = new StringBuilder();
-			var enumerator = innerJoinsMap.GetEnumerator();
-			while (enumerator.MoveNext())
+			foreach (var eachEdge in innerJoinsMap.Joins)
 			{
-				eachEdge = (ValueTuple<int, int, NodeEdge>)enumerator.Value;
-
-				if (eachEdge.Edge == null) continue;
-
 				var parentAlias = $"{tableAliasPrefix}{eachEdge.ParentTableAliasIdx}";
 				var childAlias = $"{tableAliasPrefix}{eachEdge.ChildTableAliasIdx}";
 				var nodeEdge = eachEdge.Edge;

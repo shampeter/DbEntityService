@@ -11,11 +11,11 @@ using AXAXL.DbEntity.MSSql.Autofac;
 namespace AXAXL.DbEntity.MSSql
 {
 	[Intercept(MSSqlGeneratorResponseCache.C_MS_SQL_GENERATOR_CACHE_INTERCEPTOR_NAME)]
-	public interface IMSSqlGenerator
+	internal interface IMSSqlGenerator
 	{
 		SqlDbType GetSqlDbTypeFromCSType(Type csType);
 
-		(int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause);
+		(int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IInnerJoinMap innerJoinMap, Expression<Func<T, bool>> whereClause);
 
 		NodeProperty[] ExtractPrimaryKeyAndConcurrencyControlColumns(Node node);
 

@@ -12,7 +12,7 @@ namespace AXAXL.DbEntity.MSSql
 		private int runningSequence;
 		private IDictionary<string, int> edgeKeyIndexes;
 		private IList<ValueTuple<int, int, NodeEdge>> innerJoins;
-
+		private string rootMapKey;
 		public InnerJoinMap()
 		{
 			this.edgeKeyIndexes = new Dictionary<string, int>();
@@ -20,6 +20,8 @@ namespace AXAXL.DbEntity.MSSql
 		}
 
 		public IEnumerable<(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge)> Joins => this.innerJoins;
+
+		public string RootMapKey => this.rootMapKey;
 
 		public string Add(string currentJoinKey, Node node, string newJoinEnittyRef)
 		{
@@ -51,14 +53,12 @@ namespace AXAXL.DbEntity.MSSql
 
 		public string Init(Node queryRootNode, int queryRootAliaxIdx)
 		{
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (queryRootAliaxIdx, queryRootAliaxIdx, null);
-			var rootKey = this.FormatEdgeKey(queryRootNode, null, true);
-
-			this.runningSequence = queryRootAliaxIdx;
-			this.edgeKeyIndexes.Add(rootKey, this.runningSequence++);
-			this.innerJoins.Add(topLevelJoin);
-
-			return rootKey;
+			//(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (queryRootAliaxIdx, queryRootAliaxIdx, null);
+			this.rootMapKey = this.FormatEdgeKey(queryRootNode, null, true);
+			this.edgeKeyIndexes.Add(this.rootMapKey, queryRootAliaxIdx);
+			this.runningSequence = queryRootAliaxIdx + 1;
+			//this.innerJoins.Add(topLevelJoin);
+			return this.rootMapKey;
 		}
 
 		private string FormatEdgeKey(Node node, String entityRef, bool isRoot = false)
