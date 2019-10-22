@@ -47,16 +47,28 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="maxNumOfRow">Specific maximum number of rows to be returned.  Set as <= 0 to return all rows.</param>
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
 		IEnumerable<T> Select<T>(
-			string connectionString, 
-			Node node, 
-			IEnumerable<Expression<Func<T, bool>>> whereClauses, 
+			string connectionString,
+			Node node,
+			IDictionary<string, object> parameters,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
 			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
-			int maxNumOfRow, 
-			(NodeProperty Property, bool IsAscending)[] orderBy, 
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new();
+		//IEnumerable<T> Select<T>(
+		//	string connectionString, 
+		//	Node node, 
+		//	IEnumerable<Expression<Func<T, bool>>> whereClauses, 
+		//	IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+		//	int maxNumOfRow, 
+		//	(NodeProperty Property, bool IsAscending)[] orderBy, 
+		//	int timeoutDurationInSeconds = 30
+		//	) where T : class, new();
 		/// <summary>
 		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.
 		/// </summary>

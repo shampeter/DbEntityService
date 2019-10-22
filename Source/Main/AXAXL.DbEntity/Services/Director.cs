@@ -73,7 +73,7 @@ namespace AXAXL.DbEntity.Services
 					// The result of the shorter select call can be cached as it pretty much fixed.  Thus don't want to mix these 2 calls.
 					if ((additionalWhereClause != null && additionalWhereClause.Length > 0 )|| (additionalOrClauses != null && additionalOrClauses.Count > 0))
 					{
-						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, this.TimeoutDurationInSeconds);
+						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, null, null, this.TimeoutDurationInSeconds);
 					}
 					else
 					{
