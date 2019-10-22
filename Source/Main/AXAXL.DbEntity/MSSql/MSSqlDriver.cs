@@ -120,6 +120,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			return this.SelectImplementation<T>(connectionString, node, null, whereClauses, orClausesGroup, childInnerJoinWhereClauses, childInnerJoinOrClausesGroup, maxNumOfRow, orderBy, timeoutDurationInSeconds);
 		}
+
 		private IEnumerable<T> SelectImplementation<T>(
 			string connectionString,
 			Node node,

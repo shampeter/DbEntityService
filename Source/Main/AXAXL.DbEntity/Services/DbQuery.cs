@@ -42,6 +42,8 @@ namespace AXAXL.DbEntity.Services
 			this.OrClausesGroup = new List<Expression<Func<T, bool>>[]>();
 			this.ChildOuterJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
 			this.ChildOuterJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
+			this.ChildInnerJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
+			this.ChildInnerJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
