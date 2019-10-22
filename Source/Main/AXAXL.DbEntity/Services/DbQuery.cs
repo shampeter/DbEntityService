@@ -159,7 +159,6 @@ namespace AXAXL.DbEntity.Services
 			var queryResult = this.Driver.Select(
 										connection, 
 										node, 
-										null,
 										this.WhereClauses, 
 										this.OrClausesGroup, 
 										this.ChildInnerJoinWhereClauses,

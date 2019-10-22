@@ -27,7 +27,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		IDictionary<string, SqlParameter> CreateSqlParametersForRawSqlParameters((string Name, object Value, ParameterDirection Direction)[] parameters);
 	
-		string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null);
+		string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null);
 
 		(string OutputClause, Action<SqlDataReader, dynamic> EntityUpdateAction) CreateOutputComponent(Node node, bool IsInserting = true);
 
@@ -39,7 +39,7 @@ namespace AXAXL.DbEntity.MSSql
 		
 		IDictionary<string, Func<dynamic, dynamic>> CreatePropertyValueReaderMap(Node node, NodeProperty[] columns);
 		
-		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy);
+		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy, string tableAlias = null);
 		
 		string FormatTableName(Node node, string tableAlias = null);
 	}
