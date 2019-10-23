@@ -123,7 +123,6 @@ namespace AXAXL.DbEntity.MSSql
 
 		public IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null)
 		{
-			Debug.Assert(columns != null && columns.Length > 0 && columns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
 			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : $"{parameterPrefix}";
 
 			return columns.ToDictionary(
@@ -182,7 +181,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		public string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null)
 		{
-			Debug.Assert(whereColumns != null && whereColumns.Length > 0 && whereColumns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
+			//Debug.Assert(whereColumns != null && whereColumns.Length > 0 && whereColumns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
 			var alias = tableAlias == null ? string.Empty : $"{tableAlias}.";
 			var whereClause = string.Join(
 				" AND ",
@@ -197,7 +196,6 @@ namespace AXAXL.DbEntity.MSSql
 
 		public NodeProperty[] ExtractColumnByPropertyName(Node node, params string[] propertyNames)
 		{
-			Debug.Assert(propertyNames != null && propertyNames.Length > 0);
 			return propertyNames.Select(p => node.GetPropertyFromNode(p)).ToArray();
 		}
 
