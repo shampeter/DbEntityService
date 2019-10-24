@@ -267,9 +267,17 @@ namespace AXAXL.DbEntity.EntityGraph
 		{
 			return this.EdgeToChildren.Keys.ToArray();
 		}
+		public NodeEdge[] AllChildEdges()
+		{
+			return this.EdgeToChildren.Values.ToArray();
+		}
 		public string[] AllParentEdgeNames()
 		{
 			return this.EdgeToParent.Keys.ToArray();
+		}
+		public NodeEdge[] AllParentEdges()
+		{
+			return this.EdgeToParent.Values.ToArray();
 		}
 		public NodeProperty[] AllDbColumns
 		{
