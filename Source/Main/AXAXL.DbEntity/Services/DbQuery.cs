@@ -158,20 +158,22 @@ namespace AXAXL.DbEntity.Services
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
+			var innerJoinsWhereClauses = this.ComputeNodePath<Expression>(node, this.ChildInnerJoinWhereClauses);
+			var innerJoinOrClauses = this.ComputeNodePath<Expression[]>(node, this.ChildInnerJoinOrClausesGroup);
 			var queryResult = this.Driver.Select(
 										connection, 
 										node, 
 										this.WhereClauses, 
-										this.OrClausesGroup, 
-										this.ChildInnerJoinWhereClauses,
-										this.ChildInnerJoinOrClausesGroup,
+										this.OrClausesGroup,
+										innerJoinsWhereClauses,
+										innerJoinOrClauses,
 										maxNumOfRow, 
 										this.Ordering.ToArray(), 
 										this.TimeoutDurationInSeconds
 										);
 			foreach(var eachEntity in queryResult)
 			{
-				director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup);
+				director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
 			}
 			return queryResult;
 		}
@@ -200,6 +202,66 @@ namespace AXAXL.DbEntity.Services
 			var childEdge = parent.GetEdgeToChildren(propertyToChild);
 
 			return childEdge;
+		}
+		private IList<(IList<NodeEdge> Path, IEnumerable<TExpr> expressions)> ComputeNodePath<TExpr>(Node node, IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
+		{
+			var consolidated = this.ConsolidateInnerJoins(innerJoinToChildren);
+			var computed = consolidated
+							.Select(
+								v =>
+								{
+									var path = this.ComputeNodePath(node, v.Key);
+									return ValueTuple.Create<IList<NodeEdge>, IEnumerable<TExpr>>(path, v.Value);
+								})
+							.ToList();
+			return computed;
+		}
+		private IDictionary<NodeEdge, IEnumerable<TExpr>> ConsolidateInnerJoins<TExpr>(IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
+		{
+			var dict = new Dictionary<NodeEdge, IEnumerable<TExpr>>();
+			foreach (var eachTuple in innerJoinToChildren)
+			{
+				if (!dict.ContainsKey(eachTuple.Item1))
+				{
+					dict.Add(eachTuple.Item1, new List<TExpr>());
+				}
+				((List<TExpr>)dict[eachTuple.Item1]).Add(eachTuple.Item2);
+			}
+			return dict;
+		}
+		private IList<NodeEdge> ComputeNodePath(Node node, NodeEdge targetEdge)
+		{
+			var stackOfNodeToTarget = new Stack<NodeEdge>();
+			// Look for path from currento node to parent node of the target edge.  When found, the last edge to the target inner join where clause will be
+			// the target edge itself.  Thus push the target edge to stack will create the complete path from current node to target edge.
+			var found = this.DepthFirstSearchChildEdge(node, targetEdge.ParentNode, stackOfNodeToTarget);
+			stackOfNodeToTarget.Push(targetEdge);
+
+			Debug.Assert(found, $"Cannot find a path from {node.Name} to {targetEdge.ParentNode.Name}");
+
+			return stackOfNodeToTarget.ToArray().Reverse().ToList();
+		}
+		private bool DepthFirstSearchChildEdge(Node node, Node targetNode, Stack<NodeEdge> stackOfNodeToTarget)
+		{
+			bool found = true;
+			if (targetNode.Name != node.Name)
+			{
+				foreach (var edge in node.AllChildEdges())
+				{
+					stackOfNodeToTarget.Push(edge);
+					found = this.DepthFirstSearchChildEdge(edge.ChildNode, targetNode, stackOfNodeToTarget);
+
+					if (found)
+					{
+						break;
+					}
+					else
+					{
+						stackOfNodeToTarget.Pop();
+					}
+				}
+			}
+			return found;
 		}
 	}
 }

@@ -26,6 +26,7 @@ namespace AXAXL.DbEntity.MSSql
 		private List<(string parameter, Type exprResultType, Expression expression)> captured = new List<(string, Type, Expression)>();
 		private int sqlParameterRunningSeq = 0;
 		private string tableAliasPrefix;
+		private string rootMapKey;
 		private readonly IDictionary<ExpressionType, string> operators = new Dictionary<ExpressionType, string>
 		{
 			[ExpressionType.Equal] = @" = ",
@@ -39,6 +40,7 @@ namespace AXAXL.DbEntity.MSSql
 			Node startingNode, 
 			int sqlParameterRunningSeq, 
 			string tableAliasPrefix, 
+			string rootMapKey,
 			ILogger log, 
 			IInnerJoinMap innerJoinMap, 
 			IDictionary<Type, SqlDbType> typeMap, 
@@ -53,6 +55,7 @@ namespace AXAXL.DbEntity.MSSql
 			this.sqlParameterRunningSeq = sqlParameterRunningSeq;
 			this.startingNode = startingNode;
 			this.tableAliasPrefix = tableAliasPrefix;
+			this.rootMapKey = rootMapKey;
 		}
 		//internal (int SqlParameterRunningSeq, string WhereClause, string InnerJoinClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
 		internal (int SqlParameterRunningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
@@ -158,8 +161,9 @@ namespace AXAXL.DbEntity.MSSql
 
 				//var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
 				//Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
-				var edgeKey = this.innerJoinMap.RootMapKey;
-				var columnName = this.GetDbColumnName(this.startingNode, edgeKey, propertyName, names, this.innerJoinMap);
+				//var edgeKey = this.innerJoinMap.RootMapKey;
+				//var columnName = this.GetDbColumnName(this.startingNode, edgeKey, propertyName, names, this.innerJoinMap);
+				var columnName = this.GetDbColumnName(this.startingNode, this.rootMapKey, propertyName, names, this.innerJoinMap);
 				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}'");
 				buffer.Append(columnName);
 			}

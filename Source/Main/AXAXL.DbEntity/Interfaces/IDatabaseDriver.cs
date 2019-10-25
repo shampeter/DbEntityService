@@ -51,8 +51,8 @@ namespace AXAXL.DbEntity.Interfaces
 			Node node,
 			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
-			IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
-			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+			IList<(IList<NodeEdge> Path, IEnumerable<Expression> expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, IEnumerable<Expression[]> expressions)> childInnerJoinOrClausesGroup,
 			int maxNumOfRow,
 			(NodeProperty Property, bool IsAscending)[] orderBy,
 			int timeoutDurationInSeconds = 30
@@ -66,16 +66,18 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="parameters">Dictionary of name to value representing the where condition, assuming AND operation on all key-value pairs.</param>
 		/// <param name="whereClauses">Additonal where clause in addition to the <paramref name="parameters"/></param>
 		/// <param name="orClausesGroup">Additional or clauses in addition to the <paramref name="parameters"/></param>
+		/// <param name="childInnerJoinWhereClauses">Inner joins to childset and children selection condition</param>
+		/// <param name="childInnerJoinOrClausesGroup">Inner joins to childset and children selection or group condition</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
 		/// <returns><see cref="IEnumerable{T}"/> of entity object.</returns>
 		IEnumerable<T> Select<T>(
-			string connectionString, 
-			Node node, 
-			IDictionary<string, object> parameters, 
+			string connectionString,
+			Node node,
+			IDictionary<string, object> parameters,
 			IEnumerable<Expression> whereClauses, 
 			IEnumerable<Expression[]> orClausesGroup,
-			IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
-			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+			IList<(IList<NodeEdge> Path, IEnumerable<Expression> expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, IEnumerable<Expression[]> expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new();
 		/// <summary>
