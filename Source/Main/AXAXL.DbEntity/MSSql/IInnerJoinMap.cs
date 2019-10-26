@@ -32,7 +32,7 @@ namespace AXAXL.DbEntity.MSSql
 		/// <summary>
 		/// Get inner joins saved.
 		/// </summary>
-		IEnumerable<(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge)> Joins { get;  }
+		IEnumerable<(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge, bool isTowardParent)> Joins { get;  }
 		/// <summary>
 		/// Return the root map key which is created when initiated.
 		/// </summary>

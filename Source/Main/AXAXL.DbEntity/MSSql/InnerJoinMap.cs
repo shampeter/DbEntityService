@@ -11,15 +11,15 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		private int runningSequence;
 		private IDictionary<string, int> edgeKeyIndexes;
-		private IList<ValueTuple<int, int, NodeEdge>> innerJoins;
+		private IList<ValueTuple<int, int, NodeEdge, bool>> innerJoins;
 		private string rootMapKey;
 		public InnerJoinMap()
 		{
 			this.edgeKeyIndexes = new Dictionary<string, int>();
-			this.innerJoins = new List<ValueTuple<int, int, NodeEdge>>();
+			this.innerJoins = new List<ValueTuple<int, int, NodeEdge, bool>>();
 		}
 
-		public IEnumerable<(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge)> Joins => this.innerJoins;
+		public IEnumerable<(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge, bool isTowardParent)> Joins => this.innerJoins;
 
 		public string RootMapKey => this.rootMapKey;
 
@@ -33,12 +33,12 @@ namespace AXAXL.DbEntity.MSSql
 				if (node.ContainsEdgeToChildren(newJoinEnittyRef))
 				{
 					edge = node.GetEdgeToChildren(newJoinEnittyRef);
-					this.innerJoins.Add((currentAliasIdx, this.runningSequence, edge));
+					this.innerJoins.Add((currentAliasIdx, this.runningSequence, edge, false));
 				}
 				else
 				{
 					edge = node.GetEdgeToParent(newJoinEnittyRef);
-					this.innerJoins.Add((this.runningSequence, currentAliasIdx, edge));
+					this.innerJoins.Add((this.runningSequence, currentAliasIdx, edge, true));
 				}
 				this.edgeKeyIndexes.Add(key, this.runningSequence++);
 			}

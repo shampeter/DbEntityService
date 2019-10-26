@@ -387,6 +387,51 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
 		}
 		[TestMethod]
+		[Description("Query with inner join filtering")]
+		public void QueryWithInnerJoin()
+		{
+			var contractWithTxtLayerDoc = _dbService
+											.Query<TCededContract>()
+											.InnerJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+											.ToArray();
+			// There should be just 1 layer with a t_doc of filename like *.txt.  Thus we should only find 1 contract and 1 layer in resultset.
+			Assert.AreEqual(1, contractWithTxtLayerDoc.Length);
+			Assert.AreEqual(1, contractWithTxtLayerDoc[0].CededContractLayers.Count());
+			Assert.AreEqual(2, contractWithTxtLayerDoc[0].CededContractLayers[0].CededContractLayerDocs.Count());
+
+			Assert.IsTrue(contractWithTxtLayerDoc[0].CededContractLayers[0].CededContractLayerDocs[0].Filename.EndsWith(".txt", StringComparison.OrdinalIgnoreCase));
+
+			// query with same condition and added condition for cedent company.
+			// should return the same result as the contract found is under cedant Travellers
+			contractWithTxtLayerDoc = _dbService
+										.Query<TCededContract>()
+										.Where(c => c.CedantCompany.CompanyName == "Travellers")
+										.InnerJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+										.ToArray();
+			Assert.AreEqual(1, contractWithTxtLayerDoc.Length);
+			Assert.AreEqual(1, contractWithTxtLayerDoc[0].CededContractLayers.Count());
+			Assert.AreEqual(2, contractWithTxtLayerDoc[0].CededContractLayers[0].CededContractLayerDocs.Count());
+
+			// query with same condition and added condition for cedent company.
+			// should return the same result as not the contract is not from cedant ABC
+			contractWithTxtLayerDoc = _dbService
+										.Query<TCededContract>()
+										.Where(c => c.CedantCompany.CompanyName == "ABC")
+										.InnerJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+										.ToArray();
+			Assert.AreEqual(0, contractWithTxtLayerDoc.Length);
+
+			// To make sure the inner join query on the child set was executed correctly.
+			// Expected doc returned should be just 1 with filename being layer_file_1.txt
+			var contractWithLayerDocNamedContractFile1 = _dbService
+								.Query<TCededContract>()
+								.InnerJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename == "layer_file_1.txt")
+								.ToArray();
+			Assert.AreEqual(1, contractWithLayerDocNamedContractFile1.Length);
+			Assert.AreEqual(1, contractWithLayerDocNamedContractFile1[0].CededContractLayers.Count());
+			Assert.AreEqual(1, contractWithLayerDocNamedContractFile1[0].CededContractLayers[0].CededContractLayerDocs.Count());
+		}
+		[TestMethod]
 		[Description("Query with child filtering")]
 		public void QueryWithChildFiltering()
 		{

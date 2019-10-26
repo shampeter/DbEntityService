@@ -95,7 +95,7 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
-		public IQuery<T> Where<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		public IQuery<T> InnerJoin<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
 		{
 			var childEdge = this.LocateChildEdge<TParent, TChild>();
 
@@ -116,6 +116,8 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
+		/* Removed API cause it is too confusiong.
+		 * 
 		public IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause, bool isOuterJoin = true)
 		{
 			if (isOuterJoin)
@@ -127,17 +129,22 @@ namespace AXAXL.DbEntity.Services
 				return this.Where<TParent, TChild>(whereClause);
 			}
 		}
+		*/
 		public IQuery<T> Or(params Expression<Func<T, bool>>[] orClauses)
 		{
 			Debug.Assert(orClauses != null && orClauses.Length > 1);
 			this.OrClausesGroup.Add(orClauses);
 			return this;
 		}
-		public IQuery<T> Or<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		public IQuery<T> LeftOuterJoinOr<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
 		{
-			return this.Or<TParent, TChild>(true, orClauses);
+			return this.OrImplementation<TParent, TChild>(true, orClauses);
 		}
-		public IQuery<T> Or<TParent, TChild>(bool isOuterJoin, params Expression<Func<TChild, bool>>[] orClauses)
+		public IQuery<T> InnerJoinOr<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		{
+			return this.OrImplementation<TParent, TChild>(false, orClauses);
+		}
+		private IQuery<T> OrImplementation<TParent, TChild>(bool isOuterJoin, params Expression<Func<TChild, bool>>[] orClauses)
 		{
 			Debug.Assert(orClauses != null && orClauses.Length > 1);
 

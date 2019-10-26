@@ -264,13 +264,14 @@ namespace AXAXL.DbEntity.MSSql
 		/// <returns>delegate to call the CompileConditions method</returns>
 		private Delegate MakeCompileWhereWithRightType(Node node, Type whereClausesType)
 		{
-			var resultingValueTupleType = typeof(ValueTuple<List<string>, List<Func<SqlParameter>>>);
-			var compileConditionsDelegateType = typeof(Func<,,,,,>)
+			var resultingValueTupleType = typeof(ValueTuple<string, List<Func<SqlParameter>>, int>);
+			var compileConditionsDelegateType = typeof(Func<,,,,,,>)
 													.MakeGenericType(
 														typeof(Node), 
 														whereClausesType, 
 														typeof(string),
 														typeof(string),
+														typeof(int),
 														typeof(IInnerJoinMap),
 														resultingValueTupleType
 														);
@@ -280,13 +281,14 @@ namespace AXAXL.DbEntity.MSSql
 
 		private Delegate MakeCompileOrWithRightType(Node node, Type orClausesType)
 		{
-			var resultingValueTupleType = typeof(ValueTuple<List<string>, List<Func<SqlParameter>>>);
-			var compileOrGroupDelegateType = typeof(Func<,,,,,>)
+			var resultingValueTupleType = typeof(ValueTuple<string, List<Func<SqlParameter>>, int>);
+			var compileOrGroupDelegateType = typeof(Func<,,,,,,>)
 													.MakeGenericType(
 														typeof(Node),
 														orClausesType,
 														typeof(string),
 														typeof(string),
+														typeof(int),
 														typeof(IInnerJoinMap),
 														resultingValueTupleType
 														);
@@ -322,7 +324,7 @@ namespace AXAXL.DbEntity.MSSql
 				whereStatements.Add(compilationResult.whereClause);
 				sqlParameterList.AddRange(compilationResult.sqlParameters);
 			}
-			return (string.Join(@" AND ", whereStatements), sqlParameterList, sqlParameterRunningSeq);
+			return (this.CombineWhereStatements(false, whereStatements), sqlParameterList, sqlParameterRunningSeq);
 		}
 
 		private	(string, List<Func<SqlParameter>>, int) CompileOrGroups<TEntity>
@@ -405,9 +407,15 @@ namespace AXAXL.DbEntity.MSSql
 
 		private string CombineWhereStatements(bool addWhere, params string[] whereStatements)
 		{
-			if (whereStatements == null || whereStatements.Length <= 0) return string.Empty;
+			return this.CombineWhereStatements(addWhere, whereStatements.AsEnumerable());
+		}
+
+		private string CombineWhereStatements(bool addWhere, IEnumerable<string> whereStatements)
+		{
+			if (whereStatements == null || whereStatements.Count() <= 0 || whereStatements.Any(s => string.IsNullOrEmpty(s) == false) == false) return string.Empty;
+			var whereKeyWord = addWhere ? @" WHERE " : String.Empty;
 			var combined = string.Join(@" AND ", whereStatements.Where(s => string.IsNullOrEmpty(s) == false));
-			return string.IsNullOrEmpty(combined) ? string.Empty : $" WHERE {combined}";
+			return $"{whereKeyWord}{combined}";
 		}
 
 		internal static string FormatParameterName(string parameterName)
@@ -514,7 +522,7 @@ namespace AXAXL.DbEntity.MSSql
 
 				buffer
 					.Append(@" INNER JOIN ")
-					.Append(parentTable)
+					.Append(eachEdge.isTowardParent ? parentTable : childTable)
 					.Append(@" ON ")
 					;
 
@@ -582,7 +590,7 @@ namespace AXAXL.DbEntity.MSSql
 				parameterList.AddRange(compilationResult.Item2);
 				runningSqlParameterSeq = compilationResult.Item3;
 			}
-			var combinedWhereStatement = this.CombineWhereStatements(false, whereStatements.ToArray());
+			var combinedWhereStatement = this.CombineWhereStatements(false, whereStatements);
 			return (combinedWhereStatement, parameterList, runningSqlParameterSeq);
 		}
 
@@ -611,7 +619,7 @@ namespace AXAXL.DbEntity.MSSql
 				parameterList.AddRange(compilationResult.Item2);
 				runningSqlParameterSeq = compilationResult.Item3;
 			}
-			var combinedStatements = this.CombineWhereStatements(false, orStatements.ToArray());
+			var combinedStatements = this.CombineWhereStatements(false, orStatements);
 			return (combinedStatements, parameterList, runningSqlParameterSeq);
 		}
 
