@@ -45,14 +45,17 @@ namespace AXAXL.DbEntity.MSSql
 				);
 
 			var aliasT0 = @"t0";
-			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, -1);
+			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
-			SqlCommand cmd = new SqlCommand(
-							select.SelectClause +
-							(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
-							);
+			var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, aliasT0, -1, null);
+			//SqlCommand cmd = new SqlCommand(
+			//				@"SELECT " +
+			//				select.SelectedColumns +
+			//				(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
+			//				);
+			var cmd = new SqlCommand(sql);
 
 			var parameterWithValue =
 				queryParameters
@@ -155,12 +158,12 @@ namespace AXAXL.DbEntity.MSSql
 			int sqlParameterRunningSeq = 0;
 			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
 
-			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node, maxNumOfRow);
+			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
 
 			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
 			var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
-			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
+			//var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			var innerJoinMap = new InnerJoinMap();
@@ -180,12 +183,25 @@ namespace AXAXL.DbEntity.MSSql
 			var additionalInnerJoinOr = this.CompileChildInnerJoinOrGroup(innerJoinOrForThisNode, tablePrefix, additionalInnerJoinWhere.Item3, innerJoinMap);
 			// Completed inner join work.  Remove the top edge from the path worked on, so that when stepping down the entity graph, the children along the path will create the same 
 			// inner join conditions.
-			this.RemovedVisitedAndCombine<Expression>(childInnerJoinWhereClauses, innerJoinWhereFound);
-			this.RemovedVisitedAndCombine<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
+			this.RemovedVisited<Expression>(childInnerJoinWhereClauses, innerJoinWhereFound);
+			this.RemovedVisited<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
 
 			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
-			var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
-			var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
+			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
+			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
+			var sqlCmd = this.FormatSelectStatement(
+				node, 
+				select.SelectedColumns, 
+				innerJoinStatement, 
+				primaryWhereStatement, 
+				additionalWhere.Item1, 
+				additionalOr.Item1, 
+				additionalInnerJoinWhere.Item1, 
+				additionalInnerJoinOr.Item1,
+				topLevelTableAlias,
+				maxNumOfRow,
+				orderBy
+				);
 			using (SqlCommand cmd = new SqlCommand(sqlCmd))
 			{
 				var primaryParameterWithValue =
@@ -209,6 +225,63 @@ namespace AXAXL.DbEntity.MSSql
 				resultSet = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 			}
 			return resultSet;
+		}
+
+		private string FormatSelectStatement(
+			Node node,
+			string selectedColumns, 
+			string innerJoinStatement, 
+			string primaryWhereStatement, 
+			string additionalWhereStatements, 
+			string additionalOrGroupStatements, 
+			string additionalInnerJoinWhereStatements, 
+			string additionalInnerJoinOrGroups,
+			string tableAlias,
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy
+			)
+		{
+			bool requireDistinct = false;
+			string selectStatement;
+			var tableName = this.sqlGenerator.FormatTableName(node, tableAlias);
+			var combinedWhere = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhereStatements, additionalOrGroupStatements, additionalInnerJoinWhereStatements, additionalInnerJoinOrGroups);
+
+			if (! string.IsNullOrEmpty(additionalInnerJoinWhereStatements) || ! string.IsNullOrEmpty(additionalInnerJoinOrGroups))
+			{
+				requireDistinct = true;
+			}
+			if (requireDistinct)
+			{
+				selectStatement = string.Format(
+										@"SELECT DISTINCT {0} FROM {1}{2}{3}",
+										selectedColumns,
+										tableName,
+										innerJoinStatement,
+										combinedWhere
+									);
+				if (maxNumOfRow > 0)
+				{
+					var orderByStatement = this.sqlGenerator.CompileOrderByClause(orderBy, @"distinct_result");
+					selectStatement = string.Format(@"SELECT TOP {0} distinct_result.* FROM ({1}) AS distinct_result{2}", maxNumOfRow, selectStatement, orderByStatement);
+				}
+				else
+				{
+					selectStatement += this.sqlGenerator.CompileOrderByClause(orderBy, tableAlias);
+				}
+			}
+			else
+			{
+				selectStatement = string.Format(
+										@"SELECT {0}{1} FROM {2}{3}{4}{5}",
+										maxNumOfRow > 0 ? $"TOP {maxNumOfRow} " : String.Empty,
+										selectedColumns,
+										tableName,
+										innerJoinStatement,
+										combinedWhere,
+										this.sqlGenerator.CompileOrderByClause(orderBy, tableAlias)
+									 );
+			}
+			return selectStatement;
 		}
 		private MSSqlDriver InvokeAndAddSqlParameters(SqlCommand sqlCommand, IEnumerable<Func<SqlParameter>> parameterDelegates)
 		{
@@ -364,46 +437,8 @@ namespace AXAXL.DbEntity.MSSql
 					whereStatements.Add(@"( " + string.Join(" OR ", orConditions) + @" )");
 				}
 			}
-			return (string.Join(@" AND ", whereStatements), sqlParameterList, sqlParameterRunningSeq);
+			return (this.CombineWhereStatements(false, whereStatements), sqlParameterList, sqlParameterRunningSeq);
 		}
-		//private (string, List<Func<SqlParameter>>) CompileInnerJoinWhere(Node node, string currentMapKey, IEnumerable<ValueTuple<NodeEdge, Expression>> innerJoinToChildren, string tablePrefix, IInnerJoinMap innerJoinMap)
-		//{
-		//	List<string> resultedWhereStatements = new List<string>();
-		//	List<Func<SqlParameter>> resultedSqlParameters = new List<Func<SqlParameter>>();
-
-		//	var innerJoinsFound = this.SearchInnerJoins<Expression>(node, currentMapKey, innerJoinToChildren.ToList(), innerJoinMap);
-		//	foreach(var eachChildGroup in innerJoinsFound.GroupBy(i => i.Edge.ChildNode))
-		//	{
-		//		Type restoredType;
-		//		var expressionsOnChild = eachChildGroup.Select(v => v.Expr).ToArray();
-		//		var restoredWhere = this.RestoreWhereClause(eachChildGroup.Key, expressionsOnChild, out restoredType);
-		//		var compileDelegate = this.MakeCompileWhereWithRightType(eachChildGroup.Key, restoredType);
-		//		var compilationResult = ((string, List<Func<SqlParameter>>))compileDelegate.DynamicInvoke(eachChildGroup.Key, restoredWhere, tablePrefix, innerJoinMap);
-		//		resultedWhereStatements.Add(compilationResult.Item1);
-		//		resultedSqlParameters.AddRange(compilationResult.Item2);
-		//	}
-		//	var combined = this.CombineWhereStatements(false, resultedWhereStatements.ToArray());
-		//	return (combined, resultedSqlParameters);
-		//}
-		//private (string, List<Func<SqlParameter>>) CompileInnerJoinOrGroup(Node node, string currentMapKey, IEnumerable<ValueTuple<NodeEdge, Expression[]>> innerJoinToChildren, string tablePrefix, IInnerJoinMap innerJoinMap)
-		//{
-		//	List<string> resultedOrGroups = new List<string>();
-		//	List<Func<SqlParameter>> resultedSqlParameters = new List<Func<SqlParameter>>();
-
-		//	var innerJoinsFound = this.SearchInnerJoins<Expression[]>(node, currentMapKey, innerJoinToChildren.ToList(), innerJoinMap);
-		//	foreach (var eachChildGroup in innerJoinsFound.GroupBy(i => i.Edge.ChildNode))
-		//	{
-		//		Type restoredType;
-		//		var expressionsOnChild = eachChildGroup.Select(v => v.Expr).ToArray();
-		//		var restoredOrGroups = this.RestoreOrClauses(eachChildGroup.Key, expressionsOnChild, out restoredType);
-		//		var compileDelegate = this.MakeCompileOrWithRightType(eachChildGroup.Key, restoredType);
-		//		var compilationResult = ((string, List<Func<SqlParameter>>))compileDelegate.DynamicInvoke(eachChildGroup.Key, restoredOrGroups, tablePrefix, innerJoinMap);
-		//		resultedOrGroups.Add(compilationResult.Item1);
-		//		resultedSqlParameters.AddRange(compilationResult.Item2);
-		//	}
-		//	var combined = this.CombineWhereStatements(false, resultedOrGroups.ToArray());
-		//	return (combined, resultedSqlParameters);
-		//}
 
 		private string CombineWhereStatements(bool addWhere, params string[] whereStatements)
 		{
@@ -563,7 +598,7 @@ namespace AXAXL.DbEntity.MSSql
 			matchedList = matched;
 			return matchedIdx;
 		}
-		private IList<(IList<NodeEdge> Path, IEnumerable<TE> expressions)> RemovedVisitedAndCombine<TE>(
+		private IList<(IList<NodeEdge> Path, IEnumerable<TE> expressions)> RemovedVisited<TE>(
 			IList<(IList<NodeEdge> Path, IEnumerable<TE> expressions)> input,
 			IEnumerable<int> visitedIdx
 			)

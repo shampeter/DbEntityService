@@ -412,6 +412,18 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.AreEqual(1, contractWithTxtLayerDoc[0].CededContractLayers.Count());
 			Assert.AreEqual(2, contractWithTxtLayerDoc[0].CededContractLayers[0].CededContractLayerDocs.Count());
 
+			// query with same condition and added condition for cedent company. max row and order.
+			// need to check the log to see if the sql is correct.  Don't have enough data to test.
+			contractWithTxtLayerDoc = _dbService
+										.Query<TCededContract>()
+										.Where(c => c.CedantCompany.CompanyName == "Travellers")
+										.InnerJoin<TCededContractLayer, TCededContractLayerDoc>(d => d.Filename.Like("%.txt"))
+										.OrderBy(c => c.UwYear)
+										.ToArray(200);
+			Assert.AreEqual(1, contractWithTxtLayerDoc.Length);
+			Assert.AreEqual(1, contractWithTxtLayerDoc[0].CededContractLayers.Count());
+			Assert.AreEqual(2, contractWithTxtLayerDoc[0].CededContractLayers[0].CededContractLayerDocs.Count());
+
 			// query with same condition and added condition for cedent company.
 			// should return the same result as not the contract is not from cedant ABC
 			contractWithTxtLayerDoc = _dbService

@@ -84,6 +84,44 @@ namespace AXAXL.DbEntity.MSSql
 			return (outputClause, lambdaFunc.Compile());
 		}
 
+		public (string SelectedColumns, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node)
+		{
+			var tableName = this.FormatTableName(node, tableAlias);
+			var allColumns = node.AllDbColumns;
+
+			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
+
+			var selectedColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
+			//var selectClause = string.Format(@"{0} FROM {1}", selectedColumns, tableName);
+
+			var exprBuffer = new List<Expression>();
+			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
+			var outputParameter = Expression.Variable(node.NodeType, "entity");
+
+			// entity = new T();
+			exprBuffer.Add(
+				Expression.Assign(
+					outputParameter,
+					Expression.New(node.NodeType)
+				)
+			);
+			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
+			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
+			exprBuffer.AddRange(CreateSqlReaderFetchingExpressions(allColumns, inputParameter, outputParameter));
+
+			var returnLabel = Expression.Label(node.NodeType, "return");
+
+			exprBuffer.Add(Expression.Label(returnLabel, outputParameter));
+
+			var exprBlock = Expression.Block(new[] { outputParameter }, exprBuffer.ToArray());
+			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, dynamic>>(exprBlock, inputParameter);
+
+			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
+
+			return (selectedColumns, lambdaFunc.Compile());
+		}
+		/* Archived 2019-10-26
+		 * 
 		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node, int maxNumOfRow)
 		{
 			var tableName = this.FormatTableName(node, tableAlias);
@@ -120,7 +158,7 @@ namespace AXAXL.DbEntity.MSSql
 
 			return (selectClause, lambdaFunc.Compile());
 		}
-
+		*/
 		public IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null)
 		{
 			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : $"{parameterPrefix}";

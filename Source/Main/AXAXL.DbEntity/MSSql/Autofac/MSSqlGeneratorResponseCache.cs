@@ -153,9 +153,9 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 
 		private static string SignatureForCreateSelectComponent(string methodName, IInvocation invocation)
 		{
-			var nodeSign = SignatureForNode(invocation.GetArgumentValue(0));
-			var maxRowSign = invocation.GetArgumentValue(1).ToString();
-			return $"{methodName}:{nodeSign},{maxRowSign}";
+			var nodeSign = SignatureForNode(invocation.GetArgumentValue(1));
+			var aliasSign = invocation.GetArgumentValue(0).ToString();
+			return $"{methodName}:{aliasSign},{nodeSign}";
 		}
 
 		private static string SignatureForExtractPrimaryKeyAndConcurrencyControlColumns(string methodName, IInvocation invocation)

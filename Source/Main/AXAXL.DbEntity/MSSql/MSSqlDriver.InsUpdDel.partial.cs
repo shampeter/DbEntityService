@@ -57,7 +57,7 @@ namespace AXAXL.DbEntity.MSSql
 
 			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
 			// Note that the SelectClause variable is not used.  We are just borrowing the call to create the data reader fetching func.
-			var (SelectClause, DataReaderToEntityFunc) = this.sqlGenerator.CreateSelectComponent(string.Empty, node, -1);
+			var (SelectedColumns, DataReaderToEntityFunc) = this.sqlGenerator.CreateSelectComponent(string.Empty, node);
 			this.LogSql("Execute command", null, cmd);
 
 			var resultSet = this.ExecuteQuery<T>(connectionString, DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
