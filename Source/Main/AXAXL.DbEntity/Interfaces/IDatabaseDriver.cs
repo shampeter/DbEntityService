@@ -51,8 +51,8 @@ namespace AXAXL.DbEntity.Interfaces
 			Node node,
 			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression> expressions)> childInnerJoinWhereClauses,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression[]> expressions)> childInnerJoinOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int maxNumOfRow,
 			(NodeProperty Property, bool IsAscending)[] orderBy,
 			int timeoutDurationInSeconds = 30
@@ -76,8 +76,8 @@ namespace AXAXL.DbEntity.Interfaces
 			IDictionary<string, object> parameters,
 			IEnumerable<Expression> whereClauses, 
 			IEnumerable<Expression[]> orClausesGroup,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression> expressions)> childInnerJoinWhereClauses,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression[]> expressions)> childInnerJoinOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new();
 		/// <summary>

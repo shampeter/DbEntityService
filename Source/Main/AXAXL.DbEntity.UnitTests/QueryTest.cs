@@ -51,7 +51,7 @@ namespace AXAXL.DbEntity.UnitTests
 			Assert.AreEqual(1000000.0000m, layer1.AttachmentPoint);
 			Assert.AreEqual(2000000.0000m, layer1.Limit);
 			Assert.AreEqual(@"Excess of Loss", layer1.LayerType?.Description);
-			Assert.AreEqual(1, layer1.CededContractLayerDocs?.Count);
+			Assert.AreEqual(2, layer1.CededContractLayerDocs?.Count);
 			Assert.AreEqual(1, layer1.CededContractLayerDocs[0]?.OwnerGuid);
 			Assert.AreEqual(@"Layer", layer1.CededContractLayerDocs[0]?.OwnerType, "Owner type is wrong");
 
@@ -135,7 +135,7 @@ namespace AXAXL.DbEntity.UnitTests
 
 			Assert.AreEqual(2, contracts.Count(), $"There should be 2 contracts");
 			Assert.AreEqual(5, contracts.SelectMany(p => p.CededContractLayers).Count(), "There should be totally 5 layers.");
-			Assert.AreEqual(3, contracts.SelectMany(c => c.CededContractDocs).Count() + contracts.SelectMany(p => p.CededContractLayers).SelectMany(l => l.CededContractLayerDocs).Count());
+			Assert.AreEqual(4, contracts.SelectMany(c => c.CededContractDocs).Count() + contracts.SelectMany(p => p.CededContractLayers).SelectMany(l => l.CededContractLayerDocs).Count());
 		}
 
 		[TestMethod]

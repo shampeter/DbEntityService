@@ -210,7 +210,7 @@ namespace AXAXL.DbEntity.Services
 
 			return childEdge;
 		}
-		private IList<(IList<NodeEdge> Path, IEnumerable<TExpr> expressions)> ComputeNodePath<TExpr>(Node node, IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
+		private IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TExpr> Expressions)> ComputeNodePath<TExpr>(Node node, IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
 		{
 			var consolidated = this.ConsolidateInnerJoins(innerJoinToChildren);
 			var computed = consolidated
@@ -218,7 +218,7 @@ namespace AXAXL.DbEntity.Services
 								v =>
 								{
 									var path = this.ComputeNodePath(node, v.Key);
-									return ValueTuple.Create<IList<NodeEdge>, IEnumerable<TExpr>>(path, v.Value);
+									return ValueTuple.Create<IList<NodeEdge>, Node, IEnumerable<TExpr>>(path.Path, path.TargetChild, v.Value);
 								})
 							.ToList();
 			return computed;
@@ -236,7 +236,7 @@ namespace AXAXL.DbEntity.Services
 			}
 			return dict;
 		}
-		private IList<NodeEdge> ComputeNodePath(Node node, NodeEdge targetEdge)
+		private (IList<NodeEdge> Path, Node TargetChild) ComputeNodePath(Node node, NodeEdge targetEdge)
 		{
 			var stackOfNodeToTarget = new Stack<NodeEdge>();
 			// Look for path from currento node to parent node of the target edge.  When found, the last edge to the target inner join where clause will be
@@ -246,7 +246,9 @@ namespace AXAXL.DbEntity.Services
 
 			Debug.Assert(found, $"Cannot find a path from {node.Name} to {targetEdge.ParentNode.Name}");
 
-			return stackOfNodeToTarget.ToArray().Reverse().ToList();
+			var path = stackOfNodeToTarget.ToArray().Reverse().ToList();
+			var targetChild = targetEdge.ChildNode;
+			return (path, targetChild);
 		}
 		private bool DepthFirstSearchChildEdge(Node node, Node targetNode, Stack<NodeEdge> stackOfNodeToTarget)
 		{

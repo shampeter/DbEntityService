@@ -39,8 +39,8 @@ namespace AXAXL.DbEntity.Services
 			bool isMovingTowardsChild, 
 			IEnumerable<ValueTuple<NodeEdge, Expression>> childWhereClauses,
 			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression> expressions)> innerJoinWhere,
-			IList<(IList<NodeEdge> Path, IEnumerable<Expression[]> expressions)> innerJoinOr
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
 			) where T : class, new()
 		{
 			Node node = this.NodeMap.GetNode(entity.GetType());
