@@ -22,9 +22,10 @@
 1.2.3 added inner join to parent for filtering and incremental AND/OR condition to IQuery.
 1.2.4 added childset filtering by lambda where and raw sql read into entity.
 1.2.5 bug fix.  WhereClauseVisitor not checking null parameter value and set DBNull instead.  Fixed.
-1.2.6 bug fix.  Update injected value into object before forming sql update parameters.  Thus object was updated but not database.  Test case was not correct also.  Fixed accordingly and added one more test cases.</PackageReleaseNotes>
-    <Version>1.2.6</Version>
-    <AssemblyVersion>1.2.6.0</AssemblyVersion>
+1.2.6 bug fix.  Update injected value into object before forming sql update parameters.  Thus object was updated but not database.  Test case was not correct also.  Fixed accordingly and added one more test cases.
+1.3.0 Breaking API.  Where&lt;TP, TC&gt; becomes LeftOuterJoin and added InnerJoin&lt;TP, TC&gt;</PackageReleaseNotes>
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
