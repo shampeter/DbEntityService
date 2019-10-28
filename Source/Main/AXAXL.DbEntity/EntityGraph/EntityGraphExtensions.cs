@@ -219,9 +219,18 @@ namespace AXAXL.DbEntity.EntityGraph
 
 		public static NodeProperty IdentifyMember<TEntity>(this Node node, Expression<Func<TEntity, dynamic>> memberExpression) where TEntity : class
 		{
-			var member = memberExpression.Body as MemberExpression;
-			Debug.Assert(member != null);
-			var property = member.Member as PropertyInfo;
+			PropertyInfo property = null;
+			if (memberExpression.Body is MemberExpression bodyMember)
+			{
+				property = bodyMember.Member as PropertyInfo;
+			}
+			else if (memberExpression.Body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+			{
+				if (unary.Operand is MemberExpression operandMember)
+				{
+					property = operandMember.Member as PropertyInfo;
+				}
+			}
 			Debug.Assert(property != null);
 
 			return node.GetPropertyFromNode(property.Name);

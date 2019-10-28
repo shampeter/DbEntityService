@@ -21,9 +21,11 @@ namespace AXAXL.DbEntity.Services
 		private IDatabaseDriver Driver { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<Expression<Func<T, bool>>> WhereClauses { get; set; }
-		private IList<ValueTuple<NodeEdge, Expression>> ChildWhereClauses { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression>> ChildInnerJoinWhereClauses { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression>> ChildOuterJoinWhereClauses { get; set; }
 		private IList<Expression<Func<T, bool>>[]> OrClausesGroup { get; set; }
-		private IList<ValueTuple<NodeEdge, Expression[]>> ChildOrClausesGroup { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression[]>> ChildInnerJoinOrClausesGroup { get; set; }
+		private IList<ValueTuple<NodeEdge, Expression[]>> ChildOuterJoinOrClausesGroup { get; set; }
 		private IList<(NodeProperty Column, bool IsAscending)> Ordering { get; set; }
 		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
@@ -38,8 +40,10 @@ namespace AXAXL.DbEntity.Services
 			this.Ordering = new List<(NodeProperty Column, bool IsAscending)>();
 			this.WhereClauses = new List<Expression<Func<T, bool>>>();
 			this.OrClausesGroup = new List<Expression<Func<T, bool>>[]>();
-			this.ChildWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
-			this.ChildOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
+			this.ChildOuterJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
+			this.ChildOuterJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
+			this.ChildInnerJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
+			this.ChildInnerJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
@@ -91,11 +95,19 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
-		public IQuery<T> Where<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		public IQuery<T> InnerJoin<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
 		{
 			var childEdge = this.LocateChildEdge<TParent, TChild>();
 
-			this.ChildWhereClauses.Add((childEdge, whereClause));
+			this.ChildInnerJoinWhereClauses.Add((childEdge, whereClause));
+
+			return this;
+		}
+		public IQuery<T> LeftOuterJoin<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		{
+			var childEdge = this.LocateChildEdge<TParent, TChild>();
+
+			this.ChildOuterJoinWhereClauses.Add((childEdge, whereClause));
 
 			return this;
 		}
@@ -104,22 +116,47 @@ namespace AXAXL.DbEntity.Services
 			this.WhereClauses.Add(whereClause);
 			return this;
 		}
-		public IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause)
+		/* Removed API cause it is too confusiong.
+		 * 
+		public IQuery<T> And<TParent, TChild>(Expression<Func<TChild, bool>> whereClause, bool isOuterJoin = true)
 		{
-			return this.Where<TParent, TChild>(whereClause);
+			if (isOuterJoin)
+			{
+				return this.LeftOuterJoin<TParent, TChild>(whereClause);
+			}
+			else
+			{
+				return this.Where<TParent, TChild>(whereClause);
+			}
 		}
+		*/
 		public IQuery<T> Or(params Expression<Func<T, bool>>[] orClauses)
 		{
 			Debug.Assert(orClauses != null && orClauses.Length > 1);
 			this.OrClausesGroup.Add(orClauses);
 			return this;
 		}
-		public IQuery<T> Or<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		public IQuery<T> LeftOuterJoinOr<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		{
+			return this.OrImplementation<TParent, TChild>(true, orClauses);
+		}
+		public IQuery<T> InnerJoinOr<TParent, TChild>(params Expression<Func<TChild, bool>>[] orClauses)
+		{
+			return this.OrImplementation<TParent, TChild>(false, orClauses);
+		}
+		private IQuery<T> OrImplementation<TParent, TChild>(bool isOuterJoin, params Expression<Func<TChild, bool>>[] orClauses)
 		{
 			Debug.Assert(orClauses != null && orClauses.Length > 1);
 
 			var childEdge = this.LocateChildEdge<TParent, TChild>();
-			this.ChildOrClausesGroup.Add((childEdge, orClauses));
+			if (isOuterJoin)
+			{
+				this.ChildOuterJoinOrClausesGroup.Add((childEdge, orClauses));
+			}
+			else
+			{
+				this.ChildInnerJoinOrClausesGroup.Add((childEdge, orClauses));
+			}
 
 			return this;
 		}
@@ -128,10 +165,22 @@ namespace AXAXL.DbEntity.Services
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
 			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
-			var queryResult = this.Driver.Select(connection, node, this.WhereClauses, this.OrClausesGroup, maxNumOfRow, this.Ordering.ToArray(), this.TimeoutDurationInSeconds);
+			var innerJoinsWhereClauses = this.ComputeNodePath<Expression>(node, this.ChildInnerJoinWhereClauses);
+			var innerJoinOrClauses = this.ComputeNodePath<Expression[]>(node, this.ChildInnerJoinOrClausesGroup);
+			var queryResult = this.Driver.Select(
+										connection, 
+										node, 
+										this.WhereClauses, 
+										this.OrClausesGroup,
+										innerJoinsWhereClauses,
+										innerJoinOrClauses,
+										maxNumOfRow, 
+										this.Ordering.ToArray(), 
+										this.TimeoutDurationInSeconds
+										);
 			foreach(var eachEntity in queryResult)
 			{
-				director.Build<T>(eachEntity, true, true, this.ChildWhereClauses, this.ChildOrClausesGroup);
+				director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
 			}
 			return queryResult;
 		}
@@ -160,6 +209,68 @@ namespace AXAXL.DbEntity.Services
 			var childEdge = parent.GetEdgeToChildren(propertyToChild);
 
 			return childEdge;
+		}
+		private IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TExpr> Expressions)> ComputeNodePath<TExpr>(Node node, IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
+		{
+			var consolidated = this.ConsolidateInnerJoins(innerJoinToChildren);
+			var computed = consolidated
+							.Select(
+								v =>
+								{
+									var path = this.ComputeNodePath(node, v.Key);
+									return ValueTuple.Create<IList<NodeEdge>, Node, IEnumerable<TExpr>>(path.Path, path.TargetChild, v.Value);
+								})
+							.ToList();
+			return computed;
+		}
+		private IDictionary<NodeEdge, IEnumerable<TExpr>> ConsolidateInnerJoins<TExpr>(IEnumerable<ValueTuple<NodeEdge, TExpr>> innerJoinToChildren)
+		{
+			var dict = new Dictionary<NodeEdge, IEnumerable<TExpr>>();
+			foreach (var eachTuple in innerJoinToChildren)
+			{
+				if (!dict.ContainsKey(eachTuple.Item1))
+				{
+					dict.Add(eachTuple.Item1, new List<TExpr>());
+				}
+				((List<TExpr>)dict[eachTuple.Item1]).Add(eachTuple.Item2);
+			}
+			return dict;
+		}
+		private (IList<NodeEdge> Path, Node TargetChild) ComputeNodePath(Node node, NodeEdge targetEdge)
+		{
+			var stackOfNodeToTarget = new Stack<NodeEdge>();
+			// Look for path from currento node to parent node of the target edge.  When found, the last edge to the target inner join where clause will be
+			// the target edge itself.  Thus push the target edge to stack will create the complete path from current node to target edge.
+			var found = this.DepthFirstSearchChildEdge(node, targetEdge.ParentNode, stackOfNodeToTarget);
+			stackOfNodeToTarget.Push(targetEdge);
+
+			Debug.Assert(found, $"Cannot find a path from {node.Name} to {targetEdge.ParentNode.Name}");
+
+			var path = stackOfNodeToTarget.ToArray().Reverse().ToList();
+			var targetChild = targetEdge.ChildNode;
+			return (path, targetChild);
+		}
+		private bool DepthFirstSearchChildEdge(Node node, Node targetNode, Stack<NodeEdge> stackOfNodeToTarget)
+		{
+			bool found = true;
+			if (targetNode.Name != node.Name)
+			{
+				foreach (var edge in node.AllChildEdges())
+				{
+					stackOfNodeToTarget.Push(edge);
+					found = this.DepthFirstSearchChildEdge(edge.ChildNode, targetNode, stackOfNodeToTarget);
+
+					if (found)
+					{
+						break;
+					}
+					else
+					{
+						stackOfNodeToTarget.Pop();
+					}
+				}
+			}
+			return found;
 		}
 	}
 }

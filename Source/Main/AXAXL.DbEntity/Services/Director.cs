@@ -33,27 +33,34 @@ namespace AXAXL.DbEntity.Services
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
-		public T Build<T>(T entity, bool isMovingTowardsParent, bool isMovingTowardsChild, IList<ValueTuple<NodeEdge, Expression>> childWhereClauses, IList<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup) where T : class, new()
+		public T Build<T>(
+			T entity, 
+			bool isMovingTowardsParent, 
+			bool isMovingTowardsChild, 
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			) where T : class, new()
 		{
 			Node node = this.NodeMap.GetNode(entity.GetType());
 
 			if (isMovingTowardsChild)
 			{
-				foreach (var eachParentToChild in node.AllChildEdgeNames())
+				foreach (var edge in node.AllChildEdges())
 				{
-					var edge = node.GetEdgeToChildren(eachParentToChild);
-					var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == edge).Select(w => w.Item2).ToArray();
-					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
-
-/* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
- 					var edgeSignature = this.GetEdgeSignature(edge);
-					// child path has been walked.
-					if (this.PathWalked.Contains(edgeSignature)) continue;
-					// if not, remember this path in order to prevent going in cycles.
-					this.PathWalked.Add(edgeSignature);
-*/
+					/* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
+										var edgeSignature = this.GetEdgeSignature(edge);
+										// child path has been walked.
+										if (this.PathWalked.Contains(edgeSignature)) continue;
+										// if not, remember this path in order to prevent going in cycles.
+										this.PathWalked.Add(edgeSignature);
+					*/
 					// child path excluded
 					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
+
+					var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == edge).Select(w => w.Item2).ToArray();
+					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
 
 					var readers = edge.ParentPrimaryKeyReaders;
 					IDictionary<string, object> childKeys = new Dictionary<string, object>();
@@ -71,9 +78,14 @@ namespace AXAXL.DbEntity.Services
 					var connection = this.GetConnectionString(edge.ChildNode);
 					IEnumerable<object> children = null;
 					// The result of the shorter select call can be cached as it pretty much fixed.  Thus don't want to mix these 2 calls.
-					if ((additionalWhereClause != null && additionalWhereClause.Length > 0 )|| (additionalOrClauses != null && additionalOrClauses.Count > 0))
+					if (
+						(additionalWhereClause != null && additionalWhereClause.Length > 0 ) ||
+						(additionalOrClauses != null && additionalOrClauses.Count > 0) ||
+						(innerJoinWhere != null && innerJoinWhere.Count() > 0) ||
+						(innerJoinWhere != null && innerJoinWhere.Count() > 0)
+						)
 					{
-						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, this.TimeoutDurationInSeconds);
+						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 					}
 					else
 					{
@@ -84,7 +96,7 @@ namespace AXAXL.DbEntity.Services
 					foreach (var eachChild in children)
 					{
 						edge.ParentSettingAction(eachChild, entity);
-						this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup);
+						this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 					}
 				}
 			}
@@ -111,7 +123,7 @@ namespace AXAXL.DbEntity.Services
 					var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys, this.TimeoutDurationInSeconds).FirstOrDefault();
 					edge.ParentSettingAction(entity, parent);
 					edge.ChildAddingAction(parent, new[] { entity });
-					this.Build(parent, true, false, childWhereClauses, childOrClausesGroup);
+					this.Build(parent, true, false, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 				}
 			}
 			return entity;

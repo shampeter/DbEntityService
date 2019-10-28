@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Diagnostics;
 using System.Data;
@@ -15,37 +16,51 @@ using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	public class MSSqlDriver : IDatabaseDriver
+	internal partial class MSSqlDriver : IDatabaseDriver
 	{
-		private ILogger log = null;
-		private IMSSqlGenerator sqlGenerator = null;
+		private readonly ILogger log = null;
+		private readonly IMSSqlGenerator sqlGenerator = null;
 		private static readonly MethodInfo enumerableCastMethodInfo = typeof(Enumerable).GetMethod("Cast", BindingFlags.Public | BindingFlags.Static);
-		private static readonly MethodInfo compileConditionsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileConditions), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly MethodInfo compileWhereConditionsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileWhereConditions), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly MethodInfo compileOrGroupsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileOrGroups), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly MethodInfo selectImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly IDictionary<string, object> emptyParameters = new Dictionary<string, object>();
+		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression>> emptyValueTupleOfNodeEdgeNExpression = Array.Empty<(NodeEdge, Expression)>();
+		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression[]>> emptyValueTupleOfNodeEdgeNExpressionGroup = Array.Empty<(NodeEdge, Expression[])>();
+		private static readonly ValueTuple<NodeProperty, bool>[] emptyOrderBy = Array.Empty<(NodeProperty, bool)>();
 		public MSSqlDriver(ILoggerFactory factory, IMSSqlGenerator sqlGenerator)
 		{
 			this.log = factory.CreateLogger<MSSqlDriver>();
 			this.sqlGenerator = sqlGenerator;
 		}
+
+		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated is using SQL parameters to pass user input.")]
 		public IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+			Debug.Assert(parameters != null && parameters.Count > 0);
 			Debug.Assert(
 				parameters.Keys.All(p => String.IsNullOrEmpty(node.GetDbColumnNameFromPropertyName(p)) == false),
 				$"Dictionary contains key which is not present in the given node."
 				);
 
-			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node, -1);
+			var aliasT0 = @"t0";
+			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
-			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns);
-			var cmd = new SqlCommand(
-							select.SelectClause +
-							(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
-							);
+			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
+			var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, null, null, aliasT0, -1, null);
+			//SqlCommand cmd = new SqlCommand(
+			//				@"SELECT " +
+			//				select.SelectedColumns +
+			//				(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
+			//				);
+			var cmd = new SqlCommand(sql);
 
 			var parameterWithValue =
 				queryParameters
-					.Select(kv => {
+					.Select(kv =>
+					{
 						var whereParameterValue = parameters[kv.Key];
 						var sqlParameter = kv.Value;
 						sqlParameter.Value = whereParameterValue ?? DBNull.Value;
@@ -59,86 +74,241 @@ namespace AXAXL.DbEntity.MSSql
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, IDictionary<string, object> parameters, IEnumerable<Expression> additionalWhereClauses, IEnumerable<Expression[]> additionalOrClauses, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(
+			string connectionString,
+			Node node,
+			IDictionary<string, object> parameters,
+			IEnumerable<Expression> additionalWhereClauses, 
+			IEnumerable<Expression[]> additionalOrClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
 		{
-			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-			Debug.Assert(
-				parameters.Keys.All(p => String.IsNullOrEmpty(node.GetDbColumnNameFromPropertyName(p)) == false),
-				$"Dictionary contains key which is not present in the given node."
-				);
-			var tablePrefix = @"t";
-			var tableAliasFirstIdx = 0;
-
-			// The following prepare where clause and sql parameter from the dictionary of values.  Regular stuff.
-			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, -1);
-			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
-			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
-			var primaryWhereClause = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns);
-
-			// The following compile the additional where and or conditions.
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
-			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add("-", topLevelJoin);
+			Debug.Assert(parameters != null && parameters.Count > 0);
 
 			Type typeOfAdditionalWhereClauses;
 			Type typeOfAdditionalOrClauses;
-
 			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
 			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
-			var compileConditionsDelegate = this.MakeCompileWithRightType(node, typeOfAdditionalWhereClauses, typeOfAdditionalOrClauses);
-
-			var (additonalWhereStatements, additionalSqlParameters) = (ValueTuple<List<string>, List<Func<SqlParameter>>>)compileConditionsDelegate.DynamicInvoke(node, restoredWhereClauses, restoredOrClauses, tablePrefix, innerJoinMap);
-
-			var additionalWhereClause = additonalWhereStatements.Count() > 0 ? @" AND " + string.Join(@" AND ", additonalWhereStatements) : string.Empty;
-			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
-
-			// Put them together to create the SQL command.
-			var sqlCmd = string.Format("{0}{1} WHERE {2}{3}", select.SelectClause, innerJoinStatement, primaryWhereClause, additionalWhereClause);
-			var cmd = new SqlCommand(sqlCmd);
-			var parameterWithValue =
-				primaryQueryParameters
-					.Select(kv => {
-						var whereParameterValue = parameters[kv.Key];
-						var sqlParameter = kv.Value;
-						sqlParameter.Value = whereParameterValue ?? DBNull.Value;
-						return sqlParameter;
-					})
-					.ToArray();
-			cmd.Parameters.AddRange(parameterWithValue);
-			foreach (var parameter in additionalSqlParameters)
-			{
-				cmd.Parameters.Add(parameter.Invoke());
-			}
-			this.LogSql("Select<T> with where expression", node, cmd);
-			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+			var enumerableOfTType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
+			var selectDelegateType = typeof(Func<,,,,,,,,,,>)
+													.MakeGenericType(
+														typeof(string),
+														typeof(Node),
+														typeof(IDictionary<string, object>),
+														typeOfAdditionalWhereClauses,
+														typeOfAdditionalOrClauses,
+														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression>)>),
+														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression[]>)>),
+														typeof(int),
+														typeof(ValueTuple<NodeProperty, bool>[]),
+														typeof(int),
+														enumerableOfTType
+														);
+			var delegateHandle = selectImplementationMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(selectDelegateType, this);
+			return (IEnumerable<T>)delegateHandle.DynamicInvoke(
+				connectionString,
+				node,
+				parameters,
+				restoredWhereClauses,
+				restoredOrClauses,
+				childInnerJoinWhereClauses,
+				childInnerJoinOrClausesGroup,
+				-1,
+				MSSqlDriver.emptyOrderBy,
+				timeoutDurationInSeconds
+				);
 		}
 
-		public IEnumerable<T> Select<T>(string connectionString, Node node, IEnumerable<Expression<Func<T, bool>>> whereClauses, IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup, int maxNumOfRow, (NodeProperty Property, bool IsAscending)[] orderBy, int timeoutDurationInSeconds = 30) where T : class, new()
+		public IEnumerable<T> Select<T>(
+			string connectionString,
+			Node node,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
+		{
+			return this.SelectImplementation<T>(connectionString, node, MSSqlDriver.emptyParameters, whereClauses, orClausesGroup, childInnerJoinWhereClauses, childInnerJoinOrClausesGroup, maxNumOfRow, orderBy, timeoutDurationInSeconds);
+		}
+
+		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
+		private IEnumerable<T> SelectImplementation<T>(
+			string connectionString,
+			Node node,
+			IDictionary<string, object> parameters,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
+			IEnumerable<T> resultSet = null;
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
+			int sqlParameterRunningSeq = 0;
+			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
+
+			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
+
+			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
+			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
+			var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
+			//var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) topLevelJoin = (tableAliasFirstIdx, tableAliasFirstIdx, null);
-			var innerJoinMap = new OrderedDictionary();
-			innerJoinMap.Add("-", topLevelJoin);
+			var innerJoinMap = new InnerJoinMap();
+			var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
+			var additionalWhere = this.CompileWhereConditions<T>(node, whereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
+			var additionalOr = this.CompileOrGroups<T>(node, orClausesGroup, tablePrefix, rootMapKey, additionalWhere.Item3, innerJoinMap);
+			//var (innerJoinWhereStatements, innerJoinSqlParameters) = this.CompileInnerJoinWhere(node, rootMapKey, childInnerJoinWhereClauses, tablePrefix, innerJoinMap);
 
-			var (whereStatements, sqlParameterList) = this.CompileConditions<T>(node, whereClauses, orClausesGroup, tablePrefix, innerJoinMap);
+			// Find the Inner Joins with the parent at the edge at the head of path the same as current node.
+			// Extract those inner join. Add those path into inner join map to create inner join statement later.
+			// Also Compile the where clause attached to the child node of the edge at the end of the path into where statement and parameters.
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhereForThisNode;
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOrForThisNode;
+			IEnumerable<Expression> additionalWhereForThisNode;
+			IEnumerable<Expression[]> additionalOrForThisNode;
+			var innerJoinWhereFound = this.MatchEdgeToInnerJoinPaths<Expression>(node, childInnerJoinWhereClauses, out innerJoinWhereForThisNode, out additionalWhereForThisNode);
+			var innerJoinOrFound = this.MatchEdgeToInnerJoinPaths<Expression[]>(node, childInnerJoinOrClausesGroup, out innerJoinOrForThisNode, out additionalOrForThisNode);
+			var additionalInnerJoinWhere = this.CompileChildInnerJoinWhere(innerJoinWhereForThisNode, tablePrefix, additionalOr.Item3, innerJoinMap);
+			var additionalInnerJoinOr = this.CompileChildInnerJoinOrGroup(innerJoinOrForThisNode, tablePrefix, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalWhereStatementForThisNode = this.CompileWhereConditionsFromExpressions(node, additionalWhereForThisNode, tablePrefix, rootMapKey, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalOrStatementForThisNode = this.CompileOrGroupsFromExpression(node, additionalOrForThisNode, tablePrefix, rootMapKey, additionalWhereStatementForThisNode.Item3, innerJoinMap);
 
-			var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, maxNumOfRow);
-			var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
-			var whereStatement = whereStatements.Count() > 0 ? @" WHERE " + string.Join(@" AND ", whereStatements) : string.Empty;
+			// Completed inner join work.  Remove the top edge from the path worked on, so that when stepping down the entity graph, the children along the path will create the same 
+			// inner join conditions.
+			this.RemovedVisited<Expression>(childInnerJoinWhereClauses, innerJoinWhereFound);
+			this.RemovedVisited<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
+
 			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
-			var sqlCmd = select.SelectClause + innerJoinStatement + whereStatement + orderByClause;
-			var cmd = new SqlCommand(sqlCmd);
-			foreach (var parameter in sqlParameterList)
+			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
+			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
+			var sqlCmd = this.FormatSelectStatement(
+				node, 
+				select.SelectedColumns, 
+				innerJoinStatement, 
+				primaryWhereStatement, 
+				additionalWhere.Item1, 
+				additionalOr.Item1,
+				additionalWhereStatementForThisNode.Item1,
+				additionalOrStatementForThisNode.Item1,
+				additionalInnerJoinWhere.Item1, 
+				additionalInnerJoinOr.Item1,
+				topLevelTableAlias,
+				maxNumOfRow,
+				orderBy
+				);
+			using (SqlCommand cmd = new SqlCommand(sqlCmd))
 			{
-				cmd.Parameters.Add(parameter.Invoke());
+				var primaryParameterWithValue =
+						primaryQueryParameters
+							.Select(kv =>
+							{
+								var whereParameterValue = parameters[kv.Key];
+								var sqlParameter = kv.Value;
+								sqlParameter.Value = whereParameterValue ?? DBNull.Value;
+								return sqlParameter;
+							})
+							.ToArray();
+				cmd.Parameters.AddRange(primaryParameterWithValue);
+				this
+					.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinWhere.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinOr.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
+					;
+				this.LogSql("Select<T> with where expression", node, cmd);
+				resultSet = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 			}
-			this.LogSql("Select<T> with where expression", node, cmd);
-			return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+			return resultSet;
+		}
+
+		private string FormatSelectStatement(
+			Node node,
+			string selectedColumns, 
+			string innerJoinStatement, 
+			string primaryWhereStatement, 
+			string additionalWhereStatements, 
+			string additionalOrGroupStatements, 
+			string additionalWhereFromEndOfPathInnerJoin,
+			string additionalOrGroupFromEndOfPathInnerJoin,
+			string additionalInnerJoinWhereStatements, 
+			string additionalInnerJoinOrGroups,
+			string tableAlias,
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy
+			)
+		{
+			bool requireDistinct = false;
+			string selectStatement;
+			var tableName = this.sqlGenerator.FormatTableName(node, tableAlias);
+			var combinedWhere = this.CombineWhereStatements(
+										true, 
+										primaryWhereStatement, 
+										additionalWhereStatements, 
+										additionalOrGroupStatements,
+										additionalWhereFromEndOfPathInnerJoin,
+										additionalOrGroupFromEndOfPathInnerJoin,
+										additionalInnerJoinWhereStatements, 
+										additionalInnerJoinOrGroups);
+
+			if (! string.IsNullOrEmpty(additionalInnerJoinWhereStatements) || ! string.IsNullOrEmpty(additionalInnerJoinOrGroups))
+			{
+				requireDistinct = true;
+			}
+			if (requireDistinct)
+			{
+				selectStatement = string.Format(
+										@"SELECT DISTINCT {0} FROM {1}{2}{3}",
+										selectedColumns,
+										tableName,
+										innerJoinStatement,
+										combinedWhere
+									);
+				if (maxNumOfRow > 0)
+				{
+					var orderByStatement = this.sqlGenerator.CompileOrderByClause(orderBy, @"distinct_result");
+					selectStatement = string.Format(@"SELECT TOP {0} distinct_result.* FROM ({1}) AS distinct_result{2}", maxNumOfRow, selectStatement, orderByStatement);
+				}
+				else
+				{
+					selectStatement += this.sqlGenerator.CompileOrderByClause(orderBy, tableAlias);
+				}
+			}
+			else
+			{
+				selectStatement = string.Format(
+										@"SELECT {0}{1} FROM {2}{3}{4}{5}",
+										maxNumOfRow > 0 ? $"TOP {maxNumOfRow} " : String.Empty,
+										selectedColumns,
+										tableName,
+										innerJoinStatement,
+										combinedWhere,
+										this.sqlGenerator.CompileOrderByClause(orderBy, tableAlias)
+									 );
+			}
+			return selectStatement;
+		}
+		private MSSqlDriver InvokeAndAddSqlParameters(SqlCommand sqlCommand, IEnumerable<Func<SqlParameter>> parameterDelegates)
+		{
+			foreach(var eachDelegate in parameterDelegates)
+			{
+				sqlCommand.Parameters.Add(eachDelegate.Invoke());
+			}
+			return this;
 		}
 		/// <summary>
 		/// Restore IEnumerable of Expression to IEnumerable of Expression&lt;Func&lt;T, bool&gt;&gt;.
@@ -178,44 +348,58 @@ namespace AXAXL.DbEntity.MSSql
 			return typeCastDeleage.DynamicInvoke(orClauses);
 		}
 		/// <summary>
-		/// Construct delegate of <seealso cref="CompileConditions{TEntity}(Node, IEnumerable{Expression{Func{TEntity, bool}}}, IEnumerable{Expression{Func{TEntity, bool}}[]}, string, OrderedDictionary)"/>
+		/// Construct delegate of <seealso cref="CompileWhereConditions{TEntity}"/>
 		/// with the right type for its generic type parameter.
 		/// </summary>
 		/// <param name="node">Node type will be used as the type parameter of the generic method <see cref="CompileConditions{TEntity}(Node, IEnumerable{Expression{Func{TEntity, bool}}}, IEnumerable{Expression{Func{TEntity, bool}}[]}, string, OrderedDictionary)"/></param>
 		/// <param name="whereClausesType">type of the where clauses</param>
-		/// <param name="orClausesType">type of the or clauses</param>
 		/// <returns>delegate to call the CompileConditions method</returns>
-		private Delegate MakeCompileWithRightType(Node node, Type whereClausesType, Type orClausesType)
+		private Delegate MakeCompileWhereWithRightType(Node node, Type whereClausesType)
 		{
-			var resultingValueTupleType = typeof(ValueTuple<List<string>, List<Func<SqlParameter>>>);
-			var compileConditionsDelegateType = typeof(Func<,,,,,>)
+			var resultingValueTupleType = typeof(ValueTuple<string, List<Func<SqlParameter>>, int>);
+			var compileConditionsDelegateType = typeof(Func<,,,,,,>)
 													.MakeGenericType(
 														typeof(Node), 
 														whereClausesType, 
-														orClausesType, 
-														typeof(string), 
-														typeof(OrderedDictionary),
+														typeof(string),
+														typeof(string),
+														typeof(int),
+														typeof(IInnerJoinMap),
 														resultingValueTupleType
 														);
-			var delegateHandle = compileConditionsMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(compileConditionsDelegateType, this);
+			var delegateHandle = compileWhereConditionsMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(compileConditionsDelegateType, this);
 			return delegateHandle;
 		}
-		private
-			(List<string> whereStatements, List<Func<SqlParameter>> sqlParameterList) 
-			CompileConditions<TEntity>
+
+		private Delegate MakeCompileOrWithRightType(Node node, Type orClausesType)
+		{
+			var resultingValueTupleType = typeof(ValueTuple<string, List<Func<SqlParameter>>, int>);
+			var compileOrGroupDelegateType = typeof(Func<,,,,,,>)
+													.MakeGenericType(
+														typeof(Node),
+														orClausesType,
+														typeof(string),
+														typeof(string),
+														typeof(int),
+														typeof(IInnerJoinMap),
+														resultingValueTupleType
+														);
+			var delegateHandle = compileOrGroupsMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(compileOrGroupDelegateType, this);
+			return delegateHandle;
+		}
+		private (string, List<Func<SqlParameter>>, int) CompileWhereConditions<TEntity>
 		(
-			Node node, 
-			IEnumerable<Expression<Func<TEntity, bool>>> whereClauses, 
-			IEnumerable<Expression<Func<TEntity, bool>>[]> orClausesGroup, 
-			string tablePrefix, 
-			OrderedDictionary innerJoinMap
+			Node node,
+			IEnumerable<Expression<Func<TEntity, bool>>> whereClauses,
+			string tablePrefix,
+			string rootMapKey,
+			int sqlParameterRunningSeq,
+			IInnerJoinMap innerJoinMap
 		) where TEntity : class, new()
 		{
-			var sqlParameterRunningSeq = 0;
+			//var sqlParameterRunningSeq = 0;
 			var whereStatements = new List<string>();
 			var sqlParameterList = new List<Func<SqlParameter>>();
-
-			//var emptyWhere = (ParameterSequence: 0, WhereClause: string.Empty, InnerJoinsClause: string.Empty, SqlParameters: new Func<SqlParameter>[0]);
 
 			foreach (var where in whereClauses)
 			{
@@ -224,6 +408,7 @@ namespace AXAXL.DbEntity.MSSql
 										node,
 										sqlParameterRunningSeq,
 										tablePrefix,
+										rootMapKey,
 										innerJoinMap,
 										where
 										);
@@ -231,6 +416,40 @@ namespace AXAXL.DbEntity.MSSql
 				whereStatements.Add(compilationResult.whereClause);
 				sqlParameterList.AddRange(compilationResult.sqlParameters);
 			}
+			return (this.CombineWhereStatements(false, whereStatements), sqlParameterList, sqlParameterRunningSeq);
+		}
+
+		private (string, List<Func<SqlParameter>>, int) CompileWhereConditionsFromExpressions (
+			Node node,
+			IEnumerable<Expression> whereClauses, 
+			string tablePrefix,
+			string rootMapKey,
+			int sqlParameterRunningSeq, 
+			IInnerJoinMap innerJoinMap
+			)
+		{
+			(string, List<Func<SqlParameter>>, int) compilationResult;
+			Type restoredWhereClausesType;
+			var restoredWhereClauses = this.RestoreWhereClause(node, whereClauses, out restoredWhereClausesType);
+			var compileDelegate = this.MakeCompileWhereWithRightType(node, restoredWhereClausesType);
+			compilationResult = (ValueTuple<string, List<Func<SqlParameter>>, int>)compileDelegate.DynamicInvoke(node, restoredWhereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
+			return compilationResult;
+		}
+
+		private	(string, List<Func<SqlParameter>>, int) CompileOrGroups<TEntity>
+		(
+			Node node, 
+			IEnumerable<Expression<Func<TEntity, bool>>[]> orClausesGroup, 
+			string tablePrefix,
+			string rootMapKey,
+			int sqlParameterRunningSeq,
+			IInnerJoinMap innerJoinMap
+		) where TEntity : class, new()
+		{
+			//var sqlParameterRunningSeq = 0;
+			var whereStatements = new List<string>();
+			var sqlParameterList = new List<Func<SqlParameter>>();
+
 			foreach (var orClauses in orClausesGroup)
 			{
 				List<string> orConditions = new List<string>();
@@ -241,6 +460,7 @@ namespace AXAXL.DbEntity.MSSql
 											node,
 											sqlParameterRunningSeq,
 											tablePrefix,
+											rootMapKey,
 											innerJoinMap,
 											or
 											);
@@ -253,256 +473,38 @@ namespace AXAXL.DbEntity.MSSql
 					whereStatements.Add(@"( " + string.Join(" OR ", orConditions) + @" )");
 				}
 			}
-			return (whereStatements, sqlParameterList);
+			return (this.CombineWhereStatements(false, whereStatements), sqlParameterList, sqlParameterRunningSeq);
 		}
-
-		public IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30)
+		private (string, List<Func<SqlParameter>>, int) CompileOrGroupsFromExpression (
+			Node node,
+			IEnumerable<Expression[]> orGroupExpression,
+			string tablePrefix,
+			string rootMapKey,
+			int runningSqlParameterSeq, 
+			IInnerJoinMap innerJoinMap
+			)
 		{
-			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-
-			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
-
-			this.LogSql("Execute command", null, cmd);
-			IEnumerable<dynamic> result = null;
-			using (var connection = new SqlConnection(connectionString))
-			{
-				connection.Open();
-				cmd.Connection = connection;
-				using (var reader = cmd.ExecuteReader())
-				{
-					var idx2Name = reader.GetColumnSchema().ToDictionary(k => k.ColumnOrdinal.Value, v => v.ColumnName);
-					result = reader
-								.Cast<IDataRecord>()
-								.Select(p => {
-									return idx2Name
-											.ToDictionary(k => k.Value, v => p[v.Key])
-											.ToDynamic();
-								})
-								.ToArray();
-				}
-			}
-			outputParameters = cmdParameters
-								.Where(kv => kv.Value.Direction != ParameterDirection.Input)
-								.ToDictionary(
-									k => k.Key,
-									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
-								);
-			return result;
+			(string, List<Func<SqlParameter>>, int) compilationResult;
+			Type restoredOrGroupType;
+			var restoredOrGroupClause = this.RestoreOrClauses(node, orGroupExpression, out restoredOrGroupType);
+			var compileDelegate = this.MakeCompileOrWithRightType(node, restoredOrGroupType);
+			compilationResult = (ValueTuple<string, List<Func<SqlParameter>>, int>)compileDelegate.DynamicInvoke(node, restoredOrGroupClause, tablePrefix, rootMapKey, runningSqlParameterSeq, innerJoinMap);
+			return compilationResult;
 		}
-		public IEnumerable<T> ExecuteCommand<T>(string connectionString, Node node, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30) where T : class, new()
+
+		private string CombineWhereStatements(bool addWhere, params string[] whereStatements)
 		{
-			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-
-			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
-			// Note that the SelectClause variable is not used.  We are just borrowing the call to create the data reader fetching func.
-			var (SelectClause, DataReaderToEntityFunc) = this.sqlGenerator.CreateSelectComponent(string.Empty, node, -1);
-			this.LogSql("Execute command", null, cmd);
-
-			var resultSet = this.ExecuteQuery<T>(connectionString, DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
-
-			outputParameters = cmdParameters
-								.Where(kv => kv.Value.Direction != ParameterDirection.Input)
-								.ToDictionary(
-									k => k.Key,
-									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
-								);
-			return resultSet;
+			return this.CombineWhereStatements(addWhere, whereStatements.AsEnumerable());
 		}
 
-		public T Delete<T>(string connectionString, T entity, Node node) where T: class, ITrackable
+		private string CombineWhereStatements(bool addWhere, IEnumerable<string> whereStatements)
 		{
-			var pKeyAndVersion = this.sqlGenerator.ExtractPrimaryKeyAndConcurrencyControlColumns(node);
-			var whereClause = this.sqlGenerator.CreateWhereClause(node, pKeyAndVersion);
-			var whereParameter = this.sqlGenerator.CreateSqlParameters(node, pKeyAndVersion);
-			var deleteClause = this.sqlGenerator.CreateDeleteClause(node);
-			var valueReaders = this.sqlGenerator.CreatePropertyValueReaderMap(node, pKeyAndVersion);
-
-			Debug.Assert(string.IsNullOrEmpty(whereClause) == false, $"Missing where clause for delete statement on entity '{node.NodeType.Name}'");
-
-			var deleteSql = new SqlCommand(deleteClause + @" WHERE " + whereClause);
-			var paramWithValues = 
-				whereParameter
-					.Select(p => {
-						var reader = valueReaders[p.Key];
-						var param = p.Value;
-						var value = reader(entity);
-						param.Value = value ?? DBNull.Value;
-						return param;
-					})
-					.ToArray();
-			deleteSql.Parameters.AddRange(paramWithValues);
-
-			this.LogSql("Delete<T>", node, deleteSql);
-
-			using (var connection = new SqlConnection(connectionString))
-			{
-				connection.Open();
-				deleteSql.Connection = connection;
-				var returnCount = deleteSql.ExecuteNonQuery();
-
-				if (returnCount <= 0)
-				{
-					throw new DbUpdateConcurrencyException(returnCount, deleteClause + whereClause, this.PrintParameters(paramWithValues));
-				}
-			}
-			return entity;
+			if (whereStatements == null || whereStatements.Count() <= 0 || whereStatements.Any(s => string.IsNullOrEmpty(s) == false) == false) return string.Empty;
+			var whereKeyWord = addWhere ? @" WHERE " : String.Empty;
+			var combined = string.Join(@" AND ", whereStatements.Where(s => string.IsNullOrEmpty(s) == false));
+			return $"{whereKeyWord}{combined}";
 		}
 
-		public T Insert<T>(string connectionString, T entity, Node node) where T : class, ITrackable
-		{
-			var resultCount = 0;
-			var tableName = this.sqlGenerator.FormatTableName(node);
-			var outputComponent = this.sqlGenerator.CreateOutputComponent(node, true);
-			var insertClauses = this.sqlGenerator.CreateInsertComponent(node);
-			var insertParameters = this.sqlGenerator.CreateSqlParameters(node, insertClauses.InsertColumns);
-			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, insertClauses.InsertColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnInsert);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnInsert);
-			var allConstantColumns = node.AllDbColumns.Where(p => p.IsConstant).ToArray();
-
-			foreach (var eachAction in allActions)
-			{
-				eachAction(entity);
-			}
-			foreach (var eachInj in allFuncInj)
-			{
-				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
-			}
-			foreach(var eachConstantCol in allConstantColumns)
-			{
-				eachConstantCol.ConstantValueSetterAction.Invoke(entity, eachConstantCol.ConstantValue);
-			}
-
-			var paramWithValues = insertParameters.Select(
-					kv =>
-					{
-						var value = propertyReader[kv.Key](entity);
-						var param = kv.Value;
-						param.Value = value ?? DBNull.Value;
-						return param;
-					}
-				).ToArray();
-
-			var withNoOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == true;
-			var insertSql = string.Format(@"INSERT INTO {0} ({1}){2}VALUES ({3})", tableName, insertClauses.InsertColumnsClause, withNoOutput == false ? $" {outputComponent.OutputClause} " : string.Empty, insertClauses.InsertValueClause);
-			var cmd = new SqlCommand(insertSql);
-			cmd.Parameters.AddRange(paramWithValues);
-
-			this.LogSql("Insert<T>", node, cmd);
-
-			using (var connection = new SqlConnection(connectionString))
-			{
-				connection.Open();
-				cmd.Connection = connection;
-				if (withNoOutput)
-				{
-					resultCount = cmd.ExecuteNonQuery();
-				}
-				else
-				{
-					using (var reader = cmd.ExecuteReader())
-					{
-						while (reader.Read())
-						{
-							resultCount++;
-							outputComponent.EntityUpdateAction(reader, entity);
-						}
-					}
-				}
-				if (resultCount != 1)
-				{
-					throw new InvalidOperationException($"{resultCount} returned from insert sql {insertSql} with parameters {this.PrintParameters(paramWithValues)}");
-				}
-			}
-			return entity;
-		}
-
-		public T Update<T>(string connectionString, T entity, Node node) where T : class, ITrackable
-		{
-			var resultCount = 0;
-			var tableName = this.sqlGenerator.FormatTableName(node);
-			var pKeyAndVersion = this.sqlGenerator.ExtractPrimaryKeyAndConcurrencyControlColumns(node);
-			var whereClause = this.sqlGenerator.CreateWhereClause(node, pKeyAndVersion, @"upd_");
-			var whereParameter = this.sqlGenerator.CreateSqlParameters(node, pKeyAndVersion, @"upd_");
-			var whereReaders = this.sqlGenerator.CreatePropertyValueReaderMap(node, pKeyAndVersion);
-			var outputComponent = this.sqlGenerator.CreateOutputComponent(node, false);
-			var updateComponent = this.sqlGenerator.CreateUpdateAssignmentComponent(node);
-			var updateParameters = this.sqlGenerator.CreateSqlParameters(node, updateComponent.UpdateColumns);
-			var propertyReader = this.sqlGenerator.CreatePropertyValueReaderMap(node, updateComponent.UpdateColumns);
-			var allActions = this.GetFrameworkUpdateActions(node, NodePropertyUpdateOptions.ByFwkOnUpdate);
-			var allFuncInj = this.CreateFrameworkUpdatesFromFuncInjection(node, NodePropertyUpdateOptions.ByFwkOnUpdate);
-			// capture current property value into sql parameters before updating property by framework injection
-			var whereParameterWithValues =
-				whereParameter
-					.Select(p => {
-						var reader = whereReaders[p.Key];
-						var param = p.Value;
-						var value = reader(entity);
-						param.Value = value ?? DBNull.Value;
-						return param;
-					})
-					.ToArray();
-			foreach (var eachAction in allActions)
-			{
-				eachAction(entity);
-			}
-			foreach (var eachInj in allFuncInj)
-			{
-				eachInj.ActionOnProperty(entity, eachInj.FuncInjection());
-			}
-			var updateParmeterWithValues = updateParameters.Select(
-					kv =>
-					{
-						var value = propertyReader[kv.Key](entity);
-						var param = kv.Value;
-						param.Value = value ?? DBNull.Value;
-						return param;
-					}
-				).ToArray();
-			var withNoOutput = string.IsNullOrEmpty(outputComponent.OutputClause) == true;
-			var updateSql = string.Format(
-				@"UPDATE {0} SET {1}{2} WHERE {3}", 
-				tableName, 
-				updateComponent.AssignmentClause, 
-				withNoOutput ? string.Empty : $" {outputComponent.OutputClause} ", 
-				whereClause
-				);
-			var cmd = new SqlCommand(updateSql);
-			cmd.Parameters.AddRange(updateParmeterWithValues);
-			cmd.Parameters.AddRange(whereParameterWithValues);
-
-			this.LogSql("Update<T>", node, cmd);
-
-			using (var connection = new SqlConnection(connectionString))
-			{
-				connection.Open();
-				cmd.Connection = connection;
-				if (withNoOutput)
-				{
-					resultCount = cmd.ExecuteNonQuery();
-				}
-				else
-				{
-					using (var reader = cmd.ExecuteReader())
-					{
-						while (reader.Read())
-						{
-							resultCount++;
-							outputComponent.EntityUpdateAction(reader, entity);
-						}
-					}
-				}
-				if (resultCount != 1)
-				{
-					throw new DbUpdateConcurrencyException(resultCount, updateSql, this.PrintParameters(whereParameterWithValues));
-				}
-			}
-			return entity;
-		}
-		public string GetSqlDbType(Type csType)
-		{
-			return this.sqlGenerator.GetSqlDbTypeFromCSType(csType).ToString();
-		}
 		internal static string FormatParameterName(string parameterName)
 		{
 			return parameterName.StartsWith('@') ? parameterName : "@" + parameterName;
@@ -591,17 +593,11 @@ namespace AXAXL.DbEntity.MSSql
 			return lambda.Compile();
 		}
 
-		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap, string tableAliasPrefix)
+		private string ComputeInnerJoins(IInnerJoinMap innerJoinsMap, string tableAliasPrefix)
 		{
-			(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) eachEdge;
 			StringBuilder buffer = new StringBuilder();
-			var enumerator = innerJoinsMap.GetEnumerator();
-			while (enumerator.MoveNext())
+			foreach (var eachEdge in innerJoinsMap.Joins)
 			{
-				eachEdge = (ValueTuple<int, int, NodeEdge>)enumerator.Value;
-
-				if (eachEdge.Edge == null) continue;
-
 				var parentAlias = $"{tableAliasPrefix}{eachEdge.ParentTableAliasIdx}";
 				var childAlias = $"{tableAliasPrefix}{eachEdge.ChildTableAliasIdx}";
 				var nodeEdge = eachEdge.Edge;
@@ -613,7 +609,7 @@ namespace AXAXL.DbEntity.MSSql
 
 				buffer
 					.Append(@" INNER JOIN ")
-					.Append(parentTable)
+					.Append(eachEdge.isTowardParent ? parentTable : childTable)
 					.Append(@" ON ")
 					;
 
@@ -630,6 +626,137 @@ namespace AXAXL.DbEntity.MSSql
 				}
 			}
 			return buffer.ToString();
+		}
+
+		/// <summary>
+		/// This method will match the current node with the head of the Path which a list of edge from parent to child.
+		/// If match, that means the path should form the inner joins list and the where clauses should be included to narrow
+		/// the selection of the current node as in an inner join SQL query.
+		/// If the Path in value tuple is empty, that means the current node is the child node in the path and the where clauses are the
+		/// additional where condition for this child node in addition to the foreign keys.
+		/// </summary>
+		/// <typeparam name="TE">Type of expression, i.e. either Expression or Expression[]</typeparam>
+		/// <param name="node">Current node of the Select</param>
+		/// <param name="inputList">List of inner joins that we should examine.</param>
+		/// <param name="matchedList">value tuple list with the Parent node of the first edge of Path matching current node.</param>
+		/// <param name="additionalWhereForChild">where clauses in the inputlist where Path is empty, i.e. the code has reached the child node of the where clauses in value tuple.</param>
+		/// <returns></returns>
+		private IEnumerable<int> MatchEdgeToInnerJoinPaths<TE>(
+			Node node,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TE> Expressions)> inputList,
+			out IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TE> Expressions)> matchedList,
+			out IEnumerable<TE> additionalWhereForChild
+		)
+		{
+			var matchedIdx = new List<int>();
+			var matched = new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TE> Expressions)>();
+			var childEdges = new HashSet<NodeEdge>(node.AllChildEdges());
+			var additionalWhere = new List<TE>();
+
+			for(int i = 0; i < inputList.Count; i++)
+			{
+				var eachTuple = inputList[i];
+				if (eachTuple.Path.Count > 0)
+				{
+					if (childEdges.Contains(eachTuple.Path[0]))
+					{
+						matchedIdx.Add(i);
+						matched.Add(eachTuple);
+					}
+				}
+				else
+				{
+					if (node.Name == eachTuple.TargetChild.Name)
+					{
+						additionalWhere.AddRange(eachTuple.Expressions);
+					}
+				}
+			}
+			matchedList = matched;
+			additionalWhereForChild = additionalWhere;
+			return matchedIdx;
+		}
+		private IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TE> expressions)> RemovedVisited<TE>(
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<TE> expressions)> input,
+			IEnumerable<int> visitedIdx
+			)
+		{
+			foreach(var eachIdx in visitedIdx)
+			{
+				var eachTuple = input[eachIdx];
+				if (eachTuple.Path != null && eachTuple.Path.Count > 0)
+				{
+					eachTuple.Path.RemoveAt(0);
+				}
+			}
+			return input;
+		}
+
+		private (string, List<Func<SqlParameter>>, int) CompileChildInnerJoinWhere(IEnumerable<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> innerJoinWheres, string tablePrefix, int runningSqlParameterSeq, IInnerJoinMap innerJoinMap)
+		{
+			List<string> whereStatements = new List<string>();
+			List<Func<SqlParameter>> parameterList = new List<Func<SqlParameter>>();
+			foreach(var innerJoinWhere in innerJoinWheres)
+			{
+				var compilationResult = this.CompileChildInnerJoinWhere(innerJoinWhere, tablePrefix, runningSqlParameterSeq, innerJoinMap);
+				whereStatements.Add(compilationResult.Item1);
+				parameterList.AddRange(compilationResult.Item2);
+				runningSqlParameterSeq = compilationResult.Item3;
+			}
+			var combinedWhereStatement = this.CombineWhereStatements(false, whereStatements);
+			return (combinedWhereStatement, parameterList, runningSqlParameterSeq);
+		}
+
+		private (string, List<Func<SqlParameter>>, int) CompileChildInnerJoinWhere((IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions) innerJoinWhere, string tablePrefix, int runningSqlParameterSeq, IInnerJoinMap innerJoinMap)
+		{
+			(string, List<Func<SqlParameter>>, int) compilationResult = ValueTuple.Create(string.Empty, new List<Func<SqlParameter>>(), runningSqlParameterSeq);
+			(var newKey, var childNode) = this.InsertPathIntoInnerJoinMap(innerJoinWhere.Path, innerJoinMap);
+			if (newKey != null)
+			{
+				compilationResult = CompileWhereConditionsFromExpressions(childNode, innerJoinWhere.Expressions, tablePrefix, newKey, runningSqlParameterSeq, innerJoinMap);
+			}
+			return compilationResult;
+		}
+
+		private (string, List<Func<SqlParameter>>, int) CompileChildInnerJoinOrGroup(IEnumerable<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> innerJoinOrGroups, string tablePrefix, int runningSqlParameterSeq, IInnerJoinMap innerJoinMap)
+		{
+			List<string> orStatements = new List<string>();
+			List<Func<SqlParameter>> parameterList = new List<Func<SqlParameter>>();
+			foreach (var innerJoinOrGroup in innerJoinOrGroups)
+			{
+				var compilationResult = this.CompileChildInnerJoinOrGroup(innerJoinOrGroup, tablePrefix, runningSqlParameterSeq, innerJoinMap);
+				orStatements.Add(compilationResult.Item1);
+				parameterList.AddRange(compilationResult.Item2);
+				runningSqlParameterSeq = compilationResult.Item3;
+			}
+			var combinedStatements = this.CombineWhereStatements(false, orStatements);
+			return (combinedStatements, parameterList, runningSqlParameterSeq);
+		}
+
+		private (string, List<Func<SqlParameter>>, int) CompileChildInnerJoinOrGroup((IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions) innerJoinOrGroup, string tablePrefix, int runningSqlParameterSeq, IInnerJoinMap innerJoinMap)
+		{
+			(string, List<Func<SqlParameter>>, int) compilationResult = ValueTuple.Create(string.Empty, new List<Func<SqlParameter>>(), runningSqlParameterSeq);
+			(var newKey, var childNode) = this.InsertPathIntoInnerJoinMap(innerJoinOrGroup.Path, innerJoinMap);
+			var orGroupExpression = innerJoinOrGroup.Expressions;
+			if (newKey != null)
+			{
+				compilationResult = CompileOrGroupsFromExpression(childNode, orGroupExpression, tablePrefix, newKey, runningSqlParameterSeq, innerJoinMap);
+			}
+			return compilationResult;
+		}
+
+		private (string, Node) InsertPathIntoInnerJoinMap(IList<NodeEdge> path, IInnerJoinMap innerJoinMap)
+		{
+			var parentKey = innerJoinMap.RootMapKey;
+			string newKey = null;
+			Node childNode = null;
+			foreach (var eachEdge in path)
+			{
+				newKey = innerJoinMap.Add(parentKey, eachEdge.ParentNode, eachEdge.ChildReferenceOnParentNode.PropertyName);
+				parentKey = newKey;
+				childNode = eachEdge.ChildNode;
+			}
+			return (newKey, childNode);
 		}
 		private static string PrintConstantValueAsSqlCondition(NodeProperty property)
 		{
@@ -676,5 +803,106 @@ namespace AXAXL.DbEntity.MSSql
 						);
 			this.log.LogDebug("| {0} | {1} | {2} | {3} |", message, node?.Name, sql, parameters);
 		}
+
+		#region archived at 2019-10-22 by P. Sham.
+		//public IEnumerable<T> Select<T>(
+		//	string connectionString,
+		//	Node node,
+		//	IDictionary<string, object> parameters,
+		//	IEnumerable<Expression> additionalWhereClauses,
+		//	IEnumerable<Expression[]> additionalOrClauses,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+		//	int timeoutDurationInSeconds = 30
+		//	) where T : class, new()
+		//{
+		//	Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+		//	Debug.Assert(
+		//		parameters.Keys.All(p => String.IsNullOrEmpty(node.GetDbColumnNameFromPropertyName(p)) == false),
+		//		$"Dictionary contains key which is not present in the given node."
+		//		);
+		//	var tablePrefix = @"t";
+		//	var tableAliasFirstIdx = 0;
+
+		//	// The following prepare where clause and sql parameter from the dictionary of values.  Regular stuff.
+		//	var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, -1);
+		//	var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
+		//	var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
+		//	var primaryWhereClause = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns);
+
+		//	// The following compile the additional where and or conditions.
+		//	var innerJoinMap = new InnerJoinMap();
+		//	innerJoinMap.Init(node, tableAliasFirstIdx);
+
+		//	Type typeOfAdditionalWhereClauses;
+		//	Type typeOfAdditionalOrClauses;
+
+		//	var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
+		//	var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
+		//	var compileConditionsDelegate = this.MakeCompileWithRightType(node, typeOfAdditionalWhereClauses, typeOfAdditionalOrClauses);
+
+		//	var (additonalWhereStatements, additionalSqlParameters) = (ValueTuple<List<string>, List<Func<SqlParameter>>>)compileConditionsDelegate.DynamicInvoke(node, restoredWhereClauses, restoredOrClauses, tablePrefix, innerJoinMap);
+
+		//	var additionalWhereClause = additonalWhereStatements.Count() > 0 ? @" AND " + string.Join(@" AND ", additonalWhereStatements) : string.Empty;
+		//	var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
+
+		//	// Put them together to create the SQL command.
+		//	var sqlCmd = string.Format("{0}{1} WHERE {2}{3}", select.SelectClause, innerJoinStatement, primaryWhereClause, additionalWhereClause);
+		//	var cmd = new SqlCommand(sqlCmd);
+		//	var parameterWithValue =
+		//		primaryQueryParameters
+		//			.Select(kv => {
+		//				var whereParameterValue = parameters[kv.Key];
+		//				var sqlParameter = kv.Value;
+		//				sqlParameter.Value = whereParameterValue ?? DBNull.Value;
+		//				return sqlParameter;
+		//			})
+		//			.ToArray();
+		//	cmd.Parameters.AddRange(parameterWithValue);
+		//	foreach (var parameter in additionalSqlParameters)
+		//	{
+		//		cmd.Parameters.Add(parameter.Invoke());
+		//	}
+		//	this.LogSql("Select<T> with where expression", node, cmd);
+		//	return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+		//}       
+		//public IEnumerable<T> Select<T>(
+		//	string connectionString, 
+		//	Node node, 
+		//	IEnumerable<Expression<Func<T, bool>>> whereClauses, 
+		//	IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression>> childInnerJoinWhereClauses,
+		//	IEnumerable<ValueTuple<NodeEdge, Expression[]>> childInnerJoinOrClausesGroup,
+		//	int maxNumOfRow, 
+		//	(NodeProperty Property, bool IsAscending)[] orderBy, 
+		//	int timeoutDurationInSeconds = 30
+		//	) where T : class, new()
+		//{
+		//	Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+
+		//	var tablePrefix = @"t";
+		//	var tableAliasFirstIdx = 0;
+
+		//	// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
+		//	var innerJoinMap = new InnerJoinMap();
+		//	var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
+
+		//	var (whereStatements, sqlParameterList) = this.CompileConditions<T>(node, whereClauses, orClausesGroup, tablePrefix, innerJoinMap);
+
+		//	var select = this.sqlGenerator.CreateSelectComponent($"{tablePrefix}{tableAliasFirstIdx}", node, maxNumOfRow);
+		//	var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy);
+		//	var whereStatement = whereStatements.Count() > 0 ? @" WHERE " + string.Join(@" AND ", whereStatements) : string.Empty;
+		//	var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
+		//	var sqlCmd = select.SelectClause + innerJoinStatement + whereStatement + orderByClause;
+		//	var cmd = new SqlCommand(sqlCmd);
+		//	foreach (var parameter in sqlParameterList)
+		//	{
+		//		cmd.Parameters.Add(parameter.Invoke());
+		//	}
+		//	this.LogSql("Select<T> with where expression", node, cmd);
+		//	return ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+		//}
+
+		#endregion
 	}
 }

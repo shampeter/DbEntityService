@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	public partial class MSSqlGenerator : IMSSqlGenerator
+	internal partial class MSSqlGenerator : IMSSqlGenerator
 	{
 		private ILogger log = null;
 		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
@@ -24,9 +24,9 @@ namespace AXAXL.DbEntity.MSSql
 
 		#region IMSSqlGenerator Implementation
 
-		public (int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, IOrderedDictionary innerJoinMap, Expression<Func<T, bool>> whereClause)
+		public (int parameterSequence, string whereClause, Func<SqlParameter>[] sqlParameters) CompileWhereClause<T>(Node startingPoint, int parameterSeq, string tableAliasPrefix, string rootMapKey, IInnerJoinMap innerJoinMap, Expression<Func<T, bool>> whereClause)
 		{
-			var visitor = new WhereClauseVisitor<T>(startingPoint, parameterSeq, tableAliasPrefix, this.log, innerJoinMap, MSSqlGenerator.CSTypeToSqlTypeMap, _extensions);
+			var visitor = new WhereClauseVisitor<T>(startingPoint, parameterSeq, tableAliasPrefix, rootMapKey, this.log, innerJoinMap, MSSqlGenerator.CSTypeToSqlTypeMap, _extensions);
 			return visitor.Compile(whereClause);
 		}
 
@@ -84,6 +84,44 @@ namespace AXAXL.DbEntity.MSSql
 			return (outputClause, lambdaFunc.Compile());
 		}
 
+		public (string SelectedColumns, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node)
+		{
+			var tableName = this.FormatTableName(node, tableAlias);
+			var allColumns = node.AllDbColumns;
+
+			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
+
+			var selectedColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
+			//var selectClause = string.Format(@"{0} FROM {1}", selectedColumns, tableName);
+
+			var exprBuffer = new List<Expression>();
+			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
+			var outputParameter = Expression.Variable(node.NodeType, "entity");
+
+			// entity = new T();
+			exprBuffer.Add(
+				Expression.Assign(
+					outputParameter,
+					Expression.New(node.NodeType)
+				)
+			);
+			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
+			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
+			exprBuffer.AddRange(CreateSqlReaderFetchingExpressions(allColumns, inputParameter, outputParameter));
+
+			var returnLabel = Expression.Label(node.NodeType, "return");
+
+			exprBuffer.Add(Expression.Label(returnLabel, outputParameter));
+
+			var exprBlock = Expression.Block(new[] { outputParameter }, exprBuffer.ToArray());
+			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, dynamic>>(exprBlock, inputParameter);
+
+			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
+
+			return (selectedColumns, lambdaFunc.Compile());
+		}
+		/* Archived 2019-10-26
+		 * 
 		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node, int maxNumOfRow)
 		{
 			var tableName = this.FormatTableName(node, tableAlias);
@@ -120,21 +158,20 @@ namespace AXAXL.DbEntity.MSSql
 
 			return (selectClause, lambdaFunc.Compile());
 		}
-
+		*/
 		public IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null)
 		{
-			Debug.Assert(columns != null && columns.Length > 0 && columns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
-			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : parameterPrefix;
+			var prefix = string.IsNullOrEmpty(parameterPrefix) ? string.Empty : $"{parameterPrefix}";
 
 			return columns.ToDictionary(
 				key => key.PropertyName, 
 				value =>
 				{
-					var name = $"@{prefix}{value.PropertyName}";
 					SqlDbType dbType;
 					var validDbType = Enum.TryParse<SqlDbType>(value.DbColumnType, true, out dbType);
 					Debug.Assert(validDbType, $"Invalid SqlDbType '{value.DbColumnType}'");
-					var parameter = new SqlParameter(name, dbType);
+
+					var parameter = new SqlParameter($"@{prefix}{value.PropertyName}", dbType);
 					return parameter;
 				});
 		}
@@ -180,30 +217,23 @@ namespace AXAXL.DbEntity.MSSql
 			return resultBuffer;
 		}
 
-		public string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null)
+		public string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null)
 		{
-			Debug.Assert(whereColumns != null && whereColumns.Length > 0 && whereColumns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
+			//Debug.Assert(whereColumns != null && whereColumns.Length > 0 && whereColumns.All(p => string.IsNullOrEmpty(p.DbColumnName) == false));
+			var alias = tableAlias == null ? string.Empty : $"{tableAlias}.";
 			var whereClause = string.Join(
 				" AND ",
 				whereColumns.Select(
 					p => {
-						string condition = null;
-						if (p.IsConstant)
-						{
-							condition = $"[{p.DbColumnName}] = " + this.FormatConstantValueAsParameterValue(node, p);
-						}
-						else
-						{
-							condition = $"[{p.DbColumnName}] = @{parameterPrefix ?? string.Empty}{p.PropertyName}";
-						}
+						var rightHandSide = p.IsConstant ? this.FormatConstantValueAsParameterValue(node, p) : $"@{parameterPrefix ?? string.Empty}{p.PropertyName}";
+						var condition = string.Format("{0}{1} = {2}", alias, p.DbColumnName, rightHandSide);
 						return condition;
 					}));
-			return string.IsNullOrEmpty(whereClause) ? string.Empty : whereClause;
+			return whereClause;
 		}
 
 		public NodeProperty[] ExtractColumnByPropertyName(Node node, params string[] propertyNames)
 		{
-			Debug.Assert(propertyNames != null && propertyNames.Length > 0);
 			return propertyNames.Select(p => node.GetPropertyFromNode(p)).ToArray();
 		}
 
@@ -235,8 +265,9 @@ namespace AXAXL.DbEntity.MSSql
 			return columns.ToDictionary(k => k.PropertyName, v => this.CreatePropertyValueReaderFunc(node, v));
 		}
 
-		public string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy)
+		public string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy, string tableAlias = null)
 		{
+			var alias = ! string.IsNullOrEmpty(tableAlias) ? $"{tableAlias}." : string.Empty;
 			var orderByClause = string.Empty;
 			if (orderBy != null && orderBy.Length > 0)
 			{
@@ -248,9 +279,8 @@ namespace AXAXL.DbEntity.MSSql
 						orderBy.Select(
 							o =>
 							{
-								var columnName = o.Property.DbColumnName;
 								var asc = o.IsAscending ? "ASC" : "DESC";
-								return $"[{o.Property.DbColumnName}] {asc}";
+								return $"{alias}[{o.Property.DbColumnName}] {asc}";
 							})
 					);
 			}

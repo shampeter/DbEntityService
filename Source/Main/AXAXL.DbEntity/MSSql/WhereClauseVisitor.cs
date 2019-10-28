@@ -19,13 +19,14 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		private ILogger log = null;
 		private Node startingNode = null;
-		private IOrderedDictionary innerJoinMap = null;
+		private IInnerJoinMap innerJoinMap = null;
 		private IDictionary<Type, SqlDbType> csharp2SqlTypeMap = null;
 		private IQueryExtensionForSqlOperators extensions = null;
 		private StringBuilder buffer = null;
 		private List<(string parameter, Type exprResultType, Expression expression)> captured = new List<(string, Type, Expression)>();
 		private int sqlParameterRunningSeq = 0;
 		private string tableAliasPrefix;
+		private string rootMapKey;
 		private readonly IDictionary<ExpressionType, string> operators = new Dictionary<ExpressionType, string>
 		{
 			[ExpressionType.Equal] = @" = ",
@@ -39,8 +40,9 @@ namespace AXAXL.DbEntity.MSSql
 			Node startingNode, 
 			int sqlParameterRunningSeq, 
 			string tableAliasPrefix, 
+			string rootMapKey,
 			ILogger log, 
-			IOrderedDictionary innerJoinMap, 
+			IInnerJoinMap innerJoinMap, 
 			IDictionary<Type, SqlDbType> typeMap, 
 			IQueryExtensionForSqlOperators extensions
 			)
@@ -53,6 +55,7 @@ namespace AXAXL.DbEntity.MSSql
 			this.sqlParameterRunningSeq = sqlParameterRunningSeq;
 			this.startingNode = startingNode;
 			this.tableAliasPrefix = tableAliasPrefix;
+			this.rootMapKey = rootMapKey;
 		}
 		//internal (int SqlParameterRunningSeq, string WhereClause, string InnerJoinClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
 		internal (int SqlParameterRunningSeq, string WhereClause, Func<SqlParameter>[] SqlParameters) Compile(Expression<Func<T, bool>> whereClause)
@@ -155,11 +158,12 @@ namespace AXAXL.DbEntity.MSSql
 			else
 			{
 				var propertyName = member.Member.Name;
-				
+
 				//var columnName = this.node.GetDbColumnNameFromPropertyName(propertyName);
 				//Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}' on '{this.node.NodeType.Name}'");
-
-				var columnName = this.GetDbColumnName(this.startingNode, @"-", propertyName, names, this.innerJoinMap);
+				//var edgeKey = this.innerJoinMap.RootMapKey;
+				//var columnName = this.GetDbColumnName(this.startingNode, edgeKey, propertyName, names, this.innerJoinMap);
+				var columnName = this.GetDbColumnName(this.startingNode, this.rootMapKey, propertyName, names, this.innerJoinMap);
 				Debug.Assert(string.IsNullOrEmpty(columnName) == false, $"Failed to locate DB Column for property '{propertyName}'");
 				buffer.Append(columnName);
 			}
@@ -220,6 +224,14 @@ namespace AXAXL.DbEntity.MSSql
 
 			return newExpr;
 		}
+		/// <summary>
+		/// Push the propery names involed in an memeber expression into a stack (FILO).  The member expression will be visited
+		/// from right to left recursively, that means, the last element visited will tell if this member expression is originated from
+		/// a parameter (i.e. a model node) or not.
+		/// </summary>
+		/// <param name="member">member expression</param>
+		/// <param name="names">a first-in-last-out stack</param>
+		/// <returns>true if this member expression starts from a node.</returns>
 		private bool IsAnEntityProperty(MemberExpression member, Stack<string> names)
 		{
 			if (member.Expression is MemberExpression parent)
@@ -232,43 +244,32 @@ namespace AXAXL.DbEntity.MSSql
 				return member.Expression is ParameterExpression;
 			}
 		}
-		private string GetDbColumnName(Node current, string edgeName, string propertyName, Stack<string> path, IOrderedDictionary innerJoinMap)
+		/// <summary>
+		/// By walking through the <paramref name="path"/> which is a first-in-last-out stack, the code can, on one hand, establish the "inner join"
+		/// required to reach the parent reference from the current node, and on the other hand, recursively walk the stack and reach the node with the
+		/// target property in query and thus return the proper column name for where condition.
+		/// </summary>
+		/// <param name="current">current node</param>
+		/// <param name="edgeKey">key for inner join map.  Key of previous level join so that we can get the right table alias.</param>
+		/// <param name="propertyName">rightmost name of an expression of which we want to locate the column name.</param>
+		/// <param name="path">name of parent reference on an expression from left to right.</param>
+		/// <param name="innerJoinMap">inner join map used to keep track of tables among inner joins.</param>
+		/// <returns>column name of the target <paramref name="propertyName"/></returns>
+		private string GetDbColumnName(Node current, string edgeKey, string propertyName, Stack<string> path, IInnerJoinMap innerJoinMap)
 		{
 			if (path.Count() <= 0)
 			{
-				var aliasIdx = ((ValueTuple<int, int, NodeEdge>)innerJoinMap[edgeName]).Item1;
+				var aliasIdx = innerJoinMap.GetAliasIndex(edgeKey);
 				var dbColumnName = current.GetDbColumnNameFromPropertyName(propertyName);
 				return $"{this.tableAliasPrefix}{aliasIdx}.[{dbColumnName}]";
 			}
 			else
 			{
 				var entityRef = path.Pop();
-				var edge = this.AddEdgeToInnerJoin(innerJoinMap, current, edgeName, entityRef);
-				return this.GetDbColumnName(edge.ParentNode, entityRef, propertyName, path, innerJoinMap);
+				var edge = current.GetEdgeToParent(entityRef);
+				var newEdgeKey = innerJoinMap.Add(edgeKey, current, entityRef);
+				return this.GetDbColumnName(edge.ParentNode, newEdgeKey, propertyName, path, innerJoinMap);
 			}
-		}
-		private NodeEdge AddEdgeToInnerJoin(IOrderedDictionary innerJoins, Node currentNode, string currentEdgeName, string newJoin)
-		{
-			NodeEdge edge = null;
-
-			if (! innerJoins.Contains(newJoin))
-			{
-				var parentRefOnChild = currentNode.GetPropertyFromNode(newJoin);
-				Debug.Assert(parentRefOnChild != null);
-				Debug.Assert(parentRefOnChild.IsEdge);
-
-				int currentIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[currentEdgeName]).Item1;
-				int lastIdx = ((ValueTuple<int, int, NodeEdge>)innerJoins[innerJoins.Count - 1]).Item1;
-				edge = currentNode.GetEdgeToParent(parentRefOnChild);
-				(int ParentTableAliasIdx, int ChildTableAliasIdx, NodeEdge Edge) innerJoin = (ParentTableAliasIdx: ++lastIdx, ChildTableAliasIdx: currentIdx, Edge: edge);
-
-				innerJoins.Add(newJoin, innerJoin);
-			}
-			else
-			{
-				edge = ((ValueTuple<int, int, NodeEdge>)innerJoins[newJoin]).Item3;
-			}
-			return edge;
 		}
 
 /*		private string ComputeInnerJoins(IOrderedDictionary innerJoinsMap)
