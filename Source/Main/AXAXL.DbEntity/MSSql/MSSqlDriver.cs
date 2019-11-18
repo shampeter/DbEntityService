@@ -16,7 +16,7 @@ using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	internal partial class MSSqlDriver : IDatabaseDriver
+	public partial class MSSqlDriver : IDatabaseDriver
 	{
 		private readonly ILogger log = null;
 		private readonly IMSSqlGenerator sqlGenerator = null;

@@ -5,7 +5,7 @@ using AXAXL.DbEntity.EntityGraph;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	internal interface IInnerJoinMap
+	public interface IInnerJoinMap
 	{
 		/// <summary>
 		/// Initialize the map with root node of the query and its corresponding starting sequence number.

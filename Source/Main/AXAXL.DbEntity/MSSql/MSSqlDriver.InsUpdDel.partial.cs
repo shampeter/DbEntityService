@@ -16,7 +16,7 @@ using AXAXL.DbEntity.Extensions;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	internal partial class MSSqlDriver
+	public partial class MSSqlDriver
 	{
 		public IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30)
 		{
