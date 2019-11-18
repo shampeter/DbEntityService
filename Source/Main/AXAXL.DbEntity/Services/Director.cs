@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Collections.Generic;
-using System.Text;
+using System.Threading.Tasks;
 using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
@@ -20,8 +20,9 @@ namespace AXAXL.DbEntity.Services
 		private IDbServiceOption ServiceOption { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
+		private ParallelOptions ParallelRetrievalOptions { get; set; }
 		//private ISet<string> PathWalked { get; set; }
-		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, int timeoutDurationInSeconds = 30)
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30)
 		{
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
@@ -30,6 +31,7 @@ namespace AXAXL.DbEntity.Services
 			this.ServiceOption = serviceOption;
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
+			this.ParallelRetrievalOptions = parallelRetrievalOptions;
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
@@ -93,11 +95,20 @@ namespace AXAXL.DbEntity.Services
 					}
 					edge.ChildAddingAction(entity, children);
 
-					foreach (var eachChild in children)
-					{
-						edge.ParentSettingAction(eachChild, entity);
-						this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-					}
+					Parallel.ForEach(
+						children,
+						this.ParallelRetrievalOptions,
+						(eachChild) =>
+						{
+							edge.ParentSettingAction(eachChild, entity);
+							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+						});
+
+					//foreach (var eachChild in children)
+					//{
+					//	edge.ParentSettingAction(eachChild, entity);
+					//	this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					//}
 				}
 			}
 			if (isMovingTowardsParent)

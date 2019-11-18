@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.EntityGraph;
@@ -27,6 +27,7 @@ namespace AXAXL.DbEntity.Services
 		private IList<ValueTuple<NodeEdge, Expression[]>> ChildInnerJoinOrClausesGroup { get; set; }
 		private IList<ValueTuple<NodeEdge, Expression[]>> ChildOuterJoinOrClausesGroup { get; set; }
 		private IList<(NodeProperty Column, bool IsAscending)> Ordering { get; set; }
+		private ParallelOptions ParallelRetrievalOptions { get; set; }
 		internal DbQuery(ILogger log, IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver)
 		{
 			this.ServiceOption = serviceOption;
@@ -44,6 +45,7 @@ namespace AXAXL.DbEntity.Services
 			this.ChildOuterJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
 			this.ChildInnerJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
 			this.ChildInnerJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
+			this.ParallelRetrievalOptions = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{
@@ -164,7 +166,7 @@ namespace AXAXL.DbEntity.Services
 		{
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
-			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion);
+			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion, this.ParallelRetrievalOptions, this.TimeoutDurationInSeconds);
 			var innerJoinsWhereClauses = this.ComputeNodePath<Expression>(node, this.ChildInnerJoinWhereClauses);
 			var innerJoinOrClauses = this.ComputeNodePath<Expression[]>(node, this.ChildInnerJoinOrClausesGroup);
 			var queryResult = this.Driver.Select(
@@ -178,10 +180,16 @@ namespace AXAXL.DbEntity.Services
 										this.Ordering.ToArray(), 
 										this.TimeoutDurationInSeconds
 										);
-			foreach(var eachEntity in queryResult)
-			{
-				director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
-			}
+			Parallel.ForEach(
+				queryResult, 
+				this.ParallelRetrievalOptions,
+				(eachEntity) => {
+					director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+				});
+			//foreach(var eachEntity in queryResult)
+			//{
+			//	director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+			//}
 			return queryResult;
 		}
 		private void AddToExclusion<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class, new()

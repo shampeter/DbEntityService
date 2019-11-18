@@ -140,16 +140,20 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 			var nodeSign = SignatureForNode(invocation.GetArgumentValue(0));
 			var columnsSign = SignatureForNodeProperties(invocation.GetArgumentValue(1));
 			var prefixSign = invocation.GetArgumentValue(2)?.ToString() ?? C_NA;
-			return $"{methodName}:{nodeSign},{columnsSign},{prefixSign}";
+			var tableAliasSign = invocation.GetArgumentValue(3)?.ToString() ?? C_NA;
+			return $"{methodName}:{nodeSign},{columnsSign},{prefixSign},{tableAliasSign}";
 		}
 
-		private static string SignatureForCreateSqlParameters(string methodName, IInvocation invocation)
+		/* Cannot cache sql parameter!
+		 * 
+ 		private static string SignatureForCreateSqlParameters(string methodName, IInvocation invocation)
 		{
 			var nodeSign = SignatureForNode(invocation.GetArgumentValue(0));
 			var columnsSign = SignatureForNodeProperties(invocation.GetArgumentValue(1));
 			var prefixSign = invocation.GetArgumentValue(2)?.ToString() ?? C_NA;
 			return $"{methodName}:{nodeSign},{columnsSign},{prefixSign}";
 		}
+		*/
 
 		private static string SignatureForCreateSelectComponent(string methodName, IInvocation invocation)
 		{
