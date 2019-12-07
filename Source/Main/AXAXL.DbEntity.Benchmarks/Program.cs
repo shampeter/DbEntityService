@@ -6,7 +6,12 @@ namespace AXAXL.DbEntity.Benchmarks
 	{
 		static void Main(string[] args)
 		{
-			Console.WriteLine("Hello World!");
+			var benchmark = new BenchmarkMain();
+			benchmark.GlobalSetup();
+			var count = benchmark.BaseLine();
+			Console.WriteLine($"Total records found from SQL = {count}");
+			count = benchmark.DbServiceBenchmark();
+			Console.WriteLine($"Total records found from DbServer = {count}");
 		}
 	}
 }
