@@ -33,6 +33,11 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <returns>Database connection string.</returns>
 		string GetConnectionString(string connectionName);
 		/// <summary>
+		/// Return the number of processor assigned by <see cref="SetProcessorCount(int)"/>.  If not assigned, <see cref="System.Environment.ProcessorCount"/> will be used.
+		/// </summary>
+		/// <returns>Int.  Number of processor in the environment.</returns>
+		int GetProcessorCount();
+		/// <summary>
 		/// Assign the default root transaction scope for <see cref="IPersist"/>.  If this method is not used to setup default, RequiredNew will be used.
 		/// </summary>
 		/// <param name="scope">Transaction scope option.  See <see cref="TransactionScopeOption"/></param>
@@ -44,6 +49,12 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="isolation">Isolation level. see <see cref="IsolationLevel"/></param>
 		/// <returns>Return itself to enable method chaining.</returns>
 		IDbServiceOption SetRootDefaultIsolation(IsolationLevel isolation);
+		/// <summary>
+		/// Assign number of processor available in the environment.  By default, this number will be the <see cref="System.Environment.ProcessorCount"/>.
+		/// </summary>
+		/// <param name="processorCount">Int. Number of processor.</param>
+		/// <returns>Return itself to enable method chaining.</returns>
+		IDbServiceOption SetProcessorCount(int processorCount);
 		IDbServiceOption PrintNodeMapToFile(string filename);
 		TransactionScopeOption RootDefaultTransactionScope { get; }
 		IsolationLevel RootDefaultIsolation { get; }

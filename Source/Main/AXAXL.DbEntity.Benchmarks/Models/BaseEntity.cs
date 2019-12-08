@@ -33,10 +33,9 @@ namespace AXAXL.DbEntity.Benchmarks.Models
 		[Column("modify_app")]
 		public string ModifyApp { get; set; }
 
-		[DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+		[ActionInjection(ActionScript = "(a) => ((BaseEntity)a).Version += 1", When = InjectionOptions.WhenUpdated)]
 		[ConcurrencyCheck]
 		[Column("version")]
-		public RowVersion Version { get; set; }
-
+		public int Version { get; set; }
 	}
 }

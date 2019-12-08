@@ -45,7 +45,9 @@ namespace AXAXL.DbEntity.Services
 			this.ChildOuterJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
 			this.ChildInnerJoinWhereClauses = new List<ValueTuple<NodeEdge, Expression>>();
 			this.ChildInnerJoinOrClausesGroup = new List<ValueTuple<NodeEdge, Expression[]>>();
-			this.ParallelRetrievalOptions = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
+			this.ParallelRetrievalOptions = new ParallelOptions { MaxDegreeOfParallelism = serviceOption.GetProcessorCount() };
+
+			this.Log.LogDebug("Number of processor = {0}", serviceOption.GetProcessorCount());
 		}
 		public IQuery<T> Exclude(params Expression<Func<T, dynamic>>[] exclusions)
 		{

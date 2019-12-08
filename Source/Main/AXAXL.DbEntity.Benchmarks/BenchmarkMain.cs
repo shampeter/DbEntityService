@@ -13,6 +13,9 @@ using BenchmarkDotNet.Attributes;
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Benchmarks.Models;
 
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
+
 namespace AXAXL.DbEntity.Benchmarks
 {
 
@@ -48,11 +51,25 @@ namespace AXAXL.DbEntity.Benchmarks
 								.Build();
 			this.ConnecitonString = config["ConnectionString:CLR"];
 
-			var serviceProvider = new ServiceCollection()
+			var services = new ServiceCollection()
 				.AddLogging(
 					c => c
 						.AddConsole()
-						.SetMinimumLevel(LogLevel.Debug)
+						.SetMinimumLevel(LogLevel.Information)
+				)
+				.AddMemoryCache()
+				;
+			var containerBuilder = new ContainerBuilder();
+			containerBuilder.RegisterModule(new AutofacModule(config));
+			containerBuilder.Populate(services);
+
+			var serviceProvider = new AutofacServiceProvider(containerBuilder.Build());
+/*
+ *			var serviceProvider = new ServiceCollection()
+				.AddLogging(
+					c => c
+						.AddConsole()
+						.SetMinimumLevel(LogLevel.Information)
 				)
 				.AddSqlDbEntityService(
 					option => option
@@ -62,8 +79,7 @@ namespace AXAXL.DbEntity.Benchmarks
 				)
 				.BuildServiceProvider()
 				;
-			//var map = serviceProvider.GetService<INodeMap>();
-
+*/
 			this.DbService = serviceProvider
 					.GetService<IDbService>()
 					.Bootstrap();
@@ -118,7 +134,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			}
 			return buffer.Count;
 		}
-
+		[Benchmark(Baseline = false, Description = "Query by DbEntity")]
 		public int DbServiceBenchmark()
 		{
 			var query = this.DbService

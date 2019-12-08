@@ -10,6 +10,7 @@ namespace AXAXL.DbEntity.Services
 		private IDictionary<string, string> ConnectionMap { get; set; }
 		private string DefaultConnectionName { get; set; }
 		public TransactionScopeOption RootDefaultTransactionScope { get; private set; }
+		public int ProcessorCount { get; private set; }
 		public IsolationLevel RootDefaultIsolation { get; private set; }
 		public string NodeMapPrintFilename { get; private set; }
 		public DbServiceOption()
@@ -17,6 +18,7 @@ namespace AXAXL.DbEntity.Services
 			this.ConnectionMap = new Dictionary<string, string>();
 			this.RootDefaultTransactionScope = TransactionScopeOption.Required;
 			this.RootDefaultIsolation = IsolationLevel.ReadCommitted;
+			this.ProcessorCount = System.Environment.ProcessorCount;
 		}
 		public IDbServiceOption AddOrUpdateConnection(string connectionName, string connectionString)
 		{
@@ -67,6 +69,16 @@ namespace AXAXL.DbEntity.Services
 		{
 			this.RootDefaultIsolation = isolation;
 			return this;
+		}
+
+		public IDbServiceOption SetProcessorCount(int processorCount)
+		{
+			this.ProcessorCount = processorCount;
+			return this;
+		}
+		public int GetProcessorCount()
+		{
+			return this.ProcessorCount;
 		}
 	}
 }

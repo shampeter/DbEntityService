@@ -11,7 +11,7 @@ namespace AXAXL.DbEntity.Benchmarks.Models
 		[Column("event_guid")]
 		public int EventGuid { get; set; }
 
-		[Column("total_market_loss", TypeName = "decimal(19,2)")]
+		[Column("total_market_loss", TypeName = "Decimal")]
 		public Nullable<double> TotalMarketLoss { get; set; }
 	}
 }

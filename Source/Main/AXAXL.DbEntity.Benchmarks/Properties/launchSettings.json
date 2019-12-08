@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AXAXL.DbEntity.Benchmarks": {
+      "commandName": "Project",
+      "commandLineArgs": "--verify"
+    }
+  }
+}
