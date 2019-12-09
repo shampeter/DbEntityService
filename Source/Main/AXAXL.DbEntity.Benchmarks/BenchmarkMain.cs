@@ -41,6 +41,18 @@ namespace AXAXL.DbEntity.Benchmarks
 				where t_event.active_ind = 1 
 				order by t_event.description";
 
+		private string[] columnNames =
+		{
+				"event_guid",
+				"dt_of_loss_from",
+				"total_market_loss",
+				"locked_by",
+				"log_on_dt",
+				"dt_of_loss_to",
+				"catstr_id",
+				"description",
+				"lloyd_reference"
+		};
 		[GlobalSetup]
 		public void GlobalSetup()
 		{
@@ -64,48 +76,31 @@ namespace AXAXL.DbEntity.Benchmarks
 			containerBuilder.Populate(services);
 
 			var serviceProvider = new AutofacServiceProvider(containerBuilder.Build());
-/*
- *			var serviceProvider = new ServiceCollection()
-				.AddLogging(
-					c => c
-						.AddConsole()
-						.SetMinimumLevel(LogLevel.Information)
-				)
-				.AddSqlDbEntityService(
-					option => option
-								.AddOrUpdateConnection("SQL_Connection", this.ConnecitonString)
-								.SetAsDefaultConnection("SQL_Connection")
-								.PrintNodeMapToFile(config.GetValue<string>(@"DbEntity:NodeMapExport"))
-				)
-				.BuildServiceProvider()
-				;
-*/
+
+			#region Commented.  DI without Autofac
+			/*
+			 *			var serviceProvider = new ServiceCollection()
+							.AddLogging(
+								c => c
+									.AddConsole()
+									.SetMinimumLevel(LogLevel.Information)
+							)
+							.AddSqlDbEntityService(
+								option => option
+											.AddOrUpdateConnection("SQL_Connection", this.ConnecitonString)
+											.SetAsDefaultConnection("SQL_Connection")
+											.PrintNodeMapToFile(config.GetValue<string>(@"DbEntity:NodeMapExport"))
+							)
+							.BuildServiceProvider()
+							;
+			*/
+			#endregion
+
 			this.DbService = serviceProvider
 					.GetService<IDbService>()
 					.Bootstrap();
 		}
 
-		/// <summary>
-		/// Following is the baseline SQL.
-		/// <code>
-		/// Select
-		/// t_event.event_guid,
-		///		t_event.dt_of_loss_from, 
-		///		t_event_total_marketloss.total_market_loss, 
-		///		t_sec_principal.last_name + ', ' +  t_sec_principal.first_name as locked_by, 
-		///		t_clr_user_session.log_on_dt,
-		///		t_event.dt_of_loss_to,
-		///		t_event.catstr_id,
-		///		t_event.description,
-		///		t_event.lloyd_reference
-		///		from t_event
-		///		left outer join t_event_total_marketloss on t_event.event_guid = t_event_total_marketloss.event_guid
-		///		left outer join t_clr_user_session on t_event.event_guid = t_clr_user_session.event_guid and t_clr_user_session.log_off_dt is null
-		///		left outer join t_sec_principal on t_clr_user_session.locked_by = t_sec_principal.login_name
-		///		where t_event.active_ind = 1
-		///		order by t_event.description
-		/// </code>
-		/// </summary>
 		[Benchmark(Baseline = true, Description = "Baseline. Query by direct SQL")]
 		public int BaseLine()
 		{
@@ -134,8 +129,9 @@ namespace AXAXL.DbEntity.Benchmarks
 			}
 			return buffer.Count;
 		}
-		[Benchmark(Baseline = false, Description = "Query by DbEntity")]
-		public int DbServiceBenchmark()
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with VM")]
+		public int QueryByEntityWithVM()
 		{
 			var query = this.DbService
 						.Query<Event>()
@@ -173,6 +169,61 @@ namespace AXAXL.DbEntity.Benchmarks
 						})
 					.ToList();
 			return resultSet.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM")]
+		public int QueryByEntityWithoutVM()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList();
+
+			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without Children")]
+		public int QueryByEntityWithoutChild()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.Exclude(e => e.EventTotalMarketLossList, e => e.CLRUserSessionList)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList();
+
+			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss")]
+		public int QueryByEntityWithOnlyMktLoss()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.Exclude(e => e.CLRUserSessionList)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList();
+
+			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity ExecuteCommand")]
+		public int QueryByExecCmd()
+		{
+			var resultSet = this.DbService
+							.ExecuteCommand()
+							.SetCommand(C_BASELINE_SQL)
+							.Execute(out IDictionary<string, object> output);
+			return resultSet.Count();
 		}
 	}
 }

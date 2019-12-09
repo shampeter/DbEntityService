@@ -48,9 +48,17 @@ namespace AXAXL.DbEntity.Benchmarks
 			var benchmark = new BenchmarkMain();
 			benchmark.GlobalSetup();
 			var count = benchmark.BaseLine();
-			Console.WriteLine($"Total records found from SQL      = {count}");
-			count = benchmark.DbServiceBenchmark();
-			Console.WriteLine($"Total records found from DbServer = {count}");
+			Console.WriteLine($"Total records found from SQL                             = {count}");
+			count = benchmark.QueryByEntityWithVM();
+			Console.WriteLine($"Total records found from Entity Query with VM            = {count}");
+			count = benchmark.QueryByEntityWithoutVM();
+			Console.WriteLine($"Total records found from Entity Query without VM         = {count}");
+			count = benchmark.QueryByEntityWithoutChild();
+			Console.WriteLine($"Total records found from Entity Query with no child      = {count}");
+			count = benchmark.QueryByEntityWithOnlyMktLoss();
+			Console.WriteLine($"Total records found from Entity Query with only Mkt Loss = {count}");
+			count = benchmark.QueryByExecCmd();
+			Console.WriteLine($"Total records found from Exec Cmd                        = {count}");
 		}
 	}
 }

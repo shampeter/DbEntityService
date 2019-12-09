@@ -51,13 +51,6 @@ namespace AXAXL.DbEntity.Services
 			{
 				foreach (var edge in node.AllChildEdges())
 				{
-					/* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
-										var edgeSignature = this.GetEdgeSignature(edge);
-										// child path has been walked.
-										if (this.PathWalked.Contains(edgeSignature)) continue;
-										// if not, remember this path in order to prevent going in cycles.
-										this.PathWalked.Add(edgeSignature);
-					*/
 					// child path excluded
 					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
 
