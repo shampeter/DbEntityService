@@ -51,8 +51,12 @@ namespace AXAXL.DbEntity.Benchmarks
 
 			count = benchmark.BaseLine();
 			Console.WriteLine($"Total records found from SQL                             = {count}");
+			count = benchmark.DirectQueryForTop200();
+			Console.WriteLine($"Total records found from SQL for Top 200                 = {count}");
 			count = benchmark.QueryByEntityWithVM();
 			Console.WriteLine($"Total records found from Entity Query with VM            = {count}");
+			count = benchmark.QueryByEntityWithVMForTop200();
+			Console.WriteLine($"Total records found from Entity Query with VM Top 200    = {count}");
 			count = benchmark.QueryByEntityWithoutVM();
 			Console.WriteLine($"Total records found from Entity Query without VM         = {count}");
 			count = benchmark.QueryByEntityWithoutChild();
