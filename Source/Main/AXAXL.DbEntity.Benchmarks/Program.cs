@@ -47,7 +47,9 @@ namespace AXAXL.DbEntity.Benchmarks
 		{
 			var benchmark = new BenchmarkMain();
 			benchmark.GlobalSetup();
-			var count = benchmark.BaseLine();
+			int count = 0;
+
+			count = benchmark.BaseLine();
 			Console.WriteLine($"Total records found from SQL                             = {count}");
 			count = benchmark.QueryByEntityWithVM();
 			Console.WriteLine($"Total records found from Entity Query with VM            = {count}");
@@ -57,8 +59,15 @@ namespace AXAXL.DbEntity.Benchmarks
 			Console.WriteLine($"Total records found from Entity Query with no child      = {count}");
 			count = benchmark.QueryByEntityWithOnlyMktLoss();
 			Console.WriteLine($"Total records found from Entity Query with only Mkt Loss = {count}");
+			count = benchmark.QueryByEntityWithOnlyUserSessn();
+			Console.WriteLine($"Total records found from Entity Query with only Usr Sess = {count}");
 			count = benchmark.QueryByExecCmd();
 			Console.WriteLine($"Total records found from Exec Cmd                        = {count}");
+			count = benchmark.InnerJoinQuery();
+			Console.WriteLine($"Total records found from Inner Join Query                = {count}");
+			count = benchmark.QueryByEntityWithInnerJoin();
+			Console.WriteLine($"Total records found from Entity Query with InnerJoin     = {count}");
+
 		}
 	}
 }
