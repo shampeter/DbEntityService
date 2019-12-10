@@ -60,7 +60,9 @@ namespace AXAXL.DbEntity.Benchmarks
 				("Query with No Child", benchmark.QueryByEntityWithoutChild),
 				("Query with only Market Loss", benchmark.QueryByEntityWithOnlyMktLoss),
 				("Query with only User Session", benchmark.QueryByEntityWithOnlyUserSessn),
-				("Query with no View Model", benchmark.QueryByEntityWithoutVM)
+				("Query with no View Model", benchmark.QueryByEntityWithoutVM),
+				("Query on CLR User Session", benchmark.QueryByEntityOnCLRUserSession),
+				("SQL on CLR User Session", benchmark.DirectSQLOnCLRUserSession)
 			};
 
 			for(int i = 1; i <= testCases.Length; i++)
@@ -71,7 +73,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			var loop = ConsoleEnterInt(1, 10);
 			for(int i = 1; i <= loop; i++)
 			{
-				testCases[choice - 1].test();
+				Console.WriteLine("{0,30} = {1}", testCases[choice - 1].desc, testCases[choice - 1].test());
 			}
 			Pause();
 		}
@@ -81,30 +83,30 @@ namespace AXAXL.DbEntity.Benchmarks
 			benchmark.GlobalSetup();
 			int count = 0;
 
-			count = benchmark.BaseLine();
-			Console.WriteLine($"Total records found from SQL                             = {count}");
-			count = benchmark.DirectQueryForTop200();
-			Console.WriteLine($"Total records found from SQL for Top 200                 = {count}");
-			count = benchmark.QueryByEntityWithVM();
-			Console.WriteLine($"Total records found from Entity Query with VM            = {count}");
-			count = benchmark.QueryByEntityWithVMForTop200();
-			Console.WriteLine($"Total records found from Entity Query with VM Top 200    = {count}");
-			count = benchmark.QueryByEntityWithoutVM();
-			Console.WriteLine($"Total records found from Entity Query without VM         = {count}");
-			count = benchmark.QueryByEntityWithoutChild();
-			Console.WriteLine($"Total records found from Entity Query with no child      = {count}");
-			count = benchmark.QueryByEntityWithOnlyMktLoss();
-			Console.WriteLine($"Total records found from Entity Query with only Mkt Loss = {count}");
-			count = benchmark.QueryByEntityWithOnlyUserSessn();
-			Console.WriteLine($"Total records found from Entity Query with only Usr Sess = {count}");
-			count = benchmark.QueryByExecCmd();
-			Console.WriteLine($"Total records found from Exec Cmd                        = {count}");
-			count = benchmark.InnerJoinQuery();
-			Console.WriteLine($"Total records found from Inner Join Query                = {count}");
-			count = benchmark.QueryByEntityWithInnerJoin();
-			Console.WriteLine($"Total records found from Entity Query with InnerJoin     = {count}");
+			var testcases = new (string desc, Func<int> testcase)[]
+			{
+				("From SQL", benchmark.BaseLine),
+				("From SQL for Top 200", benchmark.DirectQueryForTop200),
+				("From Entity Query with VM", benchmark.QueryByEntityWithVM),
+				("From Entity Query with VM Top 200", benchmark.QueryByEntityWithVMForTop200),
+				("From Entity Query without VM", benchmark.QueryByEntityWithoutVM),
+				("From Entity Query with no child", benchmark.QueryByEntityWithoutChild),
+				("From Entity Query with only Mkt Loss", benchmark.QueryByEntityWithOnlyMktLoss),
+				("From Entity Query with only Usr Sess", benchmark.QueryByEntityWithOnlyUserSessn),
+				("From Exec Cmd", benchmark.QueryByExecCmd),
+				("From Inner Join Query", benchmark.InnerJoinQuery),
+				("From Entity Query with InnerJoin", benchmark.QueryByEntityWithInnerJoin),
+				("From Entity Query on CLR User Session", benchmark.QueryByEntityOnCLRUserSession),
+				("From SQL on CLR User Session", benchmark.DirectSQLOnCLRUserSession)
+			};
 
+			foreach(var eachTest in testcases)
+			{
+				count = eachTest.testcase();
+				Console.WriteLine(@"{0,-40}={1}", eachTest.desc, count);
+			}
 		}
+
 		private static int ConsoleEnterInt(int start, int end)
 		{
 			bool correct = false;

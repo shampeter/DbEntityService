@@ -28,7 +28,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			// use this extension for production and QA when optimized performance is needed.
 			builder.AddSqlDbEntityServiceWithCacheForSqlGenerator(
 					dbOption => dbOption
-								.AddOrUpdateConnection("SQL_Connection", this.Configuration["ConnectionString:CLR"])
+								.AddOrUpdateConnection("SQL_Connection", this.Configuration.GetValue<string>(@"ConnectionString:CLR"))
 								.SetAsDefaultConnection("SQL_Connection")
 								.PrintNodeMapToFile(this.Configuration.GetValue<string>(@"DbEntity:NodeMapExport")));
 

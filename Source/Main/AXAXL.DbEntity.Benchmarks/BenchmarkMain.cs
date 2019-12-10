@@ -79,6 +79,26 @@ namespace AXAXL.DbEntity.Benchmarks
 			where t_event.active_ind = 1
 			order by t_event.description";
 
+		private const string C_CLR_USER_SESSION_SQL =
+			@"
+			select
+				[s].[user_session_guid],
+				[s].[event_guid],
+				[s].[locked_by],
+				[p].[first_name],
+				[p].[last_name],
+				[s].[added_dt],
+				[s].[added_app],
+				[s].[added_by],
+				[s].[modify_dt],
+				[s].[modify_app],
+				[s].[modify_by],
+				[s].[version]
+			from
+				 [t_clr_user_session] [s]
+			left outer join [t_sec_principal] [p] on [p].[login_name] = [s].[locked_by]
+			";
+
 		private string[] columnNames =
 		{
 				"event_guid",
@@ -142,7 +162,7 @@ namespace AXAXL.DbEntity.Benchmarks
 		[Benchmark(Baseline = true, Description = "Baseline. Query by direct SQL")]
 		public int BaseLine()
 		{
-			var buffer = new List<BaseLineSQLResult>();
+			var buffer = new List<BaseLineSQLResultVM>();
 			using (var conn = new SqlConnection(this.ConnecitonString))
 			{
 				conn.Open();
@@ -151,7 +171,7 @@ namespace AXAXL.DbEntity.Benchmarks
 				{
 					while (reader.Read())
 					{
-						var result = new BaseLineSQLResult();
+						var result = new BaseLineSQLResultVM();
 						result.EventGuid = reader.GetInt32(0);
 						result.DOLFrom = reader.IsDBNull(1) ? (DateTime?)null : reader.GetDateTime(1);
 						result.TotalMarketLoss = reader.IsDBNull(2) ? (double?)null : Convert.ToDouble(reader.GetDecimal(2));
@@ -168,10 +188,44 @@ namespace AXAXL.DbEntity.Benchmarks
 			return buffer.Count;
 		}
 
+		[Benchmark(Baseline = false, Description = "Query by direct SQL on CLR User Session")]
+		public int DirectSQLOnCLRUserSession()
+		{
+			var buffer = new List<CLRUserSQLResultVM>();
+			using (var conn = new SqlConnection(this.ConnecitonString))
+			{
+				conn.Open();
+				var cmd = new SqlCommand(C_CLR_USER_SESSION_SQL, conn);
+				using (var reader = cmd.ExecuteReader())
+				{
+					while (reader.Read())
+					{
+						var result = new CLRUserSQLResultVM();
+
+						result.UserSessionGuid = reader.GetInt32(0);
+						result.EventGuid = reader.GetInt32(1);
+						result.LockedBy = reader.GetString(2);
+						result.FirstName = reader.GetString(3);
+						result.LastName = reader.GetString(4);
+						result.AddedDt = reader.GetDateTime(5);
+						result.AddedApp = reader.GetString(6);
+						result.AddedBy = reader.GetString(7);
+						result.ModifyDt = reader.GetDateTime(8);
+						result.ModifyApp = reader.GetString(9);
+						result.ModifyBy = reader.GetString(10);
+						result.Version = reader.GetInt32(11);
+
+						buffer.Add(result);
+					}
+				}
+			}
+			return buffer.Count;
+		}
+
 		[Benchmark(Baseline = false, Description = "Query by direct SQL for Top 200")]
 		public int DirectQueryForTop200()
 		{
-			var buffer = new List<BaseLineSQLResult>();
+			var buffer = new List<BaseLineSQLResultVM>();
 			using (var conn = new SqlConnection(this.ConnecitonString))
 			{
 				conn.Open();
@@ -180,7 +234,7 @@ namespace AXAXL.DbEntity.Benchmarks
 				{
 					while (reader.Read())
 					{
-						var result = new BaseLineSQLResult();
+						var result = new BaseLineSQLResultVM();
 						result.EventGuid = reader.GetInt32(0);
 						result.DOLFrom = reader.IsDBNull(1) ? (DateTime?)null : reader.GetDateTime(1);
 						result.TotalMarketLoss = reader.IsDBNull(2) ? (double?)null : Convert.ToDouble(reader.GetDecimal(2));
@@ -199,7 +253,7 @@ namespace AXAXL.DbEntity.Benchmarks
 		[Benchmark(Baseline = false, Description = "Query by direct SQL in inner join query")]
 		public int InnerJoinQuery()
 		{
-			var buffer = new List<BaseLineSQLResult>();
+			var buffer = new List<BaseLineSQLResultVM>();
 			using (var conn = new SqlConnection(this.ConnecitonString))
 			{
 				conn.Open();
@@ -208,7 +262,7 @@ namespace AXAXL.DbEntity.Benchmarks
 				{
 					while (reader.Read())
 					{
-						var result = new BaseLineSQLResult();
+						var result = new BaseLineSQLResultVM();
 						result.EventGuid = reader.GetInt32(0);
 						result.DOLFrom = reader.IsDBNull(1) ? (DateTime?)null : reader.GetDateTime(1);
 						result.TotalMarketLoss = reader.IsDBNull(2) ? (double?)null : Convert.ToDouble(reader.GetDecimal(2));
@@ -248,7 +302,7 @@ namespace AXAXL.DbEntity.Benchmarks
 								userLockingEvent = $"{lockedSession.LockedByUser.LastName}, {lockedSession.LockedByUser.FirstName}";
 								sessionLockDate = lockedSession.LogOnDt;
 							}
-							var result = new BaseLineSQLResult
+							var result = new BaseLineSQLResultVM
 							{
 								EventGuid = p.EventGuid,
 								DOLFrom = p.DOLFrom,
@@ -289,7 +343,7 @@ namespace AXAXL.DbEntity.Benchmarks
 								userLockingEvent = $"{lockedSession.LockedByUser.LastName}, {lockedSession.LockedByUser.FirstName}";
 								sessionLockDate = lockedSession.LogOnDt;
 							}
-							var result = new BaseLineSQLResult
+							var result = new BaseLineSQLResultVM
 							{
 								EventGuid = p.EventGuid,
 								DOLFrom = p.DOLFrom,
@@ -391,6 +445,15 @@ namespace AXAXL.DbEntity.Benchmarks
 			var eventList = query.ToList();
 
 			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity On CLR User Session")]
+		public int QueryByEntityOnCLRUserSession()
+		{
+			var result = this.DbService
+								.Query<CLRUserSession>()
+								.ToList();
+			return result.Count;
 		}
 	}
 }

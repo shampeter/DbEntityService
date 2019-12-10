@@ -4,7 +4,7 @@ using System.Text;
 
 namespace AXAXL.DbEntity.Benchmarks.Models
 {
-	public class BaseLineSQLResult
+	public class BaseLineSQLResultVM
 	{
 		public int EventGuid { get; set; }
 
