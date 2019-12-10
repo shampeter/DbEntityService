@@ -15,11 +15,18 @@ namespace AXAXL.DbEntity.Benchmarks
 		{
 			if (
 				args != null && 
-				args.Length == 1 && 
-				args[0].Equals(@"--verify", StringComparison.InvariantCultureIgnoreCase)
+				args.Length == 1
 			)
 			{
-				Verify();
+				switch(args[0].ToLower())
+				{
+					case @"--verify":
+						Verify();
+						break;
+					case @"--debug":
+						Debug();
+						break;
+				}
 				return;
 			}
 
@@ -42,7 +49,32 @@ namespace AXAXL.DbEntity.Benchmarks
 			//	.FromAssembly(typeof(Program).Assembly)
 			//	.Run(args, benchmarkConfig);
 		}
+		private static void Debug()
+		{
+			var benchmark = new BenchmarkMain();
+			benchmark.GlobalSetup();
 
+			var testCases = new (string desc, Func<int> test)[]
+			{
+				("Baseline", benchmark.BaseLine),
+				("Query with No Child", benchmark.QueryByEntityWithoutChild),
+				("Query with only Market Loss", benchmark.QueryByEntityWithOnlyMktLoss),
+				("Query with only User Session", benchmark.QueryByEntityWithOnlyUserSessn),
+				("Query with no View Model", benchmark.QueryByEntityWithoutVM)
+			};
+
+			for(int i = 1; i <= testCases.Length; i++)
+			{
+				Console.WriteLine("{0,3} {1}", i, testCases[i - 1].desc);
+			}
+			var choice = ConsoleEnterInt(1, testCases.Length);
+			var loop = ConsoleEnterInt(1, 10);
+			for(int i = 1; i <= loop; i++)
+			{
+				testCases[choice - 1].test();
+			}
+			Pause();
+		}
 		private static void Verify()
 		{
 			var benchmark = new BenchmarkMain();
@@ -72,6 +104,25 @@ namespace AXAXL.DbEntity.Benchmarks
 			count = benchmark.QueryByEntityWithInnerJoin();
 			Console.WriteLine($"Total records found from Entity Query with InnerJoin     = {count}");
 
+		}
+		private static int ConsoleEnterInt(int start, int end)
+		{
+			bool correct = false;
+			int choice = -1;
+			while (! correct)
+			{
+				Console.Write($"Enter choice between {start} and {end}: ");
+				var entry = Console.ReadLine();
+				if (int.TryParse(entry, out choice) && start <= choice && choice <= end)
+				{
+					correct = true;
+				}
+			}
+			return choice;
+		}
+		private static void Pause()
+		{
+			Console.Write("Press Enter to continue"); Console.ReadLine();
 		}
 	}
 }
