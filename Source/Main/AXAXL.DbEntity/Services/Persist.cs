@@ -67,7 +67,7 @@ namespace AXAXL.DbEntity.Services
 			int rowCount = 0;
 			foreach (var eachEntity in changeSet.Changes)
 			{
-				var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion);
+				var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, changeSet.Exclusion, null);
 				rowCount = director.Save(eachEntity);
 			}
 

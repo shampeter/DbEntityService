@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Collections.Generic;
-using System.Text;
+using System.Threading.Tasks;
 using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
@@ -20,8 +20,9 @@ namespace AXAXL.DbEntity.Services
 		private IDbServiceOption ServiceOption { get; set; }
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
+		private ParallelOptions ParallelRetrievalOptions { get; set; }
 		//private ISet<string> PathWalked { get; set; }
-		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, int timeoutDurationInSeconds = 30)
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30)
 		{
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
@@ -30,6 +31,7 @@ namespace AXAXL.DbEntity.Services
 			this.ServiceOption = serviceOption;
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
+			this.ParallelRetrievalOptions = parallelRetrievalOptions;
 			//this.PathWalked = new HashSet<string>();
 		}
 		// TODO: Need to double check the build logic
@@ -49,13 +51,6 @@ namespace AXAXL.DbEntity.Services
 			{
 				foreach (var edge in node.AllChildEdges())
 				{
-					/* Doesn't quite work this way for recording the path because the same path can be walked by different node of different record.					
-										var edgeSignature = this.GetEdgeSignature(edge);
-										// child path has been walked.
-										if (this.PathWalked.Contains(edgeSignature)) continue;
-										// if not, remember this path in order to prevent going in cycles.
-										this.PathWalked.Add(edgeSignature);
-					*/
 					// child path excluded
 					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
 
@@ -93,11 +88,20 @@ namespace AXAXL.DbEntity.Services
 					}
 					edge.ChildAddingAction(entity, children);
 
-					foreach (var eachChild in children)
-					{
-						edge.ParentSettingAction(eachChild, entity);
-						this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-					}
+					Parallel.ForEach(
+						children,
+						this.ParallelRetrievalOptions,
+						(eachChild) =>
+						{
+							edge.ParentSettingAction(eachChild, entity);
+							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+						});
+
+					//foreach (var eachChild in children)
+					//{
+					//	edge.ParentSettingAction(eachChild, entity);
+					//	this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					//}
 				}
 			}
 			if (isMovingTowardsParent)

@@ -11,7 +11,7 @@ using AXAXL.DbEntity.MSSql.Autofac;
 namespace AXAXL.DbEntity.MSSql
 {
 	[Intercept(MSSqlGeneratorResponseCache.C_MS_SQL_GENERATOR_CACHE_INTERCEPTOR_NAME)]
-	internal interface IMSSqlGenerator
+	public interface IMSSqlGenerator
 	{
 		SqlDbType GetSqlDbTypeFromCSType(Type csType);
 

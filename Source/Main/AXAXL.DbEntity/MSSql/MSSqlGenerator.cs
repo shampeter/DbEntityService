@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AXAXL.DbEntity.MSSql
 {
-	internal partial class MSSqlGenerator : IMSSqlGenerator
+	public partial class MSSqlGenerator : IMSSqlGenerator
 	{
 		private ILogger log = null;
 		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
