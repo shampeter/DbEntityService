@@ -146,10 +146,110 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		// TODO: Complete changes on retrieving all grand-children of children in one shot.
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
-		private IEnumerable<T> SelectImplementation<T>(
+		private IEnumerable<T> SelectImplementation2<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int maxNumOfRow,
+			(NodeProperty Property, bool IsAscending)[] orderBy,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
+		{
+			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+
+			IEnumerable<T> resultSet = null;
+			var tablePrefix = @"t";
+			var tableAliasFirstIdx = 0;
+			int sqlParameterRunningSeq = 0;
+			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
+
+			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
+
+			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
+			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
+			var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
+			//var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
+
+			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
+			var innerJoinMap = new InnerJoinMap();
+			var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
+			var additionalWhere = this.CompileWhereConditions<T>(node, whereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
+			var additionalOr = this.CompileOrGroups<T>(node, orClausesGroup, tablePrefix, rootMapKey, additionalWhere.Item3, innerJoinMap);
+			//var (innerJoinWhereStatements, innerJoinSqlParameters) = this.CompileInnerJoinWhere(node, rootMapKey, childInnerJoinWhereClauses, tablePrefix, innerJoinMap);
+
+			// Find the Inner Joins with the parent at the edge at the head of path the same as current node.
+			// Extract those inner join. Add those path into inner join map to create inner join statement later.
+			// Also Compile the where clause attached to the child node of the edge at the end of the path into where statement and parameters.
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhereForThisNode;
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOrForThisNode;
+			IEnumerable<Expression> additionalWhereForThisNode;
+			IEnumerable<Expression[]> additionalOrForThisNode;
+			var innerJoinWhereFound = this.MatchEdgeToInnerJoinPaths<Expression>(node, childInnerJoinWhereClauses, out innerJoinWhereForThisNode, out additionalWhereForThisNode);
+			var innerJoinOrFound = this.MatchEdgeToInnerJoinPaths<Expression[]>(node, childInnerJoinOrClausesGroup, out innerJoinOrForThisNode, out additionalOrForThisNode);
+			var additionalInnerJoinWhere = this.CompileChildInnerJoinWhere(innerJoinWhereForThisNode, tablePrefix, additionalOr.Item3, innerJoinMap);
+			var additionalInnerJoinOr = this.CompileChildInnerJoinOrGroup(innerJoinOrForThisNode, tablePrefix, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalWhereStatementForThisNode = this.CompileWhereConditionsFromExpressions(node, additionalWhereForThisNode, tablePrefix, rootMapKey, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalOrStatementForThisNode = this.CompileOrGroupsFromExpression(node, additionalOrForThisNode, tablePrefix, rootMapKey, additionalWhereStatementForThisNode.Item3, innerJoinMap);
+
+			// Completed inner join work.  Remove the top edge from the path worked on, so that when stepping down the entity graph, the children along the path will create the same 
+			// inner join conditions.
+			this.RemovedVisited<Expression>(childInnerJoinWhereClauses, innerJoinWhereFound);
+			this.RemovedVisited<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
+
+			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
+			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
+			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
+			var sqlCmd = this.FormatSelectStatement(
+				node,
+				select.SelectedColumns,
+				innerJoinStatement,
+				primaryWhereStatement,
+				additionalWhere.Item1,
+				additionalOr.Item1,
+				additionalWhereStatementForThisNode.Item1,
+				additionalOrStatementForThisNode.Item1,
+				additionalInnerJoinWhere.Item1,
+				additionalInnerJoinOr.Item1,
+				topLevelTableAlias,
+				maxNumOfRow,
+				orderBy
+				);
+			using (SqlCommand cmd = new SqlCommand(sqlCmd))
+			{
+				var primaryParameterWithValue =
+						primaryQueryParameters
+							.Select(kv =>
+							{
+								var whereParameterValue = parameters[kv.Key];
+								var sqlParameter = kv.Value;
+								sqlParameter.Value = whereParameterValue ?? DBNull.Value;
+								return sqlParameter;
+							})
+							.ToArray();
+				cmd.Parameters.AddRange(primaryParameterWithValue);
+				this
+					.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinWhere.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinOr.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
+					.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
+					;
+				this.LogSql("SelectImplementation", node, cmd);
+				resultSet = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+			}
+			return resultSet;
+		}
+
+		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
+		private IEnumerable<T> SelectImplementation<T>(
+			string connectionString,
+			Node node,
+			IDictionary<string, object> parameters,
 			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
