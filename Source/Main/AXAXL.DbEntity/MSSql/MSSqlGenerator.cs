@@ -176,6 +176,8 @@ namespace AXAXL.DbEntity.MSSql
 				});
 		}
 
+		IDictionary<string, SqlParameter> CreateSqlParametersWithValues(Node node, IDictionary<string, object[]> keyValues, string parameterPrefix = null);
+
 		public (string AssignmentClause, NodeProperty[] UpdateColumns) CreateUpdateAssignmentComponent(Node node)
 		{
 			NodeProperty[] updateColumns, outputColumns;
