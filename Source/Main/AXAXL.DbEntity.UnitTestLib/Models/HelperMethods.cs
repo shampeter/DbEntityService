@@ -43,7 +43,6 @@ namespace AXAXL.DbEntity.UnitTestLib.Models
 										.Execute(out outputParameters);
 			return (long)outputParameters["next_seq"];
 		}
-		// TODO: Need to figure out how to get the session user Id.  This is left for security service design where we may use JWT to carry user's claims round a user sessin.
 		public static string CurrentUserId => "Testing";
 	}
 }

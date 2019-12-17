@@ -42,7 +42,6 @@ namespace AXAXL.DbEntity.MSSql.Autofac
 		/// </summary>
 		internal static readonly IDictionary<string, Func<string, IInvocation, string>> _methodResponseToBeCached = new Dictionary<string, Func<string, IInvocation, string>>
 		{
-			// TODO: Need to re-check method signature after all the changes.
 			[nameof(IMSSqlGenerator.ExtractPrimaryKeyAndConcurrencyControlColumns)] = SignatureForExtractPrimaryKeyAndConcurrencyControlColumns,
 			[nameof(IMSSqlGenerator.CreateSelectComponent)] = SignatureForCreateSelectComponent,
 			[nameof(IMSSqlGenerator.CreateWhereClause)] = SignatureForCreateWhereClause,

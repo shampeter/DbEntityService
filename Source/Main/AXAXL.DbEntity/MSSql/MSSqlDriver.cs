@@ -44,17 +44,25 @@ namespace AXAXL.DbEntity.MSSql
 				$"Dictionary contains key which is not present in the given node."
 				);
 
-			var aliasT0 = @"t0";
+			return this.SelectImplementation<T>(
+							connectionString, 
+							node, 
+							parameters, 
+							new Expression<Func<T, bool>>[0], 
+							new List<Expression<Func<T, bool>>[]>(), 
+							new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
+							new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
+							-1,
+							null,
+							timeoutDurationInSeconds
+							);
+/*			
+ *			var aliasT0 = @"t0";
 			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
 			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
 			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
 			var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, null, null, aliasT0, -1, null);
-			//SqlCommand cmd = new SqlCommand(
-			//				@"SELECT " +
-			//				select.SelectedColumns +
-			//				(!string.IsNullOrEmpty(whereClause) ? @" WHERE " + whereClause : string.Empty)
-			//				);
 			var cmd = new SqlCommand(sql);
 
 			var parameterWithValue =
@@ -72,6 +80,7 @@ namespace AXAXL.DbEntity.MSSql
 			this.LogSql("Select<T> with dictionary parameters", node, cmd);
 
 			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+*/		
 		}
 
 		public IEnumerable<T> Select<T>(
@@ -135,12 +144,12 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			return this.SelectImplementation<T>(connectionString, node, MSSqlDriver.emptyParameters, whereClauses, orClausesGroup, childInnerJoinWhereClauses, childInnerJoinOrClausesGroup, maxNumOfRow, orderBy, timeoutDurationInSeconds);
 		}
-
+		// TODO: Complete changes on retrieving all grand-children of children in one shot.
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
 		private IEnumerable<T> SelectImplementation<T>(
 			string connectionString,
 			Node node,
-			IDictionary<string, object> parameters,
+			IDictionary<string, object[]> parameters,
 			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
@@ -230,7 +239,7 @@ namespace AXAXL.DbEntity.MSSql
 					.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
 					.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
 					;
-				this.LogSql("Select<T> with where expression", node, cmd);
+				this.LogSql("SelectImplementation", node, cmd);
 				resultSet = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 			}
 			return resultSet;
@@ -783,25 +792,27 @@ namespace AXAXL.DbEntity.MSSql
 			}
 			return formattedValue;
 		}
-		[Conditional("DEBUG")]
 		private void LogSql(string message, Node node, SqlCommand cmd)
 		{
 			Debug.Assert(cmd != null);
 
-			var sql = cmd.CommandText;
-			var parameters = string.Join(
-						", ",
-						cmd.Parameters?
-								.Cast<SqlParameter>()
-								.Select(p =>
-								{
-									var name = p.ParameterName;
-									var value = p.Value?.ToString();
-									value = string.IsNullOrEmpty(value) ? @"null" : value;
-									return $"{name} = {value}";
-								})
-						);
-			this.log.LogDebug("| {0} | {1} | {2} | {3} |", message, node?.Name, sql, parameters);
+			if (this.log.IsEnabled(LogLevel.Debug))
+			{
+				var sql = cmd.CommandText;
+				var parameters = string.Join(
+							", ",
+							cmd.Parameters?
+									.Cast<SqlParameter>()
+									.Select(p =>
+									{
+										var name = p.ParameterName;
+										var value = p.Value?.ToString();
+										value = string.IsNullOrEmpty(value) ? @"null" : value;
+										return $"{name} = {value}";
+									})
+							);
+				this.log.LogDebug("| {0} | {1} | {2} | {3} |", message, node?.Name, sql, parameters);
+			}
 		}
 
 		#region archived at 2019-10-22 by P. Sham.

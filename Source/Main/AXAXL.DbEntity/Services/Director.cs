@@ -34,6 +34,7 @@ namespace AXAXL.DbEntity.Services
 			this.ParallelRetrievalOptions = parallelRetrievalOptions;
 			//this.PathWalked = new HashSet<string>();
 		}
+		/*
 		public IEnumerable<T> Build<T>(
 			IEnumerable<T> entities,
 			bool isMovingTowardsParent,
@@ -110,7 +111,7 @@ namespace AXAXL.DbEntity.Services
 			}
 			return entities;
 		}
-		// TODO: Need to double check the build logic
+		*/
 		public T Build<T>(
 			T entity, 
 			bool isMovingTowardsParent, 

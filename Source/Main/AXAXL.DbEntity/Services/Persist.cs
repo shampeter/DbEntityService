@@ -35,7 +35,6 @@ namespace AXAXL.DbEntity.Services
 		{
 			var rowCount = 0;
 			var rootOption = new TransactionOptions { IsolationLevel = this.isolation };
-			// TODO: Need fine tuning on transaction behavior.
 			using (var rootTransaction = new TransactionScope(this.scopeOption, rootOption))
 			{
 				foreach(var changeSet in this.ChangeSets)
