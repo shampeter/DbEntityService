@@ -80,6 +80,16 @@ namespace AXAXL.DbEntity.Interfaces
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new();
+		IEnumerable<T> Select<T>(
+			string connectionString,
+			Node node,
+			IDictionary<string, object[]> parameters,
+			IEnumerable<Expression> whereClauses,
+			IEnumerable<Expression[]> orClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new();
 		/// <summary>
 		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.
 		/// </summary>

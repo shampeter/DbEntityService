@@ -44,5 +44,7 @@ namespace AXAXL.DbEntity.MSSql
 		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy, string tableAlias = null);
 		
 		string FormatTableName(Node node, string tableAlias = null);
+
+		(string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, string parameterPrefix = null, string tableAlias = null, int batchSize = 1000);
 	}
 }

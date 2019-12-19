@@ -34,7 +34,7 @@ namespace AXAXL.DbEntity.Services
 			this.ParallelRetrievalOptions = parallelRetrievalOptions;
 			//this.PathWalked = new HashSet<string>();
 		}
-		/*
+		
 		public IEnumerable<T> Build<T>(
 			IEnumerable<T> entities,
 			bool isMovingTowardsParent,
@@ -51,6 +51,9 @@ namespace AXAXL.DbEntity.Services
 
 			if (isMovingTowardsChild)
 			{
+				entities.Select(p => { 
+
+				});
 				foreach(var edge in node.AllChildEdges())
 				{
 					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
@@ -59,34 +62,23 @@ namespace AXAXL.DbEntity.Services
 					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
 
 					var readers = edge.ParentPrimaryKeyReaders;
-					IDictionary<string, object> childKeys = new Dictionary<string, object>();
+					IDictionary<string, object[]> childKeys = new Dictionary<string, object[]>();
 					int i;
 					for (i = 0; i < readers.Length && i < edge.ChildNodeForeignKeys.Length; i++)
 					{
-						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, readers[i].Invoke(entity));
+						var values = entities.Select(e => readers[i].Invoke(e)).ToArray();
+						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, values);
 					}
 					while (i < edge.ChildNodeForeignKeys.Length)
 					{
 						Debug.Assert(edge.ChildNodeForeignKeys[i].IsConstant == true, $"Found foreign key {edge.ChildNodeForeignKeys[i].PropertyName} on {edge.ChildNode.Name} has no given value from parent and it's not a constant.");
-						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, edge.ChildNodeForeignKeys[i].ConstantValue);
+						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, null);
 						i++;
 					}
 					var connection = this.GetConnectionString(edge.ChildNode);
 					IEnumerable<object> children = null;
 					// The result of the shorter select call can be cached as it pretty much fixed.  Thus don't want to mix these 2 calls.
-					if (
-						(additionalWhereClause != null && additionalWhereClause.Length > 0) ||
-						(additionalOrClauses != null && additionalOrClauses.Count > 0) ||
-						(innerJoinWhere != null && innerJoinWhere.Count() > 0) ||
-						(innerJoinWhere != null && innerJoinWhere.Count() > 0)
-						)
-					{
-						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
-					}
-					else
-					{
-						children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, this.TimeoutDurationInSeconds);
-					}
+					children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 					edge.ChildAddingAction(entity, children);
 
 					Parallel.ForEach(
@@ -111,7 +103,7 @@ namespace AXAXL.DbEntity.Services
 			}
 			return entities;
 		}
-		*/
+
 		public T Build<T>(
 			T entity, 
 			bool isMovingTowardsParent, 

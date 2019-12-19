@@ -167,13 +167,17 @@ namespace AXAXL.DbEntity.MSSql
 				key => key.PropertyName, 
 				value =>
 				{
-					SqlDbType dbType;
-					var validDbType = Enum.TryParse<SqlDbType>(value.DbColumnType, true, out dbType);
-					Debug.Assert(validDbType, $"Invalid SqlDbType '{value.DbColumnType}'");
-
-					var parameter = new SqlParameter($"@{prefix}{value.PropertyName}", dbType);
-					return parameter;
+					return this.NewSqlParameterByPropertyName(value, prefix).Parameter;
 				});
+		}
+
+		private (string ParameterName, SqlParameter Parameter) NewSqlParameterByPropertyName(NodeProperty property, string prefix, int suffix = -1)
+		{
+			var dbType = this.GetDbType(property);
+			var parameterIndex = suffix > 0 ? suffix.ToString() : string.Empty;
+			var parameterName = $"@{prefix ?? string.Empty}{property.PropertyName}{parameterIndex}";
+
+			return (parameterName, new SqlParameter(parameterName, dbType));
 		}
 
 		public (string AssignmentClause, NodeProperty[] UpdateColumns) CreateUpdateAssignmentComponent(Node node)
@@ -215,6 +219,96 @@ namespace AXAXL.DbEntity.MSSql
 				resultBuffer.Add("Return", new SqlParameter() { ParameterName = @"@ReturnValue", Direction = ParameterDirection.ReturnValue });
 			}
 			return resultBuffer;
+		}
+		
+		public (string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, string parameterPrefix = null, string tableAlias = null, int batchSize = 1000)
+		{
+			Debug.Assert(keyValues != null && keyValues.Count > 0, "No key-values provided to create where clause and sql parameters.");
+			Debug.Assert(node != null);
+
+			var resultBuffer = new List<(string primaryWhereClause, SqlParameter[])>();
+
+			var alias = tableAlias == null ? string.Empty : $"{tableAlias}.";
+			var propertyValues = keyValues.ToDictionary(k => node.GetPropertyFromNode(k.Key), v => v.Value);
+			var nonConstantKeys = propertyValues.Where(p => p.Key.IsConstant == false).ToArray();
+			var constantKeys = propertyValues
+								.Where(p => p.Key.IsConstant == true)
+								.Select(p =>
+								{
+									var rightHandSide = this.FormatConstantValueAsParameterValue(node, p.Key);
+									var condition = string.Format("{0}{1} = {2}", alias, p.Key.DbColumnName, rightHandSide);
+									return condition;
+								})
+								.ToArray();
+
+			if (nonConstantKeys.Length == 1)
+			{
+				Debug.Assert(nonConstantKeys[0].Value != null && nonConstantKeys[0].Value.Length > 0, "There is no value for this column in where clause");
+				var property = nonConstantKeys[0].Key;
+				var values = nonConstantKeys[0].Value;
+				var template = values.Length == 1 ? $"{alias}{property.DbColumnName} = {0}" : $"{alias}{property.DbColumnName} in ({0})";
+				var numOfBatches = (int)(values.Length / batchSize);
+				var remains = values.Length % batchSize;
+				for(int i = 0; i <= numOfBatches; i++)
+				{
+					var size = i == numOfBatches ? remains : batchSize;
+					var names = new string[size];
+					var parameters = new SqlParameter[size];
+					for (int j = 0; j < size; j++)
+					{
+						var (name, parameter) = this.NewSqlParameterByPropertyName(property, parameterPrefix, i * batchSize + j);
+						parameter.Value = values[i * batchSize + j] ?? DBNull.Value;
+						parameters[j] = parameter;
+						names[j] = name;
+					}
+					var where = new string[]{ string.Format(template, string.Join(",", names)) };
+					var whereClause = String.Join(" AND ", where.Concat(constantKeys));
+					resultBuffer.Add((whereClause, parameters));
+				}
+			}
+			else if (nonConstantKeys.Length > 1)
+			{
+				/*
+				 * For example.  There are 3 keys and each key has 500 values.  Max parameter in query is, say, 50. Thus max. number of parameters for these 3 keys fitting into the limit is 50 / 3 = 16.
+				 * i.e. (key1 = param1 AND key2 = param2 AND key3 = param3) OR (key1 = param4 AND key2 = param5 AND key3 = param6) OR ... OR (key1 = param46 AND key2 = param47 AND key3 = param48)
+				 * And for 500 values for each keys, it will take 500 / 16 = 31 loops with 4 loop reminding after that to build all 500 values into the where clause.
+				 */
+				var distinctObjectsArrayLength = nonConstantKeys.Select(p => p.Value.Length).ToArray().Distinct().Count();
+				Debug.Assert(distinctObjectsArrayLength == 1, "values for keys have various length.");
+				var keySize = nonConstantKeys.Length;
+				var valueLength = nonConstantKeys[0].Value.Length;
+				var maxValuePerBatch = (int)(batchSize / keySize);
+				var numOfBatches = (int)(valueLength / maxValuePerBatch);
+				var remains = valueLength % maxValuePerBatch;
+				var conditions = new string[keySize]; 
+				for(var i = 0; i < keySize; i++)
+				{
+					conditions[i] = string.Format("{0} = {{{1}}}", $"{alias}{nonConstantKeys[i].Key.DbColumnName}", i);
+				}
+				var template = String.Format("( {0} )", string.Join(" AND ", conditions));
+				for (int i = 0; i <= numOfBatches; i++)
+				{
+					var size = i == numOfBatches ? remains : maxValuePerBatch;
+					var whereConditions = new string[size];
+					var parameters = new List<SqlParameter>();
+					for (int j = 0; j < size; j++)
+					{
+						var perKeysCondition = new string[keySize];
+						for (int k = 0; k < keySize; k++)
+						{
+							var (name, parameter) = this.NewSqlParameterByPropertyName(nonConstantKeys[k].Key, parameterPrefix, j * keySize + k);
+							perKeysCondition[k] = name;
+							parameter.Value = nonConstantKeys[k].Value[j] ?? DBNull.Value;
+							parameters.Add(parameter);
+						}
+						whereConditions[j] = string.Format(template, perKeysCondition);
+					}
+					var whereConditionsJoinedInOr = new string[] { string.Format("( {0} )", string.Join(" OR ", whereConditions)) };
+					var whereCombined = string.Join(" AND ", whereConditionsJoinedInOr.Concat(constantKeys));
+					resultBuffer.Add((whereCombined, parameters.ToArray()));
+				}
+			}
+			return resultBuffer.ToArray();
 		}
 
 		public string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null)
@@ -304,11 +398,9 @@ namespace AXAXL.DbEntity.MSSql
 
 			for (int i = 0; i < columns.Length; i++)
 			{
-				SqlDbType dbType;
 				var column = columns[i];
 
-				var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
-				Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
+				SqlDbType dbType = this.GetDbType(column);
 
 				var entityProperty = Expression.Property(entity, column.PropertyName);
 				/* After introduction of RowVersion, the assignment failed because the expression doesn't accept direct assignment from byte[] to RowVersion.
@@ -343,6 +435,14 @@ namespace AXAXL.DbEntity.MSSql
 				exprBuffer.Add(conditional);
 			}
 			return exprBuffer.ToArray();
+		}
+
+		private SqlDbType GetDbType(NodeProperty column)
+		{
+			SqlDbType dbType;
+			var validDbType = Enum.TryParse<SqlDbType>(column.DbColumnType, true, out dbType);
+			Debug.Assert(validDbType == true, $"Found unknown SqlDbType '{column.DbColumnType}'");
+			return dbType;
 		}
 
 		private Func<object, dynamic> CreatePropertyValueReaderFunc(Node node, NodeProperty column)

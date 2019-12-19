@@ -24,6 +24,7 @@ namespace AXAXL.DbEntity.MSSql
 		private static readonly MethodInfo compileWhereConditionsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileWhereConditions), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly MethodInfo compileOrGroupsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileOrGroups), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly MethodInfo selectImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly MethodInfo selectByMultipleValuesImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectByMultipleValuesImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly IDictionary<string, object> emptyParameters = new Dictionary<string, object>();
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression>> emptyValueTupleOfNodeEdgeNExpression = Array.Empty<(NodeEdge, Expression)>();
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression[]>> emptyValueTupleOfNodeEdgeNExpressionGroup = Array.Empty<(NodeEdge, Expression[])>();
@@ -56,31 +57,32 @@ namespace AXAXL.DbEntity.MSSql
 							null,
 							timeoutDurationInSeconds
 							);
-/*			
- *			var aliasT0 = @"t0";
-			var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
-			var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
-			var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
-			var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
-			var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, null, null, aliasT0, -1, null);
-			var cmd = new SqlCommand(sql);
 
-			var parameterWithValue =
-				queryParameters
-					.Select(kv =>
-					{
-						var whereParameterValue = parameters[kv.Key];
-						var sqlParameter = kv.Value;
-						sqlParameter.Value = whereParameterValue ?? DBNull.Value;
-						return sqlParameter;
-					})
-					.ToArray();
-			cmd.Parameters.AddRange(parameterWithValue);
+			/* replaced original code to call SelectImplementation also. 2019-12-17			
+			 *			var aliasT0 = @"t0";
+						var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
+						var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
+						var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
+						var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
+						var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, null, null, aliasT0, -1, null);
+						var cmd = new SqlCommand(sql);
 
-			this.LogSql("Select<T> with dictionary parameters", node, cmd);
+						var parameterWithValue =
+							queryParameters
+								.Select(kv =>
+								{
+									var whereParameterValue = parameters[kv.Key];
+									var sqlParameter = kv.Value;
+									sqlParameter.Value = whereParameterValue ?? DBNull.Value;
+									return sqlParameter;
+								})
+								.ToArray();
+						cmd.Parameters.AddRange(parameterWithValue);
 
-			return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
-*/		
+						this.LogSql("Select<T> with dictionary parameters", node, cmd);
+
+						return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+			*/
 		}
 
 		public IEnumerable<T> Select<T>(
@@ -133,6 +135,52 @@ namespace AXAXL.DbEntity.MSSql
 		public IEnumerable<T> Select<T>(
 			string connectionString,
 			Node node,
+			IDictionary<string, object[]> parameters,
+			IEnumerable<Expression> additionalWhereClauses,
+			IEnumerable<Expression[]> additionalOrClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+			int timeoutDurationInSeconds = 30
+			) where T : class, new()
+		{
+			Debug.Assert(parameters != null && parameters.Count > 0);
+
+			Type typeOfAdditionalWhereClauses;
+			Type typeOfAdditionalOrClauses;
+			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
+			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
+			var enumerableOfTType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
+			var selectDelegateType = typeof(Func<,,,,,,,,,,>)
+													.MakeGenericType(
+														typeof(string),
+														typeof(Node),
+														typeof(IDictionary<string, object[]>),
+														typeOfAdditionalWhereClauses,
+														typeOfAdditionalOrClauses,
+														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression>)>),
+														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression[]>)>),
+														typeof(int),
+														typeof(ValueTuple<NodeProperty, bool>[]),
+														typeof(int),
+														enumerableOfTType
+														);
+			var delegateHandle = selectByMultipleValuesImplementationMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(selectDelegateType, this);
+			return (IEnumerable<T>)delegateHandle.DynamicInvoke(
+				connectionString,
+				node,
+				parameters,
+				restoredWhereClauses,
+				restoredOrClauses,
+				childInnerJoinWhereClauses,
+				childInnerJoinOrClausesGroup,
+				-1,
+				MSSqlDriver.emptyOrderBy,
+				timeoutDurationInSeconds
+				);
+		}
+		public IEnumerable<T> Select<T>(
+			string connectionString,
+			Node node,
 			IEnumerable<Expression<Func<T, bool>>> whereClauses,
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
@@ -146,7 +194,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		// TODO: Complete changes on retrieving all grand-children of children in one shot.
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
-		private IEnumerable<T> SelectImplementation2<T>(
+		private IEnumerable<T> SelectByMultipleValuesImplementation<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
@@ -161,17 +209,17 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			IEnumerable<T> resultSet = null;
+			List<T> resultSet = new List<T>();
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
 			int sqlParameterRunningSeq = 0;
 			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
 
 			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
-
-			var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
-			var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
-			var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
+			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, tableAlias: topLevelTableAlias);
+			//var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
+			//var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
+			//var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
 			//var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
@@ -203,44 +251,40 @@ namespace AXAXL.DbEntity.MSSql
 			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
 			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
 			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
-			var sqlCmd = this.FormatSelectStatement(
-				node,
-				select.SelectedColumns,
-				innerJoinStatement,
-				primaryWhereStatement,
-				additionalWhere.Item1,
-				additionalOr.Item1,
-				additionalWhereStatementForThisNode.Item1,
-				additionalOrStatementForThisNode.Item1,
-				additionalInnerJoinWhere.Item1,
-				additionalInnerJoinOr.Item1,
-				topLevelTableAlias,
-				maxNumOfRow,
-				orderBy
-				);
-			using (SqlCommand cmd = new SqlCommand(sqlCmd))
+
+			foreach(var eachPrimaryWhere in primaryWhereTuples)
 			{
-				var primaryParameterWithValue =
-						primaryQueryParameters
-							.Select(kv =>
-							{
-								var whereParameterValue = parameters[kv.Key];
-								var sqlParameter = kv.Value;
-								sqlParameter.Value = whereParameterValue ?? DBNull.Value;
-								return sqlParameter;
-							})
-							.ToArray();
-				cmd.Parameters.AddRange(primaryParameterWithValue);
-				this
-					.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
-					.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)
-					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinWhere.Item2)
-					.InvokeAndAddSqlParameters(cmd, additionalInnerJoinOr.Item2)
-					.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
-					.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
-					;
-				this.LogSql("SelectImplementation", node, cmd);
-				resultSet = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+				var sqlCmd = this.FormatSelectStatement(
+					node,
+					select.SelectedColumns,
+					innerJoinStatement,
+					eachPrimaryWhere.primaryWhereClause,
+					additionalWhere.Item1,
+					additionalOr.Item1,
+					additionalWhereStatementForThisNode.Item1,
+					additionalOrStatementForThisNode.Item1,
+					additionalInnerJoinWhere.Item1,
+					additionalInnerJoinOr.Item1,
+					topLevelTableAlias,
+					maxNumOfRow,
+					orderBy
+					);
+				IEnumerable<T> resultOfOneBatch = null;
+				using (SqlCommand cmd = new SqlCommand(sqlCmd))
+				{
+					cmd.Parameters.AddRange(eachPrimaryWhere.primaryWhereParameters);
+					this
+						.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalInnerJoinWhere.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalInnerJoinOr.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
+						;
+					this.LogSql("SelectImplementation", node, cmd);
+					resultOfOneBatch = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+				}
+				resultSet.AddRange(resultOfOneBatch);
 			}
 			return resultSet;
 		}
