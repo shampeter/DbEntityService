@@ -51,9 +51,21 @@ namespace AXAXL.DbEntity.Services
 
 			if (isMovingTowardsChild)
 			{
-				entities.Select(p => { 
-
-				});
+				var entityIndexes = new Dictionary<object[], int>();
+				var primaryKeyCounts = node.PrimaryKeys.Keys.Count;
+				var primaryKeyValues = node.PrimaryKeys.Keys.Select(k => new List<object>()).ToArray();
+				for (int i = 0; i < entities.Count(); i++)
+				{
+					var keyValues = node.PrimaryKeyReaders.Select(r => r.Invoke(entities.ElementAt(i))).ToArray();
+					// use primary key values as dictionary key to lookup th entity in the entity list.
+					entityIndexes[keyValues] = i;
+					// pust primary key values into a list.  For example, if the primary key is a compound key with 2 columns, c1 and c2, and there are 10 entities, en1, en2 ... en10.
+					// we are here trying to create an arry of 2 list.  First list will be of values en1.c1, en2.c1, en3.c1 ... en10.c1 and second list will be en1.c2, en2.c2 ... en10.c2.
+					for(int k = 0; k < primaryKeyCounts; k++)
+					{
+						primaryKeyValues[k].Add(keyValues[k]);
+					}
+				}
 				foreach(var edge in node.AllChildEdges())
 				{
 					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
@@ -61,25 +73,48 @@ namespace AXAXL.DbEntity.Services
 					var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == edge).Select(w => w.Item2).ToArray();
 					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
 
-					var readers = edge.ParentPrimaryKeyReaders;
+					Debug.Assert(edge.ChildNodeForeignKeys.Length >= primaryKeyCounts, "Number of foreign keys is less than that of parent's primary keys.");
 					IDictionary<string, object[]> childKeys = new Dictionary<string, object[]>();
-					int i;
-					for (i = 0; i < readers.Length && i < edge.ChildNodeForeignKeys.Length; i++)
+					int idx;
+					for (idx = 0; idx < primaryKeyCounts; idx++)
 					{
-						var values = entities.Select(e => readers[i].Invoke(e)).ToArray();
-						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, values);
+						childKeys.Add(edge.ChildNodeForeignKeys[idx].PropertyName, primaryKeyValues[idx].ToArray());
+
 					}
-					while (i < edge.ChildNodeForeignKeys.Length)
+					while (idx < edge.ChildNodeForeignKeys.Length)
 					{
-						Debug.Assert(edge.ChildNodeForeignKeys[i].IsConstant == true, $"Found foreign key {edge.ChildNodeForeignKeys[i].PropertyName} on {edge.ChildNode.Name} has no given value from parent and it's not a constant.");
-						childKeys.Add(edge.ChildNodeForeignKeys[i].PropertyName, null);
-						i++;
+						Debug.Assert(edge.ChildNodeForeignKeys[idx].IsConstant == true, $"Found foreign key {edge.ChildNodeForeignKeys[idx].PropertyName} on {edge.ChildNode.Name} has no given value from parent and it's not a constant.");
+						childKeys.Add(edge.ChildNodeForeignKeys[idx].PropertyName, null);
+						idx++;
 					}
+					var foreignKeyReaders = new Func<object, dynamic>[primaryKeyCounts];
+					Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
+					
 					var connection = this.GetConnectionString(edge.ChildNode);
 					IEnumerable<object> children = null;
-					// The result of the shorter select call can be cached as it pretty much fixed.  Thus don't want to mix these 2 calls.
+
 					children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
-					edge.ChildAddingAction(entity, children);
+					var childGroupedByForeignKeys = children.GroupBy(c => foreignKeyReaders.Select(r => r.Invoke(c)).ToArray());
+					foreach(var child in childGroupedByForeignKeys)
+					{
+						int entityIdx = -1;
+						if (entityIndexes.TryGetValue(child.Key, out entityIdx))
+						{
+							edge.ChildAddingAction(entities.ElementAt(entityIdx), child);
+							foreach(var eachChild in child)
+							{
+								edge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
+							}
+						}
+						else
+						{
+							throw new InvalidOperationException(
+								string.Format(
+								"Failed to locate parent object among list of entites by key values {0}",
+								String.Join(", ", child.Key.Select(k => k?.ToString() ?? "null"))
+								));
+						}
+					}
 
 					Parallel.ForEach(
 						children,

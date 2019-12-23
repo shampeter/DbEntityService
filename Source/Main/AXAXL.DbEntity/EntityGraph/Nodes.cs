@@ -51,6 +51,7 @@ namespace AXAXL.DbEntity.EntityGraph
 		public string DbSchemaName { get; set; }
 		public String DbConnectionName { get; set; }
 		public IDictionary<string, NodeProperty> PrimaryKeys { get; set; }
+		public Func<object, dynamic>[] PrimaryKeyReaders { get; set; }
 		public IDictionary<string, NodeProperty> DataColumns { get; set; }
 		public NodeProperty ConcurrencyControl { get; set; }
 		protected IDictionary<string, NodeEdge> EdgeToChildren { get; set; }
