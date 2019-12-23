@@ -194,7 +194,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		// TODO: Complete changes on retrieving all grand-children of children in one shot.
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
-		private IEnumerable<T> SelectByMultipleValuesImplementation<T>(
+		private ILookup<object[], T> SelectByMultipleValuesImplementation<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
@@ -216,7 +216,7 @@ namespace AXAXL.DbEntity.MSSql
 			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
 
 			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
-			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, tableAlias: topLevelTableAlias);
+			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
 			//var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
 			//var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
 			//var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);

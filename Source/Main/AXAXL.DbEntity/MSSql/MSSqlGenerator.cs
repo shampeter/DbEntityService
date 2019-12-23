@@ -221,7 +221,7 @@ namespace AXAXL.DbEntity.MSSql
 			return resultBuffer;
 		}
 		
-		public (string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, string parameterPrefix = null, string tableAlias = null, int batchSize = 1000)
+		public (string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, out NodeProperty[] groupingKeys, string parameterPrefix = null, string tableAlias = null, int batchSize = 1000)
 		{
 			Debug.Assert(keyValues != null && keyValues.Count > 0, "No key-values provided to create where clause and sql parameters.");
 			Debug.Assert(node != null);
@@ -308,6 +308,7 @@ namespace AXAXL.DbEntity.MSSql
 					resultBuffer.Add((whereCombined, parameters.ToArray()));
 				}
 			}
+			groupingKeys = nonConstantKeys.Select(kv => kv.Key).ToArray();
 			return resultBuffer.ToArray();
 		}
 
