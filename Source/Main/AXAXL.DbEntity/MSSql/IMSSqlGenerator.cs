@@ -25,10 +25,12 @@ namespace AXAXL.DbEntity.MSSql
 
 		(string SelectedColumns, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node);
 
+		(string SelectedColumns, Func<SqlDataReader, ValueTuple<object[], dynamic>> DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys);
+
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 
 		IDictionary<string, SqlParameter> CreateSqlParametersForRawSqlParameters((string Name, object Value, ParameterDirection Direction)[] parameters);
-	
+
 		string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null);
 
 		(string OutputClause, Action<SqlDataReader, dynamic> EntityUpdateAction) CreateOutputComponent(Node node, bool IsInserting = true);

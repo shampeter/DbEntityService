@@ -215,12 +215,9 @@ namespace AXAXL.DbEntity.MSSql
 			int sqlParameterRunningSeq = 0;
 			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
 
-			var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
+			//var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
 			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
-			//var primaryWhereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
-			//var primaryQueryParameters = this.sqlGenerator.CreateSqlParameters(node, primaryWhereColumns);
-			//var primaryWhereStatement = this.sqlGenerator.CreateWhereClause(node, primaryWhereColumns, tableAlias: topLevelTableAlias);
-			//var orderByClause = this.sqlGenerator.CompileOrderByClause(orderBy, topLevelTableAlias);
+			var select = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			var innerJoinMap = new InnerJoinMap();

@@ -120,6 +120,43 @@ namespace AXAXL.DbEntity.MSSql
 
 			return (selectedColumns, lambdaFunc.Compile());
 		}
+		public (string SelectedColumns, Func<SqlDataReader, ValueTuple<object[], dynamic>> DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys)
+		{
+			var tableName = this.FormatTableName(node, tableAlias);
+			var allColumns = node.AllDbColumns;
+
+			Debug.Assert(allColumns != null && allColumns.Length > 0, $"No column found to create select statement for '{node.NodeType.FullName}'");
+
+			var selectedColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
+			//var selectClause = string.Format(@"{0} FROM {1}", selectedColumns, tableName);
+
+			var exprBuffer = new List<Expression>();
+			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
+			var outputParameter1 = Expression.Variable(node.NodeType, "entity");
+			var outputParameter2 = Expression.Variable(typeof(object[]), "groupKeyValues");
+
+			// entity = new T();
+			exprBuffer.Add(
+				Expression.Assign(
+					outputParameter1,
+					Expression.New(node.NodeType)
+				)
+			);
+			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
+			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
+			//exprBuffer.AddRange(CreateSqlReaderFetchingExpressions(allColumns, inputParameter, outputParameter));
+			exprBuffer.AddRange(this.CreateSqlReaderAndGroupingKeysFetchingExpressions(allColumns, groupingKeys, inputParameter, outputParameter1, outputParameter2));
+			var returnLabel = Expression.Label(node.NodeType, "return");
+
+			exprBuffer.Add(Expression.Label(returnLabel, outputParameter1));
+
+			var exprBlock = Expression.Block(new[] { outputParameter1 }, exprBuffer.ToArray());
+			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, dynamic>>(exprBlock, inputParameter);
+
+			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
+
+			return (selectedColumns, lambdaFunc.Compile());
+		}
 		/* Archived 2019-10-26
 		 * 
 		public (string SelectClause, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node, int maxNumOfRow)
@@ -438,6 +475,86 @@ namespace AXAXL.DbEntity.MSSql
 			return exprBuffer.ToArray();
 		}
 
+		private static readonly Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
+
+		private Expression[] CreateSqlReaderAndGroupingKeysFetchingExpressions(NodeProperty[] columns, NodeProperty[] groupingKeys, ParameterExpression dataReader, Expression entity, Expression groupKeyValues)
+		{
+			List<Expression> exprBuffer = new List<Expression>();
+
+			for (int i = 0; i < columns.Length; i++)
+			{
+				var column = columns[i];
+
+				SqlDbType dbType = this.GetDbType(column);
+
+				var entityProperty = Expression.Property(entity, column.PropertyName);
+				Expression dbReaderMethod = Expression.Convert(
+					Expression.Invoke(
+						SqlTypeToReaderMap[dbType],
+						dataReader,
+						Expression.Constant(i)
+						),
+					column.PropertyType
+					);
+
+				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
+				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
+
+				var conditional = Expression.IfThenElse(
+					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+					assignmentIfDbNull,
+					assignmentIfNotDbNull
+				);
+				exprBuffer.Add(conditional);
+			}
+			for (int i = 0; i < groupingKeys.Length; i++)
+			{
+				var groupKey = groupingKeys[i];
+				SqlDbType dbType = this.GetDbType(groupKey);
+				var entityProperty = Expression.Property(entity, groupKey.PropertyName);
+				Expression dbReaderMethod = Expression.Convert(
+					Expression.Invoke(
+						SqlTypeToReaderMap[dbType],
+						dataReader,
+						Expression.Constant(i)
+						),
+					groupKey.PropertyType
+					);
+				var groupArrayCell = Expression.ArrayAccess(groupKeyValues, Expression.Constant(i));
+				var assignmentIfNotDbNull = Expression.Assign(groupArrayCell, dbReaderMethod);
+				var assignmentIfDbNull = Expression.Assign(groupArrayCell, Expression.Default(groupKey.PropertyType));
+
+				var conditional = Expression.IfThenElse(
+					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+					assignmentIfDbNull,
+					assignmentIfNotDbNull
+				);
+				exprBuffer.Add(conditional);
+			}
+			return exprBuffer.ToArray();
+		}
+
+		private Expression CreateSqlReaderAssigningValueExpression(NodeProperty[] columns, NodeProperty[] groupingKeys, ParameterExpression dataReader, Expression entity, Expression groupKeyValues)
+		{
+			Expression dbReaderMethod = Expression.Convert(
+				Expression.Invoke(
+					SqlTypeToReaderMap[dbType],
+					dataReader,
+					Expression.Constant(i)
+					),
+				column.PropertyType
+				);
+
+			var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
+			var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
+
+			var conditional = Expression.IfThenElse(
+				Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+				assignmentIfDbNull,
+				assignmentIfNotDbNull
+			);
+
+		}
 		private SqlDbType GetDbType(NodeProperty column)
 		{
 			SqlDbType dbType;
