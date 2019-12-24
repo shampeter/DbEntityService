@@ -16,7 +16,12 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		private ILogger log = null;
 		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
+		private static readonly Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
 
+		internal static ValueTuple<T1, T2> CreateValueTuple<T1, T2>() where T1 : new() where T2: new()
+		{
+			return ValueTuple.Create<T1, T2>(new T1(), new T2());
+		}
 		public MSSqlGenerator(ILoggerFactory factory)
 		{
 			this.log = factory.CreateLogger<MSSqlGenerator>();
@@ -129,23 +134,19 @@ namespace AXAXL.DbEntity.MSSql
 
 			var selectedColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
 			//var selectClause = string.Format(@"{0} FROM {1}", selectedColumns, tableName);
-
+			var tupleType = typeof(ValueTuple<,>).MakeGenericType(typeof(object[]), node.NodeType);
 			var exprBuffer = new List<Expression>();
 			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
-			var outputParameter1 = Expression.Variable(node.NodeType, "entity");
-			var outputParameter2 = Expression.Variable(typeof(object[]), "groupKeyValues");
-
-			// entity = new T();
+			var outputParameter = Expression.Variable(tupleType, "output");
+			// output = new ValueTuple<object[], T>()
 			exprBuffer.Add(
 				Expression.Assign(
-					outputParameter1,
-					Expression.New(node.NodeType)
+					outputParameter,
+					Expression.New(tupleType, 
 				)
 			);
-			// run through the column by counting because, in such way, we can be 100% sure the ordinal position of the column in SELECT clause, and thus just use
-			// dataReader.Get???(ordinal position) instead of using column name.  Using column name in dataReader.Get???() method will be slower.
-			//exprBuffer.AddRange(CreateSqlReaderFetchingExpressions(allColumns, inputParameter, outputParameter));
-			exprBuffer.AddRange(this.CreateSqlReaderAndGroupingKeysFetchingExpressions(allColumns, groupingKeys, inputParameter, outputParameter1, outputParameter2));
+
+			exprBuffer.AddRange(this.CreateSqlReaderAndGroupingKeysFetchingExpressions(allColumns, groupingKeys, inputParameter, outputParameter));
 			var returnLabel = Expression.Label(node.NodeType, "return");
 
 			exprBuffer.Add(Expression.Label(returnLabel, outputParameter1));
@@ -431,7 +432,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		private Expression[] CreateSqlReaderFetchingExpressions(NodeProperty[] columns, ParameterExpression dataReader, Expression entity)
 		{
-			Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
+		//	Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
 			List<Expression> exprBuffer = new List<Expression>();
 
 			for (int i = 0; i < columns.Length; i++)
@@ -475,9 +476,7 @@ namespace AXAXL.DbEntity.MSSql
 			return exprBuffer.ToArray();
 		}
 
-		private static readonly Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
-
-		private Expression[] CreateSqlReaderAndGroupingKeysFetchingExpressions(NodeProperty[] columns, NodeProperty[] groupingKeys, ParameterExpression dataReader, Expression entity, Expression groupKeyValues)
+		private Expression[] CreateSqlReaderAndGroupingKeysFetchingExpressions(NodeProperty[] columns, NodeProperty[] groupingKeys, ParameterExpression dataReader, Expression groupKeysEntityTuple)
 		{
 			List<Expression> exprBuffer = new List<Expression>();
 
@@ -486,7 +485,7 @@ namespace AXAXL.DbEntity.MSSql
 				var column = columns[i];
 
 				SqlDbType dbType = this.GetDbType(column);
-
+				var entity = Expression.Property(groupKeysEntityTuple, "Item2");
 				var entityProperty = Expression.Property(entity, column.PropertyName);
 				Expression dbReaderMethod = Expression.Convert(
 					Expression.Invoke(
@@ -511,6 +510,7 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				var groupKey = groupingKeys[i];
 				SqlDbType dbType = this.GetDbType(groupKey);
+				var entity = Expression.Property(groupKeysEntityTuple, "Item2");
 				var entityProperty = Expression.Property(entity, groupKey.PropertyName);
 				Expression dbReaderMethod = Expression.Convert(
 					Expression.Invoke(
@@ -520,7 +520,7 @@ namespace AXAXL.DbEntity.MSSql
 						),
 					groupKey.PropertyType
 					);
-				var groupArrayCell = Expression.ArrayAccess(groupKeyValues, Expression.Constant(i));
+				var groupArrayCell = Expression.ArrayAccess(groupKeysEntityTuple, Expression.Constant(i));
 				var assignmentIfNotDbNull = Expression.Assign(groupArrayCell, dbReaderMethod);
 				var assignmentIfDbNull = Expression.Assign(groupArrayCell, Expression.Default(groupKey.PropertyType));
 
