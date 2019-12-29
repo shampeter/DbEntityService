@@ -130,10 +130,11 @@ namespace AXAXL.DbEntity.MSSql
 
 			var selectedColumns = string.Join(", ", allColumns.Select(p => $"{tableAlias}.[{p.DbColumnName}]"));
 			//var selectClause = string.Format(@"{0} FROM {1}", selectedColumns, tableName);
-			var tupleType = typeof(ValueTuple<,>).MakeGenericType(typeof(object[]), node.NodeType);
+
+			var groupKeysEntityTupleType = typeof(ValueTuple<,>).MakeGenericType(typeof(object[]), node.NodeType);
 			var exprBuffer = new List<Expression>();
 			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
-			var outputParameter = Expression.Variable(tupleType, "output");
+			var outputParameter = Expression.Variable(groupKeysEntityTupleType, "output");
 			var newTupleExpr = this.CreateValueTupleCreationExpression(
 										new Type[]
 										{
@@ -146,22 +147,17 @@ namespace AXAXL.DbEntity.MSSql
 											Expression.New(node.NodeType)
 										});
 			// output = new ValueTuple<object[], T>()
-			exprBuffer.Add(
-				Expression.Assign(
-					outputParameter,
-					newTupleExpr
-				)
-			);
+			exprBuffer.Add(Expression.Assign(outputParameter, newTupleExpr));
 
 			exprBuffer.AddRange(this.CreateSqlReaderAndGroupingKeysFetchingExpressions(allColumns, groupingKeys, inputParameter, outputParameter));
-			var returnLabel = Expression.Label(node.NodeType, "return");
+			var returnLabel = Expression.Label(groupKeysEntityTupleType, "return");
 
-			exprBuffer.Add(Expression.Label(returnLabel, outputParameter1));
+			exprBuffer.Add(Expression.Label(returnLabel, outputParameter));
 
-			var exprBlock = Expression.Block(new[] { outputParameter1 }, exprBuffer.ToArray());
-			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, dynamic>>(exprBlock, inputParameter);
+			var exprBlock = Expression.Block(new[] { outputParameter }, exprBuffer.ToArray());
+			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, ValueTuple<object[], dynamic>>>(exprBlock, inputParameter);
 
-			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
+			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name} and grouping keys", lambdaFunc);
 
 			return (selectedColumns, lambdaFunc.Compile());
 		}
@@ -504,76 +500,51 @@ namespace AXAXL.DbEntity.MSSql
 				var column = columns[i];
 
 				SqlDbType dbType = this.GetDbType(column);
-				var entity = Expression.Property(groupKeysEntityTuple, "Item2");
-				var entityProperty = Expression.Property(entity, column.PropertyName);
-				Expression dbReaderMethod = Expression.Convert(
-					Expression.Invoke(
-						SqlTypeToReaderMap[dbType],
-						dataReader,
-						Expression.Constant(i)
-						),
-					column.PropertyType
-					);
+				var entityProperty = Expression.Property(
+										Expression.PropertyOrField(groupKeysEntityTuple, "Item2"), 
+										column.PropertyName
+										);
 
-				var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
-				var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
-
-				var conditional = Expression.IfThenElse(
-					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
-					assignmentIfDbNull,
-					assignmentIfNotDbNull
+				exprBuffer.Add(
+					this.ReadFromDataReaderAndAssignToTarget(dataReader, i, column, dbType, entityProperty)
 				);
-				exprBuffer.Add(conditional);
-			}
-			for (int i = 0; i < groupingKeys.Length; i++)
-			{
-				var groupKey = groupingKeys[i];
-				SqlDbType dbType = this.GetDbType(groupKey);
-				var entity = Expression.Property(groupKeysEntityTuple, "Item2");
-				var entityProperty = Expression.Property(entity, groupKey.PropertyName);
-				Expression dbReaderMethod = Expression.Convert(
-					Expression.Invoke(
-						SqlTypeToReaderMap[dbType],
-						dataReader,
-						Expression.Constant(i)
-						),
-					groupKey.PropertyType
+				var idx = -1;
+				if ((idx = Array.IndexOf(groupingKeys, column)) >= 0)
+				{
+					var array = Expression.ArrayAccess(
+										Expression.PropertyOrField(groupKeysEntityTuple, "Item1"),
+										Expression.Constant(idx)
+										);
+					exprBuffer.Add(
+						this.ReadFromDataReaderAndAssignToTarget(dataReader, i, column, dbType, array)
 					);
-				var groupArrayCell = Expression.ArrayAccess(groupKeysEntityTuple, Expression.Constant(i));
-				var assignmentIfNotDbNull = Expression.Assign(groupArrayCell, dbReaderMethod);
-				var assignmentIfDbNull = Expression.Assign(groupArrayCell, Expression.Default(groupKey.PropertyType));
-
-				var conditional = Expression.IfThenElse(
-					Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
-					assignmentIfDbNull,
-					assignmentIfNotDbNull
-				);
-				exprBuffer.Add(conditional);
+				}
 			}
 			return exprBuffer.ToArray();
 		}
 
-		private Expression CreateSqlReaderAssigningValueExpression(NodeProperty[] columns, NodeProperty[] groupingKeys, ParameterExpression dataReader, Expression entity, Expression groupKeyValues)
+		private Expression ReadFromDataReaderAndAssignToTarget(ParameterExpression dataReader, int columnIdx, NodeProperty column, SqlDbType dbType, Expression target)
 		{
 			Expression dbReaderMethod = Expression.Convert(
 				Expression.Invoke(
 					SqlTypeToReaderMap[dbType],
 					dataReader,
-					Expression.Constant(i)
+					Expression.Constant(columnIdx)
 					),
 				column.PropertyType
 				);
 
-			var assignmentIfNotDbNull = Expression.Assign(entityProperty, dbReaderMethod);
-			var assignmentIfDbNull = Expression.Assign(entityProperty, Expression.Default(column.PropertyType));
+			var assignmentIfNotDbNull = Expression.Assign(target, dbReaderMethod);
+			var assignmentIfDbNull = Expression.Assign(target, Expression.Default(column.PropertyType));
 
 			var conditional = Expression.IfThenElse(
-				Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(i)),
+				Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(columnIdx)),
 				assignmentIfDbNull,
 				assignmentIfNotDbNull
 			);
-
+			return conditional;
 		}
+
 		private SqlDbType GetDbType(NodeProperty column)
 		{
 			SqlDbType dbType;

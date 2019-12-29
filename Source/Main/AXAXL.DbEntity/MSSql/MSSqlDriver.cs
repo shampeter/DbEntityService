@@ -194,7 +194,7 @@ namespace AXAXL.DbEntity.MSSql
 		}
 		// TODO: Complete changes on retrieving all grand-children of children in one shot.
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
-		private ILookup<object[], T> SelectByMultipleValuesImplementation<T>(
+		private IDictionary<object[], List<T>> SelectByMultipleValuesImplementation<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
@@ -209,7 +209,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			List<T> resultSet = new List<T>();
+			var resultSet = new Dictionary<object[], List<T>>();
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
 			int sqlParameterRunningSeq = 0;
@@ -217,7 +217,7 @@ namespace AXAXL.DbEntity.MSSql
 
 			//var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
 			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
-			var select = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
+			var selectedColumnsAndReaderFunc = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			var innerJoinMap = new InnerJoinMap();
@@ -253,7 +253,7 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				var sqlCmd = this.FormatSelectStatement(
 					node,
-					select.SelectedColumns,
+					selectedColumnsAndReaderFunc.SelectedColumns,
 					innerJoinStatement,
 					eachPrimaryWhere.primaryWhereClause,
 					additionalWhere.Item1,
@@ -266,7 +266,6 @@ namespace AXAXL.DbEntity.MSSql
 					maxNumOfRow,
 					orderBy
 					);
-				IEnumerable<T> resultOfOneBatch = null;
 				using (SqlCommand cmd = new SqlCommand(sqlCmd))
 				{
 					cmd.Parameters.AddRange(eachPrimaryWhere.primaryWhereParameters);
@@ -279,9 +278,8 @@ namespace AXAXL.DbEntity.MSSql
 						.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
 						;
 					this.LogSql("SelectImplementation", node, cmd);
-					resultOfOneBatch = ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+					ExecuteQuery<T>(resultSet, connectionString, selectedColumnsAndReaderFunc.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 				}
-				resultSet.AddRange(resultOfOneBatch);
 			}
 			return resultSet;
 		}
@@ -679,6 +677,33 @@ namespace AXAXL.DbEntity.MSSql
 			}
 			return resultSet;
 		}
+
+		private void ExecuteQuery<T>(IDictionary<object[], List<T>> resultSet, string connectionString, Func<SqlDataReader, (object[], dynamic)> fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
+		{
+			using (var connection = new SqlConnection(connectionString))
+			{
+				connection.Open();
+				cmd.CommandTimeout = timeoutDurationInSeconds;
+				cmd.Connection = connection;
+				using (var reader = cmd.ExecuteReader())
+				{
+					while (reader.Read())
+					{
+						var groupKeysAndEntity = fetcher.Invoke(reader);
+						List<T> entities;
+						if (resultSet.TryGetValue(groupKeysAndEntity.Item1, out entities))
+						{
+							resultSet[groupKeysAndEntity.Item1].Add(groupKeysAndEntity.Item2);
+						}
+						else
+						{
+							resultSet.Add(groupKeysAndEntity.Item1, new List<T> { groupKeysAndEntity.Item2 });
+						}
+					}
+				}
+			}
+		}
+
 		private SqlCommand PrepareCommandFromRawSql(bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, SqlParameter> cmdParameters)
 		{
 			parameters = parameters ?? new (string, object, ParameterDirection)[0];
