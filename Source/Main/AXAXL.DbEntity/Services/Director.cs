@@ -21,8 +21,9 @@ namespace AXAXL.DbEntity.Services
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
 		private ParallelOptions ParallelRetrievalOptions { get; set; }
+		private RetrievalStrategies Strategy { get; set; }
 		//private ISet<string> PathWalked { get; set; }
-		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30)
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce)
 		{
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
@@ -32,6 +33,7 @@ namespace AXAXL.DbEntity.Services
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
 			this.ParallelRetrievalOptions = parallelRetrievalOptions;
+			this.Strategy = strategy;
 			//this.PathWalked = new HashSet<string>();
 		}
 		
@@ -91,17 +93,15 @@ namespace AXAXL.DbEntity.Services
 					Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
 					
 					var connection = this.GetConnectionString(edge.ChildNode);
-					IEnumerable<object> children = null;
-
-					children = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
-					var childGroupedByForeignKeys = children.GroupBy(c => foreignKeyReaders.Select(r => r.Invoke(c)).ToArray());
-					foreach(var child in childGroupedByForeignKeys)
+					var childrenGrpByPKeys = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
+					
+					foreach(var pKeys in childrenGrpByPKeys.Keys)
 					{
 						int entityIdx = -1;
-						if (entityIndexes.TryGetValue(child.Key, out entityIdx))
+						if (entityIndexes.TryGetValue(pKeys, out entityIdx))
 						{
-							edge.ChildAddingAction(entities.ElementAt(entityIdx), child);
-							foreach(var eachChild in child)
+							edge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
+							foreach(var eachChild in childrenGrpByPKeys[pKeys])
 							{
 								edge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
 							}
@@ -111,30 +111,42 @@ namespace AXAXL.DbEntity.Services
 							throw new InvalidOperationException(
 								string.Format(
 								"Failed to locate parent object among list of entites by key values {0}",
-								String.Join(", ", child.Key.Select(k => k?.ToString() ?? "null"))
+								String.Join(", ", pKeys.Select(k => k?.ToString() ?? "null"))
 								));
 						}
 					}
 
 					Parallel.ForEach(
-						children,
+						childrenGrpByPKeys.Values,
 						this.ParallelRetrievalOptions,
 						(eachChild) =>
 						{
-							edge.ParentSettingAction(eachChild, entity);
 							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 						});
-
-					//foreach (var eachChild in children)
-					//{
-					//	edge.ParentSettingAction(eachChild, entity);
-					//	this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-					//}
 				}
 			}
 			if (isMovingTowardsParent)
 			{
+				foreach (var entity in entities)
+				{
+					foreach (var eachChildToParent in node.AllParentEdgeNames())
+					{
+						var edge = node.GetEdgeToParent(eachChildToParent);
+						if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ParentReferenceOnChildNode)) continue;
 
+						var readers = edge.ChildForeignKeyReaders;
+						IDictionary<string, object> parentKeys = new Dictionary<string, object>();
+						for (int i = 0; i < readers.Length && i < edge.ParentNodePrimaryKeys.Length; i++)
+						{
+							parentKeys.Add(edge.ParentNodePrimaryKeys[i].PropertyName, readers[i](entity));
+						}
+						var connection = this.GetConnectionString(edge.ParentNode);
+						var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys, this.TimeoutDurationInSeconds).FirstOrDefault();
+						edge.ParentSettingAction(entity, parent);
+						edge.ChildAddingAction(parent, new[] { entity });
+						this.Build(parent, true, false, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					}
+				}
 			}
 			return entities;
 		}
@@ -192,20 +204,26 @@ namespace AXAXL.DbEntity.Services
 					}
 					edge.ChildAddingAction(entity, children);
 
-					Parallel.ForEach(
-						children,
-						this.ParallelRetrievalOptions,
-						(eachChild) =>
-						{
-							edge.ParentSettingAction(eachChild, entity);
-							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-						});
-
-					//foreach (var eachChild in children)
-					//{
-					//	edge.ParentSettingAction(eachChild, entity);
-					//	this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-					//}
+					switch(this.Strategy)
+					{
+						case RetrievalStrategies.OneEntityAtATimeInParallel:
+							Parallel.ForEach(
+								children,
+								this.ParallelRetrievalOptions,
+								(eachChild) =>
+								{
+									edge.ParentSettingAction(eachChild, entity);
+									this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+								});
+							break;
+						case RetrievalStrategies.OneEntityAtATimeInSequence:
+							foreach (var eachChild in children)
+							{
+								edge.ParentSettingAction(eachChild, entity);
+								this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+							}
+							break;
+					}
 				}
 			}
 			if (isMovingTowardsParent)

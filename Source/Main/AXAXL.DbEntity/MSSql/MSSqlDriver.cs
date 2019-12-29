@@ -132,7 +132,7 @@ namespace AXAXL.DbEntity.MSSql
 				);
 		}
 
-		public IEnumerable<T> Select<T>(
+		public IDictionary<object[], List<T>> Select<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
@@ -149,7 +149,8 @@ namespace AXAXL.DbEntity.MSSql
 			Type typeOfAdditionalOrClauses;
 			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
 			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
-			var enumerableOfTType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
+			var listOfTType = typeof(List<>).MakeGenericType(node.NodeType);
+			var dictOfObjArrayEnumOfTTypeType = typeof(IDictionary<,>).MakeGenericType(typeof(object[]), listOfTType);
 			var selectDelegateType = typeof(Func<,,,,,,,,,,>)
 													.MakeGenericType(
 														typeof(string),
@@ -162,10 +163,10 @@ namespace AXAXL.DbEntity.MSSql
 														typeof(int),
 														typeof(ValueTuple<NodeProperty, bool>[]),
 														typeof(int),
-														enumerableOfTType
+														dictOfObjArrayEnumOfTTypeType
 														);
 			var delegateHandle = selectByMultipleValuesImplementationMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(selectDelegateType, this);
-			return (IEnumerable<T>)delegateHandle.DynamicInvoke(
+			return (IDictionary<object[], List<T>>)delegateHandle.DynamicInvoke(
 				connectionString,
 				node,
 				parameters,

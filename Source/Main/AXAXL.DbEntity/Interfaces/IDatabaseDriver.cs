@@ -80,7 +80,21 @@ namespace AXAXL.DbEntity.Interfaces
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new();
-		IEnumerable<T> Select<T>(
+		/// <summary>
+		/// Select multiple entities based on <paramref name="parameters"/> where the key is a property name and value is a list of object.  This is used in
+		/// retrieving the same type of children from multiple parents at the same time which is faster than retrieving the children on multiple parents one by one.
+		/// </summary>
+		/// <typeparam name="T">Entity objec type</typeparam>
+		/// <param name="connectionString">Database connection string</param>
+		/// <param name="node">The <see cref="Node"/> representing the meta data and object-to-relational database mapping of the entity class.</param>
+		/// <param name="parameters">Dictionary of name to list of values representing the where condition, assuming AND operation on all key-value pairs.</param>
+		/// <param name="whereClauses">Additonal where clause in addition to the <paramref name="parameters"/></param>
+		/// <param name="orClausesGroup">Additional or clauses in addition to the <paramref name="parameters"/></param>
+		/// <param name="childInnerJoinWhereClauses">Inner joins to childset and children selection condition</param>
+		/// <param name="childInnerJoinOrClausesGroup">Inner joins to childset and children selection or group condition</param>
+		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
+		/// <returns>Dictionary of object grouped by the primary key values of their parents</returns>
+		IDictionary<object[], List<T>> Select<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,

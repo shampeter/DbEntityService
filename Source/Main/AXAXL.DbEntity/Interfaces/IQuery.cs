@@ -4,20 +4,28 @@ using System.Collections.Generic;
 
 namespace AXAXL.DbEntity.Interfaces
 {
+	public enum RetrievalStrategies
+	{
+		OneEntityAtATimeInParallel,
+		OneEntityAtATimeInSequence,
+		AllEntitiesAtOnce
+	}
 	public interface IQuery<T> where T: class, new()
 	{
 		/// <summary>
 		/// Execute the query and return entities found in a list.
 		/// </summary>
 		/// <param name="maxNumOfRow">Set the maximum number of rows to be returned.  If set as <= 0, returns all rows</param>
+		/// <param name="strategy">Strategy to build the entity tree.</param>
 		/// <returns>List of entities</returns>
-		IList<T> ToList(int maxNumOfRow = -1);
+		IList<T> ToList(int maxNumOfRow = -1, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce);
 		/// <summary>
 		/// Execute the query and return entities found in an array.
 		/// </summary>
 		/// <param name="maxNumOfRow">Set the maximum number of rows to be returned.  If set as <= 0, returns all rows</param>
+		/// <param name="strategy">Strategy to build the entity tree.</param>
 		/// <returns>An array of entities</returns>
-		T[] ToArray(int maxNumOfRow = -1);
+		T[] ToArray(int maxNumOfRow = -1, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce);
 		/// <summary>
 		/// Specify the where clause of the query by a Lambda expression.
 		/// </summary>
