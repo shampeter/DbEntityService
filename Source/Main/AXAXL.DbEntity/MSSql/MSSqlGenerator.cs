@@ -18,10 +18,6 @@ namespace AXAXL.DbEntity.MSSql
 		private static IQueryExtensionForSqlOperators _extensions = new QueryExtensionForSqlOperators();
 		private static readonly Expression<Func<IDataReader, int, bool>> isDbNullFunc = (r, i) => r.IsDBNull(i);
 
-		internal static ValueTuple<T1, T2> CreateValueTuple<T1, T2>() where T1 : new() where T2: new()
-		{
-			return ValueTuple.Create<T1, T2>(new T1(), new T2());
-		}
 		public MSSqlGenerator(ILoggerFactory factory)
 		{
 			this.log = factory.CreateLogger<MSSqlGenerator>();
@@ -138,11 +134,22 @@ namespace AXAXL.DbEntity.MSSql
 			var exprBuffer = new List<Expression>();
 			var inputParameter = Expression.Parameter(typeof(SqlDataReader), "dataReader");
 			var outputParameter = Expression.Variable(tupleType, "output");
+			var newTupleExpr = this.CreateValueTupleCreationExpression(
+										new Type[]
+										{
+											typeof(object[]), 
+											node.NodeType
+										}, 
+										new Expression[]
+										{ 
+											this.CreateNewArrayWithNullExpression(typeof(object), groupingKeys.Length), 
+											Expression.New(node.NodeType)
+										});
 			// output = new ValueTuple<object[], T>()
 			exprBuffer.Add(
 				Expression.Assign(
 					outputParameter,
-					Expression.New(tupleType, 
+					newTupleExpr
 				)
 			);
 
@@ -157,6 +164,18 @@ namespace AXAXL.DbEntity.MSSql
 			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name}", lambdaFunc);
 
 			return (selectedColumns, lambdaFunc.Compile());
+		}
+		private Expression CreateValueTupleCreationExpression(Type[] types, Expression[] initialValues)
+		{
+			var valueTypeCreateMethodInfo = typeof(ValueType).GetMethod("Create", types.Length, types);
+			return Expression.Call(typeof(ValueTuple), @"Create", types, initialValues);
+		}
+		private Expression CreateNewArrayWithNullExpression(Type typeOfArray, int arrayLength)
+		{
+			var nullObjExprs = new Expression[arrayLength];
+			Array.Fill(nullObjExprs, Expression.Constant(null));
+			// returning new T[]{null, null, ...}
+			return Expression.NewArrayInit(typeOfArray, nullObjExprs);
 		}
 		/* Archived 2019-10-26
 		 * 
