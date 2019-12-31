@@ -506,7 +506,7 @@ namespace AXAXL.DbEntity.MSSql
 										);
 
 				exprBuffer.Add(
-					this.ReadFromDataReaderAndAssignToTarget(dataReader, i, column, dbType, entityProperty)
+					this.ReadFromDataReaderAndAssignToTarget(dataReader, i, dbType, entityProperty, column.PropertyType)
 				);
 				var idx = -1;
 				if ((idx = Array.IndexOf(groupingKeys, column)) >= 0)
@@ -516,14 +516,14 @@ namespace AXAXL.DbEntity.MSSql
 										Expression.Constant(idx)
 										);
 					exprBuffer.Add(
-						this.ReadFromDataReaderAndAssignToTarget(dataReader, i, column, dbType, array)
+						this.ReadFromDataReaderAndAssignToTarget(dataReader, i, dbType, array, typeof(object))
 					);
 				}
 			}
 			return exprBuffer.ToArray();
 		}
 
-		private Expression ReadFromDataReaderAndAssignToTarget(ParameterExpression dataReader, int columnIdx, NodeProperty column, SqlDbType dbType, Expression target)
+		private Expression ReadFromDataReaderAndAssignToTarget(ParameterExpression dataReader, int columnIdx, SqlDbType dbType, Expression target, Type targetType)
 		{
 			Expression dbReaderMethod = Expression.Convert(
 				Expression.Invoke(
@@ -531,11 +531,11 @@ namespace AXAXL.DbEntity.MSSql
 					dataReader,
 					Expression.Constant(columnIdx)
 					),
-				column.PropertyType
+				targetType
 				);
 
 			var assignmentIfNotDbNull = Expression.Assign(target, dbReaderMethod);
-			var assignmentIfDbNull = Expression.Assign(target, Expression.Default(column.PropertyType));
+			var assignmentIfDbNull = Expression.Assign(target, Expression.Default(targetType));
 
 			var conditional = Expression.IfThenElse(
 				Expression.Invoke(isDbNullFunc, dataReader, Expression.Constant(columnIdx)),

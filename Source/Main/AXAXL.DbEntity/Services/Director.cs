@@ -53,7 +53,7 @@ namespace AXAXL.DbEntity.Services
 
 			if (isMovingTowardsChild)
 			{
-				var entityIndexes = new Dictionary<object[], int>();
+				var entityIndexes = new Dictionary<object[], int>(new ObjectArrayComparer());
 				var primaryKeyCounts = node.PrimaryKeys.Keys.Count;
 				var primaryKeyValues = node.PrimaryKeys.Keys.Select(k => new List<object>()).ToArray();
 				for (int i = 0; i < entities.Count(); i++)
