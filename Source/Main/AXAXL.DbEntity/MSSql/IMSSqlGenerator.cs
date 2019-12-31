@@ -25,7 +25,7 @@ namespace AXAXL.DbEntity.MSSql
 
 		(string SelectedColumns, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node);
 
-		(string SelectedColumns, Func<SqlDataReader, ValueTuple<object[], dynamic>> DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys);
+		(string SelectedColumns, Delegate DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys);
 
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 

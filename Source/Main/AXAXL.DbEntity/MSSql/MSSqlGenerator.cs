@@ -121,7 +121,7 @@ namespace AXAXL.DbEntity.MSSql
 
 			return (selectedColumns, lambdaFunc.Compile());
 		}
-		public (string SelectedColumns, Func<SqlDataReader, ValueTuple<object[], dynamic>> DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys)
+		public (string SelectedColumns, Delegate DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys)
 		{
 			var tableName = this.FormatTableName(node, tableAlias);
 			var allColumns = node.AllDbColumns;
@@ -155,7 +155,7 @@ namespace AXAXL.DbEntity.MSSql
 			exprBuffer.Add(Expression.Label(returnLabel, outputParameter));
 
 			var exprBlock = Expression.Block(new[] { outputParameter }, exprBuffer.ToArray());
-			var lambdaFunc = Expression.Lambda<Func<SqlDataReader, ValueTuple<object[], dynamic>>>(exprBlock, inputParameter);
+			var lambdaFunc = Expression.Lambda(exprBlock, inputParameter);
 
 			this.LogDataFetchingExpression($"Created delegate to fetch SqlReader into entity {node.Name} and grouping keys", lambdaFunc);
 

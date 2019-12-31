@@ -93,6 +93,7 @@ namespace AXAXL.DbEntity.Services
 					Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
 					
 					var connection = this.GetConnectionString(edge.ChildNode);
+					// TODO: Select<Object> won't cut.  Need to fix object as the real type.
 					var childrenGrpByPKeys = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 					
 					foreach(var pKeys in childrenGrpByPKeys.Keys)

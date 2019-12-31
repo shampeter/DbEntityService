@@ -218,7 +218,7 @@ namespace AXAXL.DbEntity.MSSql
 
 			//var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
 			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
-			var selectedColumnsAndReaderFunc = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
+			var (selectedColumns, dataReaderToEntityFunc) = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
 			var innerJoinMap = new InnerJoinMap();
@@ -254,7 +254,7 @@ namespace AXAXL.DbEntity.MSSql
 			{
 				var sqlCmd = this.FormatSelectStatement(
 					node,
-					selectedColumnsAndReaderFunc.SelectedColumns,
+					selectedColumns,
 					innerJoinStatement,
 					eachPrimaryWhere.primaryWhereClause,
 					additionalWhere.Item1,
@@ -279,7 +279,7 @@ namespace AXAXL.DbEntity.MSSql
 						.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
 						;
 					this.LogSql("SelectImplementation", node, cmd);
-					ExecuteQuery<T>(resultSet, connectionString, selectedColumnsAndReaderFunc.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+					ExecuteQuery<T>(resultSet, connectionString, dataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 				}
 			}
 			return resultSet;
@@ -679,7 +679,7 @@ namespace AXAXL.DbEntity.MSSql
 			return resultSet;
 		}
 
-		private void ExecuteQuery<T>(IDictionary<object[], List<T>> resultSet, string connectionString, Func<SqlDataReader, (object[], dynamic)> fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
+		private void ExecuteQuery<T>(IDictionary<object[], List<T>> resultSet, string connectionString, Delegate fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			using (var connection = new SqlConnection(connectionString))
 			{
@@ -690,15 +690,15 @@ namespace AXAXL.DbEntity.MSSql
 				{
 					while (reader.Read())
 					{
-						var groupKeysAndEntity = fetcher.Invoke(reader);
+						var (groupKeys, entity) = (ValueTuple<object[], T>)fetcher.DynamicInvoke(reader);
 						List<T> entities;
-						if (resultSet.TryGetValue(groupKeysAndEntity.Item1, out entities))
+						if (resultSet.TryGetValue(groupKeys, out entities))
 						{
-							resultSet[groupKeysAndEntity.Item1].Add(groupKeysAndEntity.Item2);
+							resultSet[groupKeys].Add(entity);
 						}
 						else
 						{
-							resultSet.Add(groupKeysAndEntity.Item1, new List<T> { groupKeysAndEntity.Item2 });
+							resultSet.Add(groupKeys, new List<T> { entity });
 						}
 					}
 				}
