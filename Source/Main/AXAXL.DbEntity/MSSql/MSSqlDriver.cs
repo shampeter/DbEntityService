@@ -20,11 +20,10 @@ namespace AXAXL.DbEntity.MSSql
 	{
 		private readonly ILogger log = null;
 		private readonly IMSSqlGenerator sqlGenerator = null;
-		private static readonly MethodInfo enumerableCastMethodInfo = typeof(Enumerable).GetMethod("Cast", BindingFlags.Public | BindingFlags.Static);
 		private static readonly MethodInfo compileWhereConditionsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileWhereConditions), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly MethodInfo compileOrGroupsMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(CompileOrGroups), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly MethodInfo selectImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
-		private static readonly MethodInfo selectByMultipleValuesImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectByMultipleValuesImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
+		//private static readonly MethodInfo selectByMultipleValuesImplementationMethodInfo = typeof(MSSqlDriver).GetMethod(nameof(SelectByMultipleValuesImplementation), BindingFlags.NonPublic | BindingFlags.Instance);
 		private static readonly IDictionary<string, object> emptyParameters = new Dictionary<string, object>();
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression>> emptyValueTupleOfNodeEdgeNExpression = Array.Empty<(NodeEdge, Expression)>();
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression[]>> emptyValueTupleOfNodeEdgeNExpressionGroup = Array.Empty<(NodeEdge, Expression[])>();
@@ -100,8 +99,8 @@ namespace AXAXL.DbEntity.MSSql
 
 			Type typeOfAdditionalWhereClauses;
 			Type typeOfAdditionalOrClauses;
-			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
-			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
+			var restoredWhereClauses = ExpressionHelper.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
+			var restoredOrClauses = ExpressionHelper.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
 			var enumerableOfTType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
 			var selectDelegateType = typeof(Func<,,,,,,,,,,>)
 													.MakeGenericType(
@@ -132,53 +131,146 @@ namespace AXAXL.DbEntity.MSSql
 				);
 		}
 
-		public IDictionary<object[], List<T>> Select<T>(
+		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
+		public IDictionary<object[], List<T>> MultipleSelectCombined<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
-			IEnumerable<Expression> additionalWhereClauses,
-			IEnumerable<Expression[]> additionalOrClauses,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
 			) where T : class, new()
 		{
-			Debug.Assert(parameters != null && parameters.Count > 0);
+			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			Type typeOfAdditionalWhereClauses;
-			Type typeOfAdditionalOrClauses;
-			var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
-			var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
-			var listOfTType = typeof(List<>).MakeGenericType(node.NodeType);
-			var dictOfObjArrayEnumOfTTypeType = typeof(IDictionary<,>).MakeGenericType(typeof(object[]), listOfTType);
-			var selectDelegateType = typeof(Func<,,,,,,,,,,>)
-													.MakeGenericType(
-														typeof(string),
-														typeof(Node),
-														typeof(IDictionary<string, object[]>),
-														typeOfAdditionalWhereClauses,
-														typeOfAdditionalOrClauses,
-														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression>)>),
-														typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression[]>)>),
-														typeof(int),
-														typeof(ValueTuple<NodeProperty, bool>[]),
-														typeof(int),
-														dictOfObjArrayEnumOfTTypeType
-														);
-			var delegateHandle = selectByMultipleValuesImplementationMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(selectDelegateType, this);
-			return (IDictionary<object[], List<T>>)delegateHandle.DynamicInvoke(
-				connectionString,
-				node,
-				parameters,
-				restoredWhereClauses,
-				restoredOrClauses,
-				childInnerJoinWhereClauses,
-				childInnerJoinOrClausesGroup,
-				-1,
-				MSSqlDriver.emptyOrderBy,
-				timeoutDurationInSeconds
-				);
+			var resultSet = new Dictionary<object[], List<T>>();
+			var tablePrefix = @"t";
+			var tableAliasFirstIdx = 0;
+			int sqlParameterRunningSeq = 0;
+			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
+
+			//var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
+			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
+			var (selectedColumns, dataReaderToEntityFunc) = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
+
+			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
+			var innerJoinMap = new InnerJoinMap();
+			var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
+			var additionalWhere = this.CompileWhereConditions<T>(node, whereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
+			var additionalOr = this.CompileOrGroups<T>(node, orClausesGroup, tablePrefix, rootMapKey, additionalWhere.Item3, innerJoinMap);
+			//var (innerJoinWhereStatements, innerJoinSqlParameters) = this.CompileInnerJoinWhere(node, rootMapKey, childInnerJoinWhereClauses, tablePrefix, innerJoinMap);
+
+			// Find the Inner Joins with the parent at the edge at the head of path the same as current node.
+			// Extract those inner join. Add those path into inner join map to create inner join statement later.
+			// Also Compile the where clause attached to the child node of the edge at the end of the path into where statement and parameters.
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhereForThisNode;
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOrForThisNode;
+			IEnumerable<Expression> additionalWhereForThisNode;
+			IEnumerable<Expression[]> additionalOrForThisNode;
+			var innerJoinWhereFound = this.MatchEdgeToInnerJoinPaths<Expression>(node, childInnerJoinWhereClauses, out innerJoinWhereForThisNode, out additionalWhereForThisNode);
+			var innerJoinOrFound = this.MatchEdgeToInnerJoinPaths<Expression[]>(node, childInnerJoinOrClausesGroup, out innerJoinOrForThisNode, out additionalOrForThisNode);
+			var additionalInnerJoinWhere = this.CompileChildInnerJoinWhere(innerJoinWhereForThisNode, tablePrefix, additionalOr.Item3, innerJoinMap);
+			var additionalInnerJoinOr = this.CompileChildInnerJoinOrGroup(innerJoinOrForThisNode, tablePrefix, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalWhereStatementForThisNode = this.CompileWhereConditionsFromExpressions(node, additionalWhereForThisNode, tablePrefix, rootMapKey, additionalInnerJoinWhere.Item3, innerJoinMap);
+			var additionalOrStatementForThisNode = this.CompileOrGroupsFromExpression(node, additionalOrForThisNode, tablePrefix, rootMapKey, additionalWhereStatementForThisNode.Item3, innerJoinMap);
+
+			// Completed inner join work.  Remove the top edge from the path worked on, so that when stepping down the entity graph, the children along the path will create the same 
+			// inner join conditions.
+			this.RemovedVisited<Expression>(childInnerJoinWhereClauses, innerJoinWhereFound);
+			this.RemovedVisited<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
+
+			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
+			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
+			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
+
+			foreach (var eachPrimaryWhere in primaryWhereTuples)
+			{
+				var sqlCmd = this.FormatSelectStatement(
+					node,
+					selectedColumns,
+					innerJoinStatement,
+					eachPrimaryWhere.primaryWhereClause,
+					additionalWhere.Item1,
+					additionalOr.Item1,
+					additionalWhereStatementForThisNode.Item1,
+					additionalOrStatementForThisNode.Item1,
+					additionalInnerJoinWhere.Item1,
+					additionalInnerJoinOr.Item1,
+					topLevelTableAlias,
+					-1,
+					null
+					);
+				using (SqlCommand cmd = new SqlCommand(sqlCmd))
+				{
+					cmd.Parameters.AddRange(eachPrimaryWhere.primaryWhereParameters);
+					this
+						.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalInnerJoinWhere.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalInnerJoinOr.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
+						.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
+						;
+					this.LogSql("SelectImplementation", node, cmd);
+					ExecuteQuery<T>(resultSet, connectionString, dataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
+				}
+			}
+			return resultSet;
 		}
+
+		/*		Replaced with actual implementation instead of going through creating delegate.  Implementation was used only once by this and the caller
+		 *		need to called via delegate instead of injecting the correct entity type.  Thus no need to create delegate here.
+		 *		
+		 *		public IDictionary<object[], List<T>> Select<T>(
+					string connectionString,
+					Node node,
+					IDictionary<string, object[]> parameters,
+					IEnumerable<Expression> additionalWhereClauses,
+					IEnumerable<Expression[]> additionalOrClauses,
+					IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
+					IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
+					int timeoutDurationInSeconds = 30
+					) where T : class, new()
+				{
+					Debug.Assert(parameters != null && parameters.Count > 0);
+
+					Type typeOfAdditionalWhereClauses;
+					Type typeOfAdditionalOrClauses;
+					var restoredWhereClauses = this.RestoreWhereClause(node, additionalWhereClauses, out typeOfAdditionalWhereClauses);
+					var restoredOrClauses = this.RestoreOrClauses(node, additionalOrClauses, out typeOfAdditionalOrClauses);
+					var listOfTType = typeof(List<>).MakeGenericType(node.NodeType);
+					var dictOfObjArrayEnumOfTTypeType = typeof(IDictionary<,>).MakeGenericType(typeof(object[]), listOfTType);
+					var selectDelegateType = typeof(Func<,,,,,,,,,,>)
+															.MakeGenericType(
+																typeof(string),
+																typeof(Node),
+																typeof(IDictionary<string, object[]>),
+																typeOfAdditionalWhereClauses,
+																typeOfAdditionalOrClauses,
+																typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression>)>),
+																typeof(IList<(IList<NodeEdge>, Node, IEnumerable<Expression[]>)>),
+																typeof(int),
+																typeof(ValueTuple<NodeProperty, bool>[]),
+																typeof(int),
+																dictOfObjArrayEnumOfTTypeType
+																);
+					var delegateHandle = selectByMultipleValuesImplementationMethodInfo.MakeGenericMethod(node.NodeType).CreateDelegate(selectDelegateType, this);
+					return (IDictionary<object[], List<T>>)delegateHandle.DynamicInvoke(
+						connectionString,
+						node,
+						parameters,
+						restoredWhereClauses,
+						restoredOrClauses,
+						childInnerJoinWhereClauses,
+						childInnerJoinOrClausesGroup,
+						-1,
+						MSSqlDriver.emptyOrderBy,
+						timeoutDurationInSeconds
+						);
+				}
+		*/
 		public IEnumerable<T> Select<T>(
 			string connectionString,
 			Node node,
@@ -193,8 +285,9 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			return this.SelectImplementation<T>(connectionString, node, MSSqlDriver.emptyParameters, whereClauses, orClausesGroup, childInnerJoinWhereClauses, childInnerJoinOrClausesGroup, maxNumOfRow, orderBy, timeoutDurationInSeconds);
 		}
-		// TODO: Complete changes on retrieving all grand-children of children in one shot.
-		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
+
+/*		
+ *		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
 		private IDictionary<object[], List<T>> SelectByMultipleValuesImplementation<T>(
 			string connectionString,
 			Node node,
@@ -284,7 +377,7 @@ namespace AXAXL.DbEntity.MSSql
 			}
 			return resultSet;
 		}
-
+*/
 		[SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "SQL generated are using SQL parameters for user input.")]
 		private IEnumerable<T> SelectImplementation<T>(
 			string connectionString,
@@ -459,43 +552,7 @@ namespace AXAXL.DbEntity.MSSql
 			}
 			return this;
 		}
-		/// <summary>
-		/// Restore IEnumerable of Expression to IEnumerable of Expression&lt;Func&lt;T, bool&gt;&gt;.
-		/// </summary>
-		/// <param name="node">Type of this node will be the type of the delegate to be restored.</param>
-		/// <param name="whereClauses">list of expression</param>
-		/// <param name="restoredType">type of the original expression</param>
-		/// <returns>Restored expression of the right type</returns>
-		private object RestoreWhereClause(Node node, IEnumerable<Expression> whereClauses, out Type restoredType)
-		{
-			var originalWhereClauseType = typeof(Func<,>).MakeGenericType(node.NodeType, typeof(bool));
-			var originalWhereExprType = typeof(Expression<>).MakeGenericType(originalWhereClauseType);
-			restoredType = typeof(IEnumerable<>).MakeGenericType(originalWhereExprType);
-			var typeCastDelegateType = typeof(Func<,>).MakeGenericType(whereClauses.GetType(), restoredType);
-			var typeCastDeleage = enumerableCastMethodInfo
-									.MakeGenericMethod(originalWhereExprType)
-									.CreateDelegate(typeCastDelegateType);
-			return typeCastDeleage.DynamicInvoke(whereClauses);
-		}
-		/// <summary>
-		/// Restore IEnumerable of Expression[] to IEnumerable of Expression&lt;Func&lt;T, bool&gt;&gt;[].
-		/// </summary>
-		/// <param name="node">Type of this node will be the type of the delegate to be restored.</param>
-		/// <param name="orClauses">list of expression[]</param>
-		/// <param name="restoredType">type of the original expression</param>
-		/// <returns>Restored expression of the right type</returns>
-		private object RestoreOrClauses(Node node, IEnumerable<Expression[]> orClauses, out Type restoredType)
-		{
-			var originalWhereClauseType = typeof(Func<,>).MakeGenericType(node.NodeType, typeof(bool));
-			var originalWhereExprType = typeof(Expression<>).MakeGenericType(originalWhereClauseType);
-			var originalOrExprArrayType = originalWhereExprType.MakeArrayType();
-			restoredType = typeof(IEnumerable<>).MakeGenericType(originalOrExprArrayType);
-			var typeCastDelegateType = typeof(Func<,>).MakeGenericType(orClauses.GetType(), restoredType);
-			var typeCastDeleage = enumerableCastMethodInfo
-									.MakeGenericMethod(originalOrExprArrayType)
-									.CreateDelegate(typeCastDelegateType);
-			return typeCastDeleage.DynamicInvoke(orClauses);
-		}
+
 		/// <summary>
 		/// Construct delegate of <seealso cref="CompileWhereConditions{TEntity}"/>
 		/// with the right type for its generic type parameter.
@@ -579,7 +636,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			(string, List<Func<SqlParameter>>, int) compilationResult;
 			Type restoredWhereClausesType;
-			var restoredWhereClauses = this.RestoreWhereClause(node, whereClauses, out restoredWhereClausesType);
+			var restoredWhereClauses = ExpressionHelper.RestoreWhereClause(node, whereClauses, out restoredWhereClausesType);
 			var compileDelegate = this.MakeCompileWhereWithRightType(node, restoredWhereClausesType);
 			compilationResult = (ValueTuple<string, List<Func<SqlParameter>>, int>)compileDelegate.DynamicInvoke(node, restoredWhereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
 			return compilationResult;
@@ -635,7 +692,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			(string, List<Func<SqlParameter>>, int) compilationResult;
 			Type restoredOrGroupType;
-			var restoredOrGroupClause = this.RestoreOrClauses(node, orGroupExpression, out restoredOrGroupType);
+			var restoredOrGroupClause = ExpressionHelper.RestoreOrClauses(node, orGroupExpression, out restoredOrGroupType);
 			var compileDelegate = this.MakeCompileOrWithRightType(node, restoredOrGroupType);
 			compilationResult = (ValueTuple<string, List<Func<SqlParameter>>, int>)compileDelegate.DynamicInvoke(node, restoredOrGroupClause, tablePrefix, rootMapKey, runningSqlParameterSeq, innerJoinMap);
 			return compilationResult;

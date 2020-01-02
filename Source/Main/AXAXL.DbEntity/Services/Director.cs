@@ -94,7 +94,7 @@ namespace AXAXL.DbEntity.Services
 					
 					var connection = this.GetConnectionString(edge.ChildNode);
 					// TODO: Select<Object> won't cut.  Need to fix object as the real type.
-					var childrenGrpByPKeys = this.Driver.Select<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
+					var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 					
 					foreach(var pKeys in childrenGrpByPKeys.Keys)
 					{
@@ -150,6 +150,52 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 			return entities;
+		}
+
+		private void BuildAllChildrenInOneGo(
+			IDictionary<object[], int> entityIndexes,
+			IEnumerable<T> entities,
+			NodeEdge edge,
+			Node node, 
+			IDictionary<string, object[]> childKeys, 
+			Expression[] additionalWhereClause, 
+			List<Expression[]> additionalOrClauses, 
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			)
+		{
+			var connection = this.GetConnectionString(node);
+			// TODO: Select<Object> won't cut.  Need to fix object as the real type.
+			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<object>(connection, node, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
+
+			foreach (var pKeys in childrenGrpByPKeys.Keys)
+			{
+				int entityIdx = -1;
+				if (entityIndexes.TryGetValue(pKeys, out entityIdx))
+				{
+					edge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
+					foreach (var eachChild in childrenGrpByPKeys[pKeys])
+					{
+						edge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
+					}
+				}
+				else
+				{
+					throw new InvalidOperationException(
+						string.Format(
+						"Failed to locate parent object among list of entites by key values {0}",
+						String.Join(", ", pKeys.Select(k => k?.ToString() ?? "null"))
+						));
+				}
+			}
+
+			Parallel.ForEach(
+				childrenGrpByPKeys.Values,
+				this.ParallelRetrievalOptions,
+				(eachChild) =>
+				{
+					this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+				});
 		}
 
 		public T Build<T>(

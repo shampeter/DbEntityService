@@ -94,12 +94,12 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="childInnerJoinOrClausesGroup">Inner joins to childset and children selection or group condition</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
 		/// <returns>Dictionary of object grouped by the primary key values of their parents</returns>
-		IDictionary<object[], List<T>> Select<T>(
+		IDictionary<object[], List<T>> MultipleSelectCombined<T>(
 			string connectionString,
 			Node node,
 			IDictionary<string, object[]> parameters,
-			IEnumerable<Expression> whereClauses,
-			IEnumerable<Expression[]> orClausesGroup,
+			IEnumerable<Expression<Func<T, bool>>> whereClauses,
+			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
 			int timeoutDurationInSeconds = 30
