@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace AXAXL.DbEntity.Services
+namespace AXAXL.DbEntity.Interfaces
 {
 	public class ObjectArrayComparer : IEqualityComparer<object[]>
 	{

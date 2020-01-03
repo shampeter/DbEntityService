@@ -329,21 +329,15 @@ namespace AXAXL.DbEntity.UnitTests
 					l.CededContract.CedantCompany.CompanyName == @"Travellers")
 				);
 			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
-			var layerTDocs = new Dictionary<int, string[]>{
-				{ 1, new[] { "contract_file_1.txt", "layer_file_1.txt", "layer_file_2.txt" } },
-				{ 2, new[] { "contract_file_2.txt" } }
-				};
+			var layer1TDocs = new string[] { "layer_file_1.txt", "layer_file_2.txt" };
 			// Query starts from Layer level, so the query should not retrieve any childset from contract (parent of layer). So T-Doc on contract should be empty.
 			Assert.IsTrue(resultSet1.Select(l => l.CededContract).All(c => c.CededContractDocs.Count() == 0));
 			// Layer of pkey 3, 4, 5 has no t-doc.
-			Assert.IsTrue(resultSet1.Where(l => l.CededContractLayerPkey >= 3 && l.CededContractLayerPkey <= 5).Sum(l => l.CededContractLayerDocs.Count()) == 0);
+			Assert.IsTrue(resultSet1.Where(l => l.CededContractLayerPkey >= 2 && l.CededContractLayerPkey <= 5).Sum(l => l.CededContractLayerDocs.Count()) == 0);
 			// Layer of pkey 1 has 3 t-doc and layer of pkey 2 has 1 t-doc
 			var layer1TDocName = resultSet1.Single(l => l.CededContractLayerPkey == 1).CededContractLayerDocs.Select(d => d.Filename).ToArray();
-			var layer2TDocName = resultSet1.Single(l => l.CededContractLayerPkey == 2).CededContractLayerDocs.Select(d => d.Filename).ToArray();
-			Assert.IsTrue(layer1TDocName.Length == layerTDocs[1].Length);
-			Assert.IsTrue(layer1TDocName.Intersect(layerTDocs[1]).Count() == 3);
-			Assert.IsTrue(layer2TDocName.Length == layerTDocs[2].Length);
-			Assert.IsTrue(layer1TDocName.Intersect(layerTDocs[2]).Count() == 1);
+			Assert.IsTrue(layer1TDocName.Length == layer1TDocs.Length);
+			Assert.IsTrue(layer1TDocName.Intersect(layer1TDocs).Count() == 2);
 
 			var cedents = new[] { "State Farm", "Travellers" };
 			var resultSet2 = _dbService

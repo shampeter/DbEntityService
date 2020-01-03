@@ -145,7 +145,7 @@ namespace AXAXL.DbEntity.MSSql
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
 
-			var resultSet = new Dictionary<object[], List<T>>();
+			var resultSet = new Dictionary<object[], List<T>>(new ObjectArrayComparer());
 			var tablePrefix = @"t";
 			var tableAliasFirstIdx = 0;
 			int sqlParameterRunningSeq = 0;
@@ -748,10 +748,9 @@ namespace AXAXL.DbEntity.MSSql
 					while (reader.Read())
 					{
 						var (groupKeys, entity) = (ValueTuple<object[], T>)fetcher.DynamicInvoke(reader);
-						List<T> entities;
-						if (resultSet.TryGetValue(groupKeys, out entities))
+						if (resultSet.TryGetValue(groupKeys, out List<T> entities))
 						{
-							resultSet[groupKeys].Add(entity);
+							entities.Add(entity);
 						}
 						else
 						{

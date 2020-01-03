@@ -360,8 +360,9 @@ namespace AXAXL.DbEntity.Benchmarks
 					.ToList();
 			return resultSet.Count;
 		}
-		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM")]
-		public int QueryByEntityWithoutVM()
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM without Optimization")]
+		public int QueryByEntityWithoutVMWithNoOptimization()
 		{
 			var query = this.DbService
 						.Query<Event>()
@@ -370,7 +371,37 @@ namespace AXAXL.DbEntity.Benchmarks
 						.OrderBy(e => e.Description)
 						;
 
-			var eventList = query.ToList();
+			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInSequence);
+
+			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM with Optimization 1")]
+		public int QueryByEntityWithoutVMWithOptimization1()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInParallel);
+
+			return eventList.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM with Optimization 2")]
+		public int QueryByEntityWithoutVMWithOptimization2()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList(strategy: RetrievalStrategies.AllEntitiesAtOnce);
 
 			return eventList.Count;
 		}
