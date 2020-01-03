@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ namespace AXAXL.DbEntity.Services
 {
 	public class Director
 	{
+		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
+
 		private IDatabaseDriver Driver { get; set; }
 		private INodeMap NodeMap { get; set; }
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
@@ -89,11 +92,45 @@ namespace AXAXL.DbEntity.Services
 						childKeys.Add(edge.ChildNodeForeignKeys[idx].PropertyName, null);
 						idx++;
 					}
-					var foreignKeyReaders = new Func<object, dynamic>[primaryKeyCounts];
-					Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
-					
-					var connection = this.GetConnectionString(edge.ChildNode);
-					// TODO: Select<Object> won't cut.  Need to fix object as the real type.
+					//var foreignKeyReaders = new Func<object, dynamic>[primaryKeyCounts];
+					//Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
+
+					Type restoredWhereType;
+					Type restoredOrGrpType;
+					var additionalWhere = ExpressionHelper.RestoreWhereClause(edge.ChildNode, additionalWhereClause, out restoredWhereType);
+					var additionalOr = ExpressionHelper.RestoreOrClauses(edge.ChildNode, additionalOrClauses, out restoredOrGrpType);
+					var parentEnumType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
+					var actionType = typeof(Action<,,,,,,,,,,>).MakeGenericType(
+						typeof(IDictionary<object[], int>),
+						parentEnumType,
+						typeof(NodeEdge),
+						typeof(Node),
+						typeof(IDictionary<string, object[]>),
+						restoredWhereType,
+						restoredOrGrpType,
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]> >),
+						typeof(IList < (IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+						typeof(IList < (IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+						);
+					Director.buildAllChildrenInOneGoMethodInfo
+						.MakeGenericMethod(node.NodeType, edge.ChildNode.NodeType)
+						.CreateDelegate(actionType, this)
+						.DynamicInvoke(
+							entityIndexes,
+							entities,
+							edge,
+							edge.ChildNode,
+							childKeys,
+							additionalWhere,
+							additionalOr,
+							childWhereClauses,
+							childOrClausesGroup,
+							innerJoinWhere,
+							innerJoinOr
+						);
+/*					
+ *					var connection = this.GetConnectionString(edge.ChildNode);
 					var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 					
 					foreach(var pKeys in childrenGrpByPKeys.Keys)
@@ -116,7 +153,7 @@ namespace AXAXL.DbEntity.Services
 								));
 						}
 					}
-
+					// ToDo.  this looks wrong!
 					Parallel.ForEach(
 						childrenGrpByPKeys.Values,
 						this.ParallelRetrievalOptions,
@@ -124,6 +161,7 @@ namespace AXAXL.DbEntity.Services
 						{
 							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 						});
+*/
 				}
 			}
 			if (isMovingTowardsParent)
@@ -152,31 +190,33 @@ namespace AXAXL.DbEntity.Services
 			return entities;
 		}
 
-		private void BuildAllChildrenInOneGo(
+		private void BuildAllChildrenInOneGo<TParent, TChild>(
 			IDictionary<object[], int> entityIndexes,
-			IEnumerable<T> entities,
-			NodeEdge edge,
-			Node node, 
-			IDictionary<string, object[]> childKeys, 
-			Expression[] additionalWhereClause, 
-			List<Expression[]> additionalOrClauses, 
+			IEnumerable<TParent> entities,
+			NodeEdge parentToChildEdge,
+			Node childNode, 
+			IDictionary<string, object[]> childKeys,
+			IEnumerable<Expression<Func<TChild, bool>>> additionalWhereClause,
+			IEnumerable<Expression<Func<TChild, bool>>[]> additionalOrClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
-			)
+			) where TChild : class, new()
 		{
-			var connection = this.GetConnectionString(node);
+			var connection = this.GetConnectionString(childNode);
 			// TODO: Select<Object> won't cut.  Need to fix object as the real type.
-			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<object>(connection, node, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
+			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<TChild>(connection, childNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
 
 			foreach (var pKeys in childrenGrpByPKeys.Keys)
 			{
 				int entityIdx = -1;
 				if (entityIndexes.TryGetValue(pKeys, out entityIdx))
 				{
-					edge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
+					parentToChildEdge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
 					foreach (var eachChild in childrenGrpByPKeys[pKeys])
 					{
-						edge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
+						parentToChildEdge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
 					}
 				}
 				else
@@ -189,13 +229,7 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			Parallel.ForEach(
-				childrenGrpByPKeys.Values,
-				this.ParallelRetrievalOptions,
-				(eachChild) =>
-				{
-					this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-				});
+			this.Build<TChild>(childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
 		public T Build<T>(

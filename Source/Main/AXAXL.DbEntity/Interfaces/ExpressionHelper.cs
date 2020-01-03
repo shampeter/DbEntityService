@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using AXAXL.DbEntity.EntityGraph;
 
-namespace AXAXL.DbEntity.MSSql
+namespace AXAXL.DbEntity.Interfaces
 {
 	internal class ExpressionHelper
 	{

@@ -299,7 +299,7 @@ namespace AXAXL.DbEntity.MSSql
 				Debug.Assert(nonConstantKeys[0].Value != null && nonConstantKeys[0].Value.Length > 0, "There is no value for this column in where clause");
 				var property = nonConstantKeys[0].Key;
 				var values = nonConstantKeys[0].Value;
-				var template = values.Length == 1 ? $"{alias}{property.DbColumnName} = {0}" : $"{alias}{property.DbColumnName} in ({0})";
+				var template = values.Length == 1 ? $"{alias}{property.DbColumnName} = {{0}}" : $"{alias}{property.DbColumnName} in ({{0}})";
 				var numOfBatches = (int)(values.Length / batchSize);
 				var remains = values.Length % batchSize;
 				for(int i = 0; i <= numOfBatches; i++)

@@ -213,7 +213,7 @@ namespace AXAXL.DbEntity.MSSql
 						.InvokeAndAddSqlParameters(cmd, additionalWhereStatementForThisNode.Item2)
 						.InvokeAndAddSqlParameters(cmd, additionalOrStatementForThisNode.Item2)
 						;
-					this.LogSql("SelectImplementation", node, cmd);
+					this.LogSql("MultipleSelectCombined", node, cmd);
 					ExecuteQuery<T>(resultSet, connectionString, dataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
 				}
 			}
