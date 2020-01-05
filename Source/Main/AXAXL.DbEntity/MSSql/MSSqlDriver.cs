@@ -56,32 +56,6 @@ namespace AXAXL.DbEntity.MSSql
 							null,
 							timeoutDurationInSeconds
 							);
-
-			/* replaced original code to call SelectImplementation also. 2019-12-17			
-			 *			var aliasT0 = @"t0";
-						var select = this.sqlGenerator.CreateSelectComponent(@"t0", node);
-						var whereColumns = this.sqlGenerator.ExtractColumnByPropertyName(node, parameters.Keys.ToArray());
-						var queryParameters = this.sqlGenerator.CreateSqlParameters(node, whereColumns);
-						var whereClause = this.sqlGenerator.CreateWhereClause(node, whereColumns, tableAlias: aliasT0);
-						var sql = this.FormatSelectStatement(node, select.SelectedColumns, null, whereClause, null, null, null, null, null, null, aliasT0, -1, null);
-						var cmd = new SqlCommand(sql);
-
-						var parameterWithValue =
-							queryParameters
-								.Select(kv =>
-								{
-									var whereParameterValue = parameters[kv.Key];
-									var sqlParameter = kv.Value;
-									sqlParameter.Value = whereParameterValue ?? DBNull.Value;
-									return sqlParameter;
-								})
-								.ToArray();
-						cmd.Parameters.AddRange(parameterWithValue);
-
-						this.LogSql("Select<T> with dictionary parameters", node, cmd);
-
-						return this.ExecuteQuery<T>(connectionString, select.DataReaderToEntityFunc, cmd, timeoutDurationInSeconds);
-			*/
 		}
 
 		public IEnumerable<T> Select<T>(

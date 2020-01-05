@@ -15,7 +15,7 @@ namespace AXAXL.DbEntity.Services
 	public class Director
 	{
 		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
-
+		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
 		private IDatabaseDriver Driver { get; set; }
 		private INodeMap NodeMap { get; set; }
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
@@ -41,6 +41,7 @@ namespace AXAXL.DbEntity.Services
 		}
 		
 		public IEnumerable<T> Build<T>(
+			ISet<NodeEdge> walkedPath,
 			IEnumerable<T> entities,
 			bool isMovingTowardsParent,
 			bool isMovingTowardsChild,
@@ -52,7 +53,7 @@ namespace AXAXL.DbEntity.Services
 		{
 			if (entities == null || entities.Count() <= 0) return entities;
 
-			Node node = this.NodeMap.GetNode(entities.FirstOrDefault()?.GetType());
+			Node node = this.NodeMap.GetNode(entities.FirstOrDefault()?.GetType() ?? typeof(T));
 
 			if (isMovingTowardsChild)
 			{
@@ -61,6 +62,7 @@ namespace AXAXL.DbEntity.Services
 				var primaryKeyValues = node.PrimaryKeys.Keys.Select(k => new List<object>()).ToArray();
 				for (int i = 0; i < entities.Count(); i++)
 				{
+					// read primary key values for each entity into an object array.
 					var keyValues = node.PrimaryKeyReaders.Select(r => r.Invoke(entities.ElementAt(i))).ToArray();
 					// use primary key values as dictionary key to lookup th entity in the entity list.
 					entityIndexes[keyValues] = i;
@@ -73,126 +75,192 @@ namespace AXAXL.DbEntity.Services
 				}
 				foreach(var edge in node.AllChildEdges())
 				{
-					if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode)) continue;
-
-					var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == edge).Select(w => w.Item2).ToArray();
-					var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == edge).Select(o => o.Item2).ToList();
-
-					Debug.Assert(edge.ChildNodeForeignKeys.Length >= primaryKeyCounts, "Number of foreign keys is less than that of parent's primary keys.");
-					IDictionary<string, object[]> childKeys = new Dictionary<string, object[]>();
-					int idx;
-					for (idx = 0; idx < primaryKeyCounts; idx++)
+					if (
+						(this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode))
+						||
+						walkedPath.Contains(edge)
+					)
 					{
-						childKeys.Add(edge.ChildNodeForeignKeys[idx].PropertyName, primaryKeyValues[idx].ToArray());
-
+						continue;
 					}
-					while (idx < edge.ChildNodeForeignKeys.Length)
+					else
 					{
-						Debug.Assert(edge.ChildNodeForeignKeys[idx].IsConstant == true, $"Found foreign key {edge.ChildNodeForeignKeys[idx].PropertyName} on {edge.ChildNode.Name} has no given value from parent and it's not a constant.");
-						childKeys.Add(edge.ChildNodeForeignKeys[idx].PropertyName, null);
-						idx++;
+						walkedPath.Add(edge);
 					}
-					//var foreignKeyReaders = new Func<object, dynamic>[primaryKeyCounts];
-					//Array.Copy(edge.ChildForeignKeyReaders, 0, foreignKeyReaders, 0, primaryKeyCounts);
-
-					Type restoredWhereType;
-					Type restoredOrGrpType;
-					var additionalWhere = ExpressionHelper.RestoreWhereClause(edge.ChildNode, additionalWhereClause, out restoredWhereType);
-					var additionalOr = ExpressionHelper.RestoreOrClauses(edge.ChildNode, additionalOrClauses, out restoredOrGrpType);
-					var parentEnumType = typeof(IEnumerable<>).MakeGenericType(node.NodeType);
-					var actionType = typeof(Action<,,,,,,,,,,>).MakeGenericType(
-						typeof(IDictionary<object[], int>),
-						parentEnumType,
-						typeof(NodeEdge),
-						typeof(Node),
-						typeof(IDictionary<string, object[]>),
-						restoredWhereType,
-						restoredOrGrpType,
-						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
-						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]> >),
-						typeof(IList < (IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
-						typeof(IList < (IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
-						);
-					Director.buildAllChildrenInOneGoMethodInfo
-						.MakeGenericMethod(node.NodeType, edge.ChildNode.NodeType)
-						.CreateDelegate(actionType, this)
-						.DynamicInvoke(
-							entityIndexes,
-							entities,
-							edge,
-							edge.ChildNode,
-							childKeys,
-							additionalWhere,
-							additionalOr,
-							childWhereClauses,
-							childOrClausesGroup,
-							innerJoinWhere,
-							innerJoinOr
-						);
-/*					
- *					var connection = this.GetConnectionString(edge.ChildNode);
-					var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<object>(connection, edge.ChildNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
-					
-					foreach(var pKeys in childrenGrpByPKeys.Keys)
-					{
-						int entityIdx = -1;
-						if (entityIndexes.TryGetValue(pKeys, out entityIdx))
-						{
-							edge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
-							foreach(var eachChild in childrenGrpByPKeys[pKeys])
-							{
-								edge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
-							}
-						}
-						else
-						{
-							throw new InvalidOperationException(
-								string.Format(
-								"Failed to locate parent object among list of entites by key values {0}",
-								String.Join(", ", pKeys.Select(k => k?.ToString() ?? "null"))
-								));
-						}
-					}
-					// ToDo.  this looks wrong!
-					Parallel.ForEach(
-						childrenGrpByPKeys.Values,
-						this.ParallelRetrievalOptions,
-						(eachChild) =>
-						{
-							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-						});
-*/
+					this.BuildByOneChildEdge<T>(walkedPath, entityIndexes, entities, node, primaryKeyCounts, primaryKeyValues, edge, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 				}
 			}
 			if (isMovingTowardsParent)
 			{
-				foreach (var entity in entities)
+				// TODO: Walked path need to be the full path not the last mile otherwise some path might be skipped. For example.
+				// After getting ceded company's company type, xl company's company type will be skipped because the edige company->company-type has been walked
+				// when getting ceded company's company type.
+				foreach (var edge in node.AllParentEdges())
 				{
-					foreach (var eachChildToParent in node.AllParentEdgeNames())
+					if (
+						(this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ParentReferenceOnChildNode))
+						|| 
+						walkedPath.Contains(edge)
+					)
 					{
-						var edge = node.GetEdgeToParent(eachChildToParent);
-						if (this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ParentReferenceOnChildNode)) continue;
-
-						var readers = edge.ChildForeignKeyReaders;
-						IDictionary<string, object> parentKeys = new Dictionary<string, object>();
-						for (int i = 0; i < readers.Length && i < edge.ParentNodePrimaryKeys.Length; i++)
-						{
-							parentKeys.Add(edge.ParentNodePrimaryKeys[i].PropertyName, readers[i](entity));
-						}
-						var connection = this.GetConnectionString(edge.ParentNode);
-						var parent = this.Driver.Select<object>(connection, edge.ParentNode, parentKeys, this.TimeoutDurationInSeconds).FirstOrDefault();
-						edge.ParentSettingAction(entity, parent);
-						edge.ChildAddingAction(parent, new[] { entity });
-						this.Build(parent, true, false, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+						continue;
+					} 
+					else 
+					{
+						walkedPath.Add(edge);
 					}
-				}
+						
+
+					this.BuildByOneParentEdge<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+				}               
 			}
 			return entities;
 		}
+		private void BuildByOneParentEdge<T>(
+			ISet<NodeEdge> walkedPath,
+			Node childNode,
+			NodeEdge childToParentEdge,
+			IEnumerable<T> children,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			)
+		{
+			var parentKeys = childToParentEdge.ParentNodePrimaryKeys;
+			var childFKeyReaders = childToParentEdge.ChildForeignKeyReaders.Take(parentKeys.Length);
+			var childFKeyToEnumLoc = new Dictionary<object[], List<int>>(new ObjectArrayComparer());
+			for (int idx = 0; idx < children.Count(); idx++)
+			{
+				var fKey = childFKeyReaders.Select(k => k.Invoke(children.ElementAt(idx))).ToArray();
+				if (childFKeyToEnumLoc.TryGetValue(fKey, out var locList))
+				{
+					locList.Add(idx);
+				}
+				else
+				{
+					childFKeyToEnumLoc.Add(fKey, new List<int> { idx });
+				}
+			}
+			var parentKeyParameters = new Dictionary<string, object[]>();
+			var consolidatedKeys = childFKeyToEnumLoc.Keys.ToList();
+			for (int kPos = 0; kPos < parentKeys.Length; kPos++)
+			{
+				parentKeyParameters.Add(parentKeys[kPos].PropertyName, consolidatedKeys.Select(v => v[kPos]).ToArray());
+			}
+			var actionType = typeof(Action<,,,,,,,,,>).MakeGenericType(
+				typeof(ISet<NodeEdge>),
+				typeof(IDictionary<object[], List<int>>),
+				typeof(IEnumerable<T>),
+				typeof(NodeEdge),
+				typeof(Node),
+				typeof(IDictionary<string, object[]>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+				);
+			buildAllParentInOneGoMethodInfo
+				.MakeGenericMethod(childToParentEdge.ChildNode.NodeType, childToParentEdge.ParentNode.NodeType)
+				.CreateDelegate(actionType, this)
+				.DynamicInvoke(
+					walkedPath,
+					childFKeyToEnumLoc,
+					children,
+					childToParentEdge,
+					childToParentEdge.ParentNode,
+					parentKeyParameters,
+					childWhereClauses,
+					childOrClausesGroup,
+					innerJoinWhere,
+					innerJoinOr
+					);
+			/*
+					private void BuildAllParentInOneGo<TChild, TParent>(
+						IDictionary<object[], List<int>> childFKeyToEnumLocs,
+						IEnumerable<TChild> children,
+						NodeEdge childToParentEdge,
+						Node parentNode,
+						IDictionary<string, object[]> parentKeys,
+						IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+						IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
+						IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+						IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+						)
+
+			 */
+		}
+		private void BuildByOneChildEdge<T>(
+			ISet<NodeEdge> walkedPath,
+			Dictionary<object[], int> parentKeyToEnumLoc,
+			IEnumerable<T> parents,
+			Node parentNode,
+			int primaryKeyCounts,
+			List<object>[] primaryKeyValues,
+			NodeEdge parentToChildEdge,
+			IEnumerable<(NodeEdge, Expression)> childWhereClauses, 
+			IEnumerable<(NodeEdge, Expression[])> childOrClausesGroup, 
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere, 
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			) where T : class, new()
+		{
+			var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == parentToChildEdge).Select(w => w.Item2).ToArray();
+			var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == parentToChildEdge).Select(o => o.Item2).ToList();
+
+			Debug.Assert(parentToChildEdge.ChildNodeForeignKeys.Length >= primaryKeyCounts, "Number of foreign keys is less than that of parent's primary keys.");
+			var childKeys = new Dictionary<string, object[]>();
+			int idx;
+			for (idx = 0; idx < primaryKeyCounts; idx++)
+			{
+				childKeys.Add(parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName, primaryKeyValues[idx].ToArray());
+
+			}
+			while (idx < parentToChildEdge.ChildNodeForeignKeys.Length)
+			{
+				Debug.Assert(parentToChildEdge.ChildNodeForeignKeys[idx].IsConstant == true, $"Found foreign key {parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName} on {parentToChildEdge.ChildNode.Name} has no given value from parent and it's not a constant.");
+				childKeys.Add(parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName, null);
+				idx++;
+			}
+			var additionalWhere = ExpressionHelper.RestoreWhereClause(parentToChildEdge.ChildNode, additionalWhereClause, out Type restoredWhereType);
+			var additionalOr = ExpressionHelper.RestoreOrClauses(parentToChildEdge.ChildNode, additionalOrClauses, out Type restoredOrGrpType);
+			var parentEnumType = typeof(IEnumerable<>).MakeGenericType(parentNode.NodeType);
+			var actionType = typeof(Action<,,,,,,,,,,,>).MakeGenericType(
+				typeof(ISet<NodeEdge>),
+				typeof(IDictionary<object[], int>),
+				parentEnumType,
+				typeof(NodeEdge),
+				typeof(Node),
+				typeof(IDictionary<string, object[]>),
+				restoredWhereType,
+				restoredOrGrpType,
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+				);
+			Director.buildAllChildrenInOneGoMethodInfo
+				.MakeGenericMethod(parentNode.NodeType, parentToChildEdge.ChildNode.NodeType)
+				.CreateDelegate(actionType, this)
+				.DynamicInvoke(
+					walkedPath,
+					parentKeyToEnumLoc,
+					parents,
+					parentToChildEdge,
+					parentToChildEdge.ChildNode,
+					childKeys,
+					additionalWhere,
+					additionalOr,
+					childWhereClauses,
+					childOrClausesGroup,
+					innerJoinWhere,
+					innerJoinOr
+				);
+		}
 
 		private void BuildAllChildrenInOneGo<TParent, TChild>(
-			IDictionary<object[], int> entityIndexes,
-			IEnumerable<TParent> entities,
+			ISet<NodeEdge> walkedPath,
+			IDictionary<object[], int> parentPKeyToEnumLocIdx,
+			IEnumerable<TParent> parents,
 			NodeEdge parentToChildEdge,
 			Node childNode, 
 			IDictionary<string, object[]> childKeys,
@@ -211,12 +279,12 @@ namespace AXAXL.DbEntity.Services
 			foreach (var pKeys in childrenGrpByPKeys.Keys)
 			{
 				int entityIdx = -1;
-				if (entityIndexes.TryGetValue(pKeys, out entityIdx))
+				if (parentPKeyToEnumLocIdx.TryGetValue(pKeys, out entityIdx))
 				{
-					parentToChildEdge.ChildAddingAction(entities.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
+					parentToChildEdge.ChildAddingAction(parents.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
 					foreach (var eachChild in childrenGrpByPKeys[pKeys])
 					{
-						parentToChildEdge.ParentSettingAction(eachChild, entities.ElementAt(entityIdx));
+						parentToChildEdge.ParentSettingAction(eachChild, parents.ElementAt(entityIdx));
 					}
 				}
 				else
@@ -229,7 +297,60 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			this.Build<TChild>(childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+			this.Build<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+		}
+
+		private void BuildAllParentInOneGo<TChild, TParent>(
+			ISet<NodeEdge> walkedPath,
+			IDictionary<object[], List<int>> childFKeyToEnumLocs,
+			IEnumerable<TChild> children,
+			NodeEdge childToParentEdge,
+			Node parentNode,
+			IDictionary<string, object[]> parentKeys,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			)
+			where TParent : class, new()
+		{
+			var connection = this.GetConnectionString(parentNode);
+			var parentGrpByFKeys = this.Driver.MultipleSelectCombined<TParent>(
+										connection,
+										parentNode,
+										parentKeys,
+										new Expression<Func<TParent, bool>>[0],
+										new List<Expression<Func<TParent, bool>>[]>(),
+										new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
+										new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
+										this.TimeoutDurationInSeconds
+										);
+			foreach (var fKeys in parentGrpByFKeys.Keys)
+			{
+				foreach(var parent in parentGrpByFKeys[fKeys])
+				{
+					if (childFKeyToEnumLocs.TryGetValue(fKeys, out var entityIdxs))
+					{
+						var childrenList = new List<TChild>();
+						foreach (var entityIdx in entityIdxs)
+						{
+							childToParentEdge.ParentSettingAction(children.ElementAt(entityIdx), parent);
+							childrenList.Add(children.ElementAt(entityIdx));
+						}
+						childToParentEdge.ChildAddingAction(parent, (IEnumerable<object>)childrenList);
+					}
+					else
+					{
+						throw new InvalidOperationException(
+							string.Format(
+							"Failed to locate child object among list of entites by key values {0}",
+							String.Join(", ", fKeys.Select(k => k?.ToString() ?? "null"))
+							));
+					}
+				}
+			}
+
+			this.Build<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
 		public T Build<T>(
