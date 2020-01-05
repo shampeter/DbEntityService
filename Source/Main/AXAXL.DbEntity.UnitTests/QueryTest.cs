@@ -354,8 +354,8 @@ cont num	desc					layer ty		cedant		cedant ty		xl cpy					xl type			owner ty	fil
 			var resultSet1 = _dbService
 							.Query<TCededContractLayer>()
 							.Where(
-								l => 
-									l.AttachmentPoint > 0 && 
+								l =>
+									l.AttachmentPoint > 0 &&
 									(
 										l.CededContract.CedantCompany.CompanyName == @"State Farm" ||
 										l.CededContract.CedantCompany.CompanyName == @"Travellers"
@@ -364,17 +364,69 @@ cont num	desc					layer ty		cedant		cedant ty		xl cpy					xl type			owner ty	fil
 							.ToArray()
 							;
 			Assert.IsTrue(
-				resultSet1.All(l => 
-					l.CededContract.CedantCompany.CompanyName == @"State Farm" || 
+				resultSet1.All(l =>
+					l.CededContract.CedantCompany.CompanyName == @"State Farm" ||
 					l.CededContract.CedantCompany.CompanyName == @"Travellers")
 				);
+			FilterByParentEntityPropertiesTestVerifications(resultSet1);
+
+			var cedents = new[] { "State Farm", "Travellers" };
+			var resultSet2 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.In(cedents)
+				)
+				.ToArray()
+				;
+			FilterByParentEntityPropertiesTestVerifications(resultSet2);
+
+			var stateFarm = @"%State%";
+			var resultSet3 = _dbService
+				.Query<TCededContractLayer>()
+				.Where(
+					l =>
+						l.AttachmentPoint > 0 &&
+						l.CededContract.CedantCompany.CompanyName.Like(stateFarm)
+				)
+				.ToArray()
+				;
+			Assert.AreEqual(3, resultSet3.Length, $"Actual number of rows returned = {resultSet3.Length}");
+			var layer01 = resultSet3.Single(l => l.Description == "This is test layer 1");
+			var layer02 = resultSet3.Single(l => l.Description == "This is test layer 2");
+			var layer03 = resultSet3.Single(l => l.Description == "This is test layer 3");
+
+			var contract101 = layer03.CededContract;
+			Assert.AreEqual(layer01.CededContract, layer02.CededContract);
+			Assert.AreEqual(layer01.CededContract, layer03.CededContract);
+			Assert.AreEqual(contract101.CededContractLayers.Count(), 3);
+
+			Assert.AreEqual(layer01.LayerType.Description, "Quota Share");
+			Assert.AreEqual(layer02.LayerType.Description, "Excess of Loss");
+			Assert.AreEqual(layer03.LayerType.Description, "Excess of Loss");
+			Assert.AreEqual(layer02.LayerType, layer03.LayerType);
+
+			Assert.AreEqual(contract101.CedantCompany.CompanyName, "State Farm");
+			Assert.AreEqual(contract101.XlCompany.CompanyName, "XL Reinsurance Bermuda");
+			Assert.AreEqual(contract101.CedantCompany.CompanyTypeFkeyNavigation.Description, "Cedant Company");
+			Assert.AreEqual(contract101.XlCompany.CompanyTypeFkeyNavigation.Description, "AXA XL Company");
+
+			Assert.AreEqual(contract101.CededContractDocs.Count(), 0);
+			Assert.AreEqual(layer01.CededContractLayerDocs.Count(), 0);
+			Assert.AreEqual(layer02.CededContractLayerDocs.Count(), 0);
+			Assert.AreEqual(layer03.CededContractLayerDocs.Count(), 0);
+		}
+
+		private static void FilterByParentEntityPropertiesTestVerifications(TCededContractLayer[] resultSet)
+		{
 			// The result should get 5 layers.
-			Assert.AreEqual(5, resultSet1.Length, $"Actual number of rows returned = {resultSet1.Length}");
-			var layer01 = resultSet1.Single(l => l.Description == "First Test Layer");
-			var layer02 = resultSet1.Single(l => l.Description == "Second Test Layer");
-			var layer03 = resultSet1.Single(l => l.Description == "This is test layer 1");
-			var layer04 = resultSet1.Single(l => l.Description == "This is test layer 2");
-			var layer05 = resultSet1.Single(l => l.Description == "This is test layer 3");
+			Assert.AreEqual(5, resultSet.Length, $"Actual number of rows returned = {resultSet.Length}");
+			var layer01 = resultSet.Single(l => l.Description == "First Test Layer");
+			var layer02 = resultSet.Single(l => l.Description == "Second Test Layer");
+			var layer03 = resultSet.Single(l => l.Description == "This is test layer 1");
+			var layer04 = resultSet.Single(l => l.Description == "This is test layer 2");
+			var layer05 = resultSet.Single(l => l.Description == "This is test layer 3");
 
 			var contract100 = layer01.CededContract;
 			var contract101 = layer03.CededContract;
@@ -390,6 +442,8 @@ cont num	desc					layer ty		cedant		cedant ty		xl cpy					xl type			owner ty	fil
 
 			Assert.IsTrue(layer01.LayerType == layer04.LayerType && layer01.LayerType == layer05.LayerType);
 			Assert.AreEqual(layer01.LayerType.Description, "Excess of Loss");
+			Assert.AreEqual(layer02.LayerType.Description, "Stop Loss");
+			Assert.AreEqual(layer03.LayerType.Description, "Quota Share");
 
 			Assert.AreEqual(contract100.CedantCompany.CompanyName, "Travellers");
 			Assert.AreEqual(contract101.CedantCompany.CompanyName, "State Farm");
@@ -405,38 +459,20 @@ cont num	desc					layer ty		cedant		cedant ty		xl cpy					xl type			owner ty	fil
 
 			var layer1TDocs = new string[] { "layer_file_1.txt", "layer_file_2.txt" };
 			// Query starts from Layer level, so the query should not retrieve any childset from contract (parent of layer). So T-Doc on contract should be empty.
-			Assert.IsTrue(resultSet1.Select(l => l.CededContract).All(c => c.CededContractDocs.Count() == 0));
+			Assert.AreEqual(contract100.CededContractDocs.Count(), 0);
+			Assert.AreEqual(contract101.CededContractDocs.Count(), 0);
+
 			// Layer of pkey 3, 4, 5 has no t-doc.
-			Assert.IsTrue(resultSet1.Where(l => l.CededContractLayerPkey >= 2 && l.CededContractLayerPkey <= 5).Sum(l => l.CededContractLayerDocs.Count()) == 0);
-			// Layer of pkey 1 has 3 t-doc and layer of pkey 2 has 1 t-doc
-			var layer1TDocName = resultSet1.Single(l => l.CededContractLayerPkey == 1).CededContractLayerDocs.Select(d => d.Filename).ToArray();
-			Assert.IsTrue(layer1TDocName.Length == layer1TDocs.Length);
-			Assert.IsTrue(layer1TDocName.Intersect(layer1TDocs).Count() == 2);
+			Assert.AreEqual(layer02.CededContractLayerDocs.Count(), 0);
+			Assert.AreEqual(layer03.CededContractLayerDocs.Count(), 0);
+			Assert.AreEqual(layer04.CededContractLayerDocs.Count(), 0);
+			Assert.AreEqual(layer05.CededContractLayerDocs.Count(), 0);
 
-			var cedents = new[] { "State Farm", "Travellers" };
-			var resultSet2 = _dbService
-				.Query<TCededContractLayer>()
-				.Where(
-					l =>
-						l.AttachmentPoint > 0 &&
-						l.CededContract.CedantCompany.CompanyName.In(cedents)
-				)
-				.ToArray()
-				;
-			Assert.AreEqual(5, resultSet2.Length, $"Actual number of rows returned = {resultSet2.Length}");
-
-			var stateFarm = @"%State%";
-			var resultSet3 = _dbService
-				.Query<TCededContractLayer>()
-				.Where(
-					l =>
-						l.AttachmentPoint > 0 &&
-						l.CededContract.CedantCompany.CompanyName.Like(stateFarm)
-				)
-				.ToArray()
-				;
-			Assert.AreEqual(3, resultSet3.Length, $"Actual number of rows returned = {resultSet3.Length}");
+			// Layer01 has 2 t-doc
+			Assert.AreEqual(layer01.CededContractLayerDocs.Count(), 2);
+			Assert.IsTrue(layer01.CededContractLayerDocs.Select(d => d.Filename).ToArray().Intersect(layer1TDocs).Count() == 2);
 		}
+
 		[TestMethod]
 		[Description("Multiple Where() and And() Call test")]
 		public void MultiWhereCall()

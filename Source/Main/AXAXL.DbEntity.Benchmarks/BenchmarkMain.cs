@@ -188,7 +188,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return buffer.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by direct SQL on CLR User Session")]
+		//[Benchmark(Baseline = false, Description = "Query by direct SQL on CLR User Session")]
 		public int DirectSQLOnCLRUserSession()
 		{
 			var buffer = new List<CLRUserSQLResultVM>();
@@ -250,7 +250,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			}
 			return buffer.Count;
 		}
-		[Benchmark(Baseline = false, Description = "Query by direct SQL in inner join query")]
+		//[Benchmark(Baseline = false, Description = "Query by direct SQL in inner join query")]
 		public int InnerJoinQuery()
 		{
 			var buffer = new List<BaseLineSQLResultVM>();
@@ -279,8 +279,88 @@ namespace AXAXL.DbEntity.Benchmarks
 			return buffer.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity with VM")]
-		public int QueryByEntityWithVM()
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without Optimization")]
+		public int QueryByEntityWithVMWithNoOptimization()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInSequence);
+			var resultSet = eventList
+					.Select(
+						p => {
+							var lockedSession = p.CLRUserSessionList.FirstOrDefault();
+							string userLockingEvent = null;
+							DateTime? sessionLockDate = null;
+							if (lockedSession != null)
+							{
+								userLockingEvent = $"{lockedSession.LockedByUser.LastName}, {lockedSession.LockedByUser.FirstName}";
+								sessionLockDate = lockedSession.LogOnDt;
+							}
+							var result = new BaseLineSQLResultVM
+							{
+								EventGuid = p.EventGuid,
+								DOLFrom = p.DOLFrom,
+								DOLTo = p.DOLTo,
+								CatstrId = p.CatstrId,
+								Description = p.Description,
+								LloydReference = p.LloydReference,
+								TotalMarketLoss = p.EventTotalMarketLossList.FirstOrDefault()?.TotalMarketLoss,
+								LockedBy = userLockingEvent,
+								LockedDt = sessionLockDate
+							};
+							return result;
+						})
+					.ToList();
+			return resultSet.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with Optimization 1")]
+		public int QueryByEntityWithVMWithOptimization1()
+		{
+			var query = this.DbService
+						.Query<Event>()
+						.Where(e => e.IsActive == true)
+						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
+						.OrderBy(e => e.Description)
+						;
+
+			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInParallel);
+			var resultSet = eventList
+					.Select(
+						p => {
+							var lockedSession = p.CLRUserSessionList.FirstOrDefault();
+							string userLockingEvent = null;
+							DateTime? sessionLockDate = null;
+							if (lockedSession != null)
+							{
+								userLockingEvent = $"{lockedSession.LockedByUser.LastName}, {lockedSession.LockedByUser.FirstName}";
+								sessionLockDate = lockedSession.LogOnDt;
+							}
+							var result = new BaseLineSQLResultVM
+							{
+								EventGuid = p.EventGuid,
+								DOLFrom = p.DOLFrom,
+								DOLTo = p.DOLTo,
+								CatstrId = p.CatstrId,
+								Description = p.Description,
+								LloydReference = p.LloydReference,
+								TotalMarketLoss = p.EventTotalMarketLossList.FirstOrDefault()?.TotalMarketLoss,
+								LockedBy = userLockingEvent,
+								LockedDt = sessionLockDate
+							};
+							return result;
+						})
+					.ToList();
+			return resultSet.Count;
+		}
+
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with Optimization 2")]
+		public int QueryByEntityWithVMWithOptimization2()
 		{
 			var query = this.DbService
 						.Query<Event>()
@@ -320,7 +400,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity with VM for Top 200")]
+		[Benchmark(Baseline = false, Description = "Query by DbEntity for Top 200 with Optimization 2")]
 		public int QueryByEntityWithVMForTop200()
 		{
 			var query = this.DbService
@@ -361,52 +441,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM without Optimization")]
-		public int QueryByEntityWithoutVMWithNoOptimization()
-		{
-			var query = this.DbService
-						.Query<Event>()
-						.Where(e => e.IsActive == true)
-						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
-						.OrderBy(e => e.Description)
-						;
-
-			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInSequence);
-
-			return eventList.Count;
-		}
-
-		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM with Optimization 1")]
-		public int QueryByEntityWithoutVMWithOptimization1()
-		{
-			var query = this.DbService
-						.Query<Event>()
-						.Where(e => e.IsActive == true)
-						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
-						.OrderBy(e => e.Description)
-						;
-
-			var eventList = query.ToList(strategy: RetrievalStrategies.OneEntityAtATimeInParallel);
-
-			return eventList.Count;
-		}
-
-		[Benchmark(Baseline = false, Description = "Query by DbEntity without VM with Optimization 2")]
-		public int QueryByEntityWithoutVMWithOptimization2()
-		{
-			var query = this.DbService
-						.Query<Event>()
-						.Where(e => e.IsActive == true)
-						.LeftOuterJoin<Event, CLRUserSession>(s => s.LogOffDt == null)
-						.OrderBy(e => e.Description)
-						;
-
-			var eventList = query.ToList(strategy: RetrievalStrategies.AllEntitiesAtOnce);
-
-			return eventList.Count;
-		}
-
-		[Benchmark(Baseline = false, Description = "Query by DbEntity without Children")]
+		[Benchmark(Baseline = false, Description = "Query by DbEntity without Children with Optimization 2")]
 		public int QueryByEntityWithoutChild()
 		{
 			var query = this.DbService
@@ -421,7 +456,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss")]
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss with Optimization 2")]
 		public int QueryByEntityWithOnlyMktLoss()
 		{
 			var query = this.DbService
@@ -436,7 +471,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session")]
+		[Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session with Optimization 2")]
 		public int QueryByEntityWithOnlyUserSessn()
 		{
 			var query = this.DbService
@@ -462,7 +497,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count();
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity with Inner Join")]
+		//[Benchmark(Baseline = false, Description = "Query by DbEntity with Inner Join")]
 		public int QueryByEntityWithInnerJoin()
 		{
 			var query = this.DbService
@@ -478,7 +513,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		[Benchmark(Baseline = false, Description = "Query by DbEntity On CLR User Session")]
+		//[Benchmark(Baseline = false, Description = "Query by DbEntity On CLR User Session")]
 		public int QueryByEntityOnCLRUserSession()
 		{
 			var result = this.DbService

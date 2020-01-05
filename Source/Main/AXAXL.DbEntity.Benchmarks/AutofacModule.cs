@@ -19,19 +19,19 @@ namespace AXAXL.DbEntity.Benchmarks
 		protected override void Load(ContainerBuilder builder)
 		{
 			// use this extension when debugging SQL generation which is not being cached.
-/*			builder.AddSqlDbEntityService(
+			builder.AddSqlDbEntityService(
 					dbOption => dbOption
 								.AddOrUpdateConnection("SQL_Connection", this.Configuration["ConnectionString:CLR"])
 								.SetAsDefaultConnection("SQL_Connection")
 								.PrintNodeMapToFile(this.Configuration.GetValue<string>(@"DbEntity:NodeMapExport")));
-*/
+
 			// use this extension for production and QA when optimized performance is needed.
-			builder.AddSqlDbEntityServiceWithCacheForSqlGenerator(
+/*			builder.AddSqlDbEntityServiceWithCacheForSqlGenerator(
 					dbOption => dbOption
 								.AddOrUpdateConnection("SQL_Connection", this.Configuration.GetValue<string>(@"ConnectionString:CLR"))
 								.SetAsDefaultConnection("SQL_Connection")
 								.PrintNodeMapToFile(this.Configuration.GetValue<string>(@"DbEntity:NodeMapExport")));
 
-		}
+*/		}
 	}
 }

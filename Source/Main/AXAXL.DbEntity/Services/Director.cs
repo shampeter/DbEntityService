@@ -25,7 +25,6 @@ namespace AXAXL.DbEntity.Services
 		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
 		private ParallelOptions ParallelRetrievalOptions { get; set; }
 		private RetrievalStrategies Strategy { get; set; }
-		//private ISet<string> PathWalked { get; set; }
 		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce)
 		{
 			this.NodeMap = nodeMap;
@@ -37,7 +36,6 @@ namespace AXAXL.DbEntity.Services
 			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
 			this.ParallelRetrievalOptions = parallelRetrievalOptions;
 			this.Strategy = strategy;
-			//this.PathWalked = new HashSet<string>();
 		}
 		
 		public IEnumerable<T> Build<T>(
@@ -92,9 +90,7 @@ namespace AXAXL.DbEntity.Services
 			}
 			if (isMovingTowardsParent)
 			{
-				// TODO: Walked path need to be the full path not the last mile otherwise some path might be skipped. For example.
-				// After getting ceded company's company type, xl company's company type will be skipped because the edige company->company-type has been walked
-				// when getting ceded company's company type.
+				// TODO: Inner join failed in benchmark. Check it out.
 				foreach (var edge in node.AllParentEdges())
 				{
 					if (
@@ -105,10 +101,10 @@ namespace AXAXL.DbEntity.Services
 					{
 						continue;
 					} 
-					else 
-					{
-						walkedPath.Add(edge);
-					}
+					//else 
+					//{
+					//	walkedPath.Add(edge);
+					//}
 						
 
 					this.BuildByOneParentEdge<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
@@ -273,8 +269,7 @@ namespace AXAXL.DbEntity.Services
 			) where TChild : class, new()
 		{
 			var connection = this.GetConnectionString(childNode);
-			// TODO: Select<Object> won't cut.  Need to fix object as the real type.
-			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<TChild>(connection, childNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds);
+			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<TChild>(connection, childNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds, this.ServiceOption.QueryBatchSize);
 
 			foreach (var pKeys in childrenGrpByPKeys.Keys)
 			{
@@ -319,11 +314,12 @@ namespace AXAXL.DbEntity.Services
 										connection,
 										parentNode,
 										parentKeys,
-										new Expression<Func<TParent, bool>>[0],
-										new List<Expression<Func<TParent, bool>>[]>(),
-										new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
-										new List<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
-										this.TimeoutDurationInSeconds
+										Array.Empty<Expression<Func<TParent, bool>>>(),
+										Array.Empty<Expression<Func<TParent, bool>>[]>(),
+										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
+										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
+										this.TimeoutDurationInSeconds,
+										this.ServiceOption.QueryBatchSize
 										);
 			foreach (var fKeys in parentGrpByFKeys.Keys)
 			{

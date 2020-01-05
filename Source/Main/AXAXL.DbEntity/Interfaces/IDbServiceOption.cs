@@ -55,9 +55,21 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="processorCount">Int. Number of processor.</param>
 		/// <returns>Return itself to enable method chaining.</returns>
 		IDbServiceOption SetProcessorCount(int processorCount);
+		/// <summary>
+		/// Assign query batch size.  After version 1.3.1, query is capable to retrieve child entities of the same type for multiple parent entities, thus saving
+		/// multiple round trips of retrieving children of the same type for multiple parents.  Foreign keys will be submitted to operatiors, such as IN, to retrieve
+		/// child set in one go.  The limit is the number of SQL parameters allowed in one SQL.  Thus this batch size comes into picture.
+		/// A batch size of 1000 means 1000 parents will be grouped together in retrieving their children.  Thus if there is only 1 primary key for such entity type,
+		/// the number of SQL parameters will be 1000.  Hence if the primary key length is 2 for a parent entity type, the number of parents grouped together will be
+		/// 500.  The current limit of SQL parameters in one query is 2100.
+		/// </summary>
+		/// <param name="queryBatchSize">Number of parameters in one query for retrieving children for multiple parents.</param>
+		/// <returns>Return itself to enable method chaining.</returns>
+		IDbServiceOption SetQueryBatchSize(int queryBatchSize);
 		IDbServiceOption PrintNodeMapToFile(string filename);
 		TransactionScopeOption RootDefaultTransactionScope { get; }
 		IsolationLevel RootDefaultIsolation { get; }
 		string NodeMapPrintFilename { get; }
+		int QueryBatchSize { get; }
 	}
 }

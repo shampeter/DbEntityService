@@ -274,7 +274,7 @@ namespace AXAXL.DbEntity.MSSql
 			return resultBuffer;
 		}
 		
-		public (string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, out NodeProperty[] groupingKeys, string parameterPrefix = null, string tableAlias = null, int batchSize = 1000)
+		public (string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, out NodeProperty[] groupingKeys, string parameterPrefix = null, string tableAlias = null, int batchSize = 1800)
 		{
 			Debug.Assert(keyValues != null && keyValues.Count > 0, "No key-values provided to create where clause and sql parameters.");
 			Debug.Assert(node != null);

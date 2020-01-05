@@ -28,7 +28,7 @@ namespace AXAXL.DbEntity.MSSql
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression>> emptyValueTupleOfNodeEdgeNExpression = Array.Empty<(NodeEdge, Expression)>();
 		private static readonly IEnumerable<ValueTuple<NodeEdge, Expression[]>> emptyValueTupleOfNodeEdgeNExpressionGroup = Array.Empty<(NodeEdge, Expression[])>();
 		private static readonly ValueTuple<NodeProperty, bool>[] emptyOrderBy = Array.Empty<(NodeProperty, bool)>();
-		public MSSqlDriver(ILoggerFactory factory, IMSSqlGenerator sqlGenerator)
+		public MSSqlDriver(ILoggerFactory factory, IMSSqlGenerator sqlGenerator, IDbServiceOption dbServiceOption)
 		{
 			this.log = factory.CreateLogger<MSSqlDriver>();
 			this.sqlGenerator = sqlGenerator;
@@ -114,7 +114,8 @@ namespace AXAXL.DbEntity.MSSql
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
-			int timeoutDurationInSeconds = 30
+			int timeoutDurationInSeconds = 30,
+			int batchSize = 1800
 			) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
@@ -126,7 +127,7 @@ namespace AXAXL.DbEntity.MSSql
 			var topLevelTableAlias = $"{tablePrefix}{tableAliasFirstIdx}";
 
 			//var select = this.sqlGenerator.CreateSelectComponent(topLevelTableAlias, node);
-			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias);
+			var primaryWhereTuples = this.sqlGenerator.CreateWhereClauseAndSqlParametersFromKeyValues(node, parameters, out NodeProperty[] groupingKeys, tableAlias: topLevelTableAlias, batchSize: batchSize);
 			var (selectedColumns, dataReaderToEntityFunc) = this.sqlGenerator.CreateSelectAndGroupKeysComponent(topLevelTableAlias, node, groupingKeys);
 
 			// set the current node, which is the T as the starting point.  All other inner joins should be derived from this point upwards towards parent reference.
@@ -134,17 +135,12 @@ namespace AXAXL.DbEntity.MSSql
 			var rootMapKey = innerJoinMap.Init(node, tableAliasFirstIdx);
 			var additionalWhere = this.CompileWhereConditions<T>(node, whereClauses, tablePrefix, rootMapKey, sqlParameterRunningSeq, innerJoinMap);
 			var additionalOr = this.CompileOrGroups<T>(node, orClausesGroup, tablePrefix, rootMapKey, additionalWhere.Item3, innerJoinMap);
-			//var (innerJoinWhereStatements, innerJoinSqlParameters) = this.CompileInnerJoinWhere(node, rootMapKey, childInnerJoinWhereClauses, tablePrefix, innerJoinMap);
 
 			// Find the Inner Joins with the parent at the edge at the head of path the same as current node.
 			// Extract those inner join. Add those path into inner join map to create inner join statement later.
 			// Also Compile the where clause attached to the child node of the edge at the end of the path into where statement and parameters.
-			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhereForThisNode;
-			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOrForThisNode;
-			IEnumerable<Expression> additionalWhereForThisNode;
-			IEnumerable<Expression[]> additionalOrForThisNode;
-			var innerJoinWhereFound = this.MatchEdgeToInnerJoinPaths<Expression>(node, childInnerJoinWhereClauses, out innerJoinWhereForThisNode, out additionalWhereForThisNode);
-			var innerJoinOrFound = this.MatchEdgeToInnerJoinPaths<Expression[]>(node, childInnerJoinOrClausesGroup, out innerJoinOrForThisNode, out additionalOrForThisNode);
+			var innerJoinWhereFound = this.MatchEdgeToInnerJoinPaths<Expression>(node, childInnerJoinWhereClauses, out IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhereForThisNode, out IEnumerable<Expression> additionalWhereForThisNode);
+			var innerJoinOrFound = this.MatchEdgeToInnerJoinPaths<Expression[]>(node, childInnerJoinOrClausesGroup, out IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOrForThisNode, out IEnumerable<Expression[]> additionalOrForThisNode);
 			var additionalInnerJoinWhere = this.CompileChildInnerJoinWhere(innerJoinWhereForThisNode, tablePrefix, additionalOr.Item3, innerJoinMap);
 			var additionalInnerJoinOr = this.CompileChildInnerJoinOrGroup(innerJoinOrForThisNode, tablePrefix, additionalInnerJoinWhere.Item3, innerJoinMap);
 			var additionalWhereStatementForThisNode = this.CompileWhereConditionsFromExpressions(node, additionalWhereForThisNode, tablePrefix, rootMapKey, additionalInnerJoinWhere.Item3, innerJoinMap);
@@ -156,16 +152,14 @@ namespace AXAXL.DbEntity.MSSql
 			this.RemovedVisited<Expression[]>(childInnerJoinOrClausesGroup, innerJoinOrFound);
 
 			var innerJoinStatement = this.ComputeInnerJoins(innerJoinMap, tablePrefix);
-			//var whereStatements = this.CombineWhereStatements(true, primaryWhereStatement, additionalWhere.Item1, additionalOr.Item1, additionalInnerJoinWhere.Item1, additionalInnerJoinOr.Item1);
-			//var sqlCmd = string.Format("{0}{1}{2}{3}", select.SelectClause, innerJoinStatement, whereStatements, orderByClause);
 
-			foreach (var eachPrimaryWhere in primaryWhereTuples)
+			foreach (var (primaryWhereClause, primaryWhereParameters) in primaryWhereTuples)
 			{
 				var sqlCmd = this.FormatSelectStatement(
 					node,
 					selectedColumns,
 					innerJoinStatement,
-					eachPrimaryWhere.primaryWhereClause,
+					primaryWhereClause,
 					additionalWhere.Item1,
 					additionalOr.Item1,
 					additionalWhereStatementForThisNode.Item1,
@@ -178,7 +172,7 @@ namespace AXAXL.DbEntity.MSSql
 					);
 				using (SqlCommand cmd = new SqlCommand(sqlCmd))
 				{
-					cmd.Parameters.AddRange(eachPrimaryWhere.primaryWhereParameters);
+					cmd.Parameters.AddRange(primaryWhereParameters);
 					this
 						.InvokeAndAddSqlParameters(cmd, additionalWhere.Item2)
 						.InvokeAndAddSqlParameters(cmd, additionalOr.Item2)

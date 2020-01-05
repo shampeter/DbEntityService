@@ -93,6 +93,7 @@ namespace AXAXL.DbEntity.Interfaces
 		/// <param name="childInnerJoinWhereClauses">Inner joins to childset and children selection condition</param>
 		/// <param name="childInnerJoinOrClausesGroup">Inner joins to childset and children selection or group condition</param>
 		/// <param name="timeoutDurationInSeconds">Timeout setting for this query.  Default is 30 seconds.</param>
+		/// <param name="batchSize">Number of sql parameters in one query.  This will be used to calculate the number of retrieval batched together in one query according to the size of <paramref name="parameters"/></param>
 		/// <returns>Dictionary of object grouped by the primary key values of their parents</returns>
 		IDictionary<object[], List<T>> MultipleSelectCombined<T>(
 			string connectionString,
@@ -102,7 +103,8 @@ namespace AXAXL.DbEntity.Interfaces
 			IEnumerable<Expression<Func<T, bool>>[]> orClausesGroup,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)> childInnerJoinWhereClauses,
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)> childInnerJoinOrClausesGroup,
-			int timeoutDurationInSeconds = 30
+			int timeoutDurationInSeconds = 30,
+			int batchSize = 1800
 			) where T : class, new();
 		/// <summary>
 		/// Select entity object into <see cref="IEnumerable{T}"/> using the <paramref name="parameters"/> dictionary for the where clause.

@@ -60,9 +60,9 @@ namespace AXAXL.DbEntity.Benchmarks
 				("Query with No Child", benchmark.QueryByEntityWithoutChild),
 				("Query with only Market Loss", benchmark.QueryByEntityWithOnlyMktLoss),
 				("Query with only User Session", benchmark.QueryByEntityWithOnlyUserSessn),
-				("Query with no View Model base", benchmark.QueryByEntityWithoutVMWithNoOptimization),
-				("Query with no View Model Opt1", benchmark.QueryByEntityWithoutVMWithOptimization1),
-				("Query with no View Model Opt2", benchmark.QueryByEntityWithoutVMWithOptimization2),
+				("Query with no View Model base", benchmark.QueryByEntityWithVMWithNoOptimization),
+				("Query with no View Model Opt1", benchmark.QueryByEntityWithVMWithOptimization1),
+				("Query with no View Model Opt2", benchmark.QueryByEntityWithVMWithOptimization2),
 				("Query on CLR User Session", benchmark.QueryByEntityOnCLRUserSession),
 				("SQL on CLR User Session", benchmark.DirectSQLOnCLRUserSession)
 			};
@@ -89,11 +89,11 @@ namespace AXAXL.DbEntity.Benchmarks
 			{
 				("From SQL", benchmark.BaseLine),
 				("From SQL for Top 200", benchmark.DirectQueryForTop200),
-				("From Entity Query with VM", benchmark.QueryByEntityWithVM),
+				//("From Entity Query with VM", benchmark.QueryByEntityWithVM),
 				("From Entity Query with VM Top 200", benchmark.QueryByEntityWithVMForTop200),
-				("From Entity Query without VM base", benchmark.QueryByEntityWithoutVMWithNoOptimization),
-				("From Entity Query without VM Opt1", benchmark.QueryByEntityWithoutVMWithOptimization1),
-				("From Entity Query without VM Opt2", benchmark.QueryByEntityWithoutVMWithOptimization2),
+				("From Entity Query without VM base", benchmark.QueryByEntityWithVMWithNoOptimization),
+				("From Entity Query without VM Opt1", benchmark.QueryByEntityWithVMWithOptimization1),
+				("From Entity Query without VM Opt2", benchmark.QueryByEntityWithVMWithOptimization2),
 				("From Entity Query with no child", benchmark.QueryByEntityWithoutChild),
 				("From Entity Query with only Mkt Loss", benchmark.QueryByEntityWithOnlyMktLoss),
 				("From Entity Query with only Usr Sess", benchmark.QueryByEntityWithOnlyUserSessn),
