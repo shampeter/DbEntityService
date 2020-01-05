@@ -13,7 +13,10 @@ namespace AXAXL.DbEntity.Benchmarks
 
 		static void Main(string[] args)
 		{
-			if (
+			IConfig benchmarkConfig = null;
+
+/*			
+ *			if (
 				args != null && 
 				args.Length == 1
 			)
@@ -30,7 +33,6 @@ namespace AXAXL.DbEntity.Benchmarks
 				return;
 			}
 
-			IConfig benchmarkConfig = null;
 
 			if (IsDebugging())
 			{
@@ -45,11 +47,12 @@ namespace AXAXL.DbEntity.Benchmarks
 					.With(ExecutionValidator.FailOnError);
 			}
 			var summary = BenchmarkRunner.Run<BenchmarkMain>(benchmarkConfig);
-			//BenchmarkSwitcher
-			//	.FromAssembly(typeof(Program).Assembly)
-			//	.Run(args, benchmarkConfig);
+*/			
+			BenchmarkSwitcher
+				.FromAssembly(typeof(Program).Assembly)
+				.Run(args, benchmarkConfig);
 		}
-		private static void Debug()
+/*		private static void Debug()
 		{
 			var benchmark = new BenchmarkMain();
 			benchmark.GlobalSetup();
@@ -110,7 +113,7 @@ namespace AXAXL.DbEntity.Benchmarks
 				Console.WriteLine(@"{0,-40}={1}", eachTest.desc, count);
 			}
 		}
-
+*/
 		private static int ConsoleEnterInt(int start, int end)
 		{
 			bool correct = false;
