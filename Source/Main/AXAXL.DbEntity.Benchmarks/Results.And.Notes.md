@@ -2,18 +2,19 @@
 
 ## 2020-01-05
 
-|                                                         Method |         Mean |     Error |    StdDev |    Ratio | RatioSD |
-|--------------------------------------------------------------- |-------------:|----------:|----------:|---------:|--------:|
-|                                'Baseline. Query by direct SQL' |     19.64 ms |  0.390 ms |  0.742 ms |     1.00 |    0.00 |
-|                              'Query by direct SQL for Top 200' |     13.54 ms |  0.272 ms |  0.637 ms |     0.70 |    0.04 |
-|                        'Query by DbEntity Exec Cmd Dyn Result' |     40.15 ms |  0.491 ms |  0.459 ms |     2.01 |    0.06 |
-|                       'Query by DbEntity without Optimization' | 23,378.94 ms | 33.086 ms | 25.832 ms | 1,180.34 |   19.26 |
-|                        'Query by DbEntity with Optimization 1' |  6,649.72 ms | 31.455 ms | 29.423 ms |   332.48 |    8.80 |
-|                        'Query by DbEntity with Optimization 2' |    370.93 ms |  7.330 ms | 17.277 ms |    19.13 |    1.11 |
-|            'Query by DbEntity for Top 200 with Optimization 2' |     21.35 ms |  0.633 ms |  1.838 ms |     1.09 |    0.12 |
-|       'Query by DbEntity without Children with Optimization 2' |     23.32 ms |  0.623 ms |  1.827 ms |     1.20 |    0.09 |
-|     'Query by DbEntity with only Mkt Loss with Optimization 2' |    194.56 ms |  3.851 ms |  6.328 ms |     9.81 |    0.42 |
-| 'Query by DbEntity with only User Session with Optimization 2' |    191.96 ms |  3.753 ms |  6.373 ms |     9.70 |    0.39 |
+|                                   Method | Categories |         Mean |     Error |    StdDev |    Ratio | RatioSD |
+|----------------------------------------- |----------- |-------------:|----------:|----------:|---------:|--------:|
+|          'Baseline. Query by direct SQL' |       Full |     20.09 ms |  0.374 ms |  0.312 ms |     1.00 |    0.00 |
+|         'Query by DbEntity Exec Command' |       Full |     42.46 ms |  0.844 ms |  0.972 ms |     2.14 |    0.06 |
+| 'Query by DbEntity without Optimization' |       Full | 23,914.09 ms | 82.503 ms | 77.173 ms | 1,190.94 |   17.50 |
+|  'Query by DbEntity with Optimization 1' |       Full |  6,822.02 ms | 52.633 ms | 49.233 ms |   339.55 |    5.56 |
+|  'Query by DbEntity with Optimization 2' |       Full |    349.16 ms |  5.372 ms |  5.025 ms |    17.37 |    0.40 |
+|                                          |            |              |           |           |          |         |
+|          'Baseline. Query by direct SQL' |    Top 200 |     13.23 ms |  0.109 ms |  0.091 ms |     1.00 |    0.00 |
+|         'Query by DbEntity Exec Command' |    Top 200 |     13.23 ms |  0.096 ms |  0.089 ms |     1.00 |    0.01 |
+| 'Query by DbEntity without Optimization' |    Top 200 |  1,003.28 ms | 19.180 ms | 18.837 ms |    75.89 |    1.17 |
+|  'Query by DbEntity with Optimization 1' |    Top 200 |    295.58 ms |  4.757 ms |  4.450 ms |    22.34 |    0.40 |
+|  'Query by DbEntity with Optimization 2' |    Top 200 |     21.87 ms |  0.434 ms |  1.204 ms |     1.64 |    0.06 |
 
 ## 2020-01-03
 

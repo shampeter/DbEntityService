@@ -46,11 +46,12 @@ namespace AXAXL.DbEntity.Benchmarks
 					.With(BenchmarkDotNet.Loggers.ConsoleLogger.Default)
 					.With(ExecutionValidator.FailOnError);
 			}
-			var summary = BenchmarkRunner.Run<BenchmarkMain>(benchmarkConfig);
 */			
-			BenchmarkSwitcher
-				.FromAssembly(typeof(Program).Assembly)
-				.Run(args, benchmarkConfig);
+			var summary = BenchmarkRunner.Run<BenchmarkMain>(benchmarkConfig);
+			//BenchmarkSwitcher
+			//	.FromAssembly(typeof(Program).Assembly)
+			//	.Run(args, benchmarkConfig);
+			BenchmarkBase.PrintTotalSampleSize();
 		}
 /*		private static void Debug()
 		{
