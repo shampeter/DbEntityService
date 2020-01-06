@@ -516,7 +516,8 @@ namespace AXAXL.DbEntity.MSSql
 										Expression.Constant(idx)
 										);
 					exprBuffer.Add(
-						this.ReadFromDataReaderAndAssignToTarget(dataReader, i, dbType, array, typeof(object))
+						Expression.Assign(array, Expression.Convert(entityProperty, typeof(object)))
+						//this.ReadFromDataReaderAndAssignToTarget(dataReader, i, dbType, array, typeof(object))
 					);
 				}
 			}

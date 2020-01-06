@@ -6,6 +6,8 @@ using System.Data.SqlClient;
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Filters;
+
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Benchmarks.Models;
 
@@ -13,6 +15,7 @@ namespace AXAXL.DbEntity.Benchmarks
 {
 	[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 	[CategoriesColumn]
+	[Config(typeof(Config))]
 	public class BenchmarkMain : BenchmarkBase
 	{
 
@@ -55,18 +58,14 @@ namespace AXAXL.DbEntity.Benchmarks
 			left outer join [t_sec_principal] [p] on [p].[login_name] = [s].[locked_by]
 			";
 
-		//private string[] columnNames =
-		//{
-		//		"event_guid",
-		//		"dt_of_loss_from",
-		//		"total_market_loss",
-		//		"locked_by",
-		//		"log_on_dt",
-		//		"dt_of_loss_to",
-		//		"catstr_id",
-		//		"description",
-		//		"lloyd_reference"
-		//};
+		private class Config : ManualConfig
+		{
+			public Config()
+			{
+				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top200" }));
+			}
+		}
+
 		[GlobalSetup]
 		public void GlobalSetup()
 		{
@@ -143,8 +142,8 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count;
 		}
 
-		#region Kept for later use
-		//[Benchmark(Baseline = false, Description = "Query by DbEntity without Children with Optimization 2")]
+		#region Kept for later diagnostics
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity without Children with Optimization 2")]
 		public int QueryByEntityWithoutChild()
 		{
 			var query = this.DbService
@@ -159,7 +158,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		//[Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss with Optimization 2")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss with Optimization 2")]
 		public int QueryByEntityWithOnlyMktLoss()
 		{
 			var query = this.DbService
@@ -174,7 +173,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		//[Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session with Optimization 2")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session with Optimization 2")]
 		public int QueryByEntityWithOnlyUserSessn()
 		{
 			var query = this.DbService
@@ -190,7 +189,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		//[Benchmark(Baseline = false, Description = "Query by DbEntity with Inner Join")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with Inner Join")]
 		public int QueryByEntityWithInnerJoin()
 		{
 			var query = this.DbService
@@ -206,7 +205,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		//[Benchmark(Baseline = false, Description = "Query by DbEntity On CLR User Session")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity On CLR User Session")]
 		public int QueryByEntityOnCLRUserSession()
 		{
 			var result = this.DbService
@@ -214,7 +213,7 @@ namespace AXAXL.DbEntity.Benchmarks
 								.ToList();
 			return result.Count;
 		}
-		//[Benchmark(Baseline = false, Description = "Query by direct SQL on CLR User Session")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = true, Description = "Query by direct SQL on CLR User Session")]
 		public int DirectSQLOnCLRUserSession()
 		{
 			var buffer = new List<CLRUserSQLResultVM>();
@@ -248,7 +247,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return buffer.Count;
 		}
 
-		//[Benchmark(Baseline = false, Description = "Query by direct SQL in inner join query")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by direct SQL in inner join query")]
 		public int InnerJoinQuery()
 		{
 			var buffer = new List<BaseLineSQLResultVM>();

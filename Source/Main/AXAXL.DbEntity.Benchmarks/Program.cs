@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Linq;
+using System.Reflection;
 using System.Diagnostics;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Validators;
+using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
 namespace AXAXL.DbEntity.Benchmarks
@@ -15,17 +18,14 @@ namespace AXAXL.DbEntity.Benchmarks
 		{
 			IConfig benchmarkConfig = null;
 
-/*			
- *			if (
-				args != null && 
+
+			if (
+				args != null &&
 				args.Length == 1
-			)
+				)
 			{
-				switch(args[0].ToLower())
+				switch (args[0].ToLower())
 				{
-					case @"--verify":
-						Verify();
-						break;
 					case @"--debug":
 						Debug();
 						break;
@@ -46,19 +46,36 @@ namespace AXAXL.DbEntity.Benchmarks
 					.With(BenchmarkDotNet.Loggers.ConsoleLogger.Default)
 					.With(ExecutionValidator.FailOnError);
 			}
-*/			
+
 			var summary = BenchmarkRunner.Run<BenchmarkMain>(benchmarkConfig);
 			//BenchmarkSwitcher
 			//	.FromAssembly(typeof(Program).Assembly)
 			//	.Run(args, benchmarkConfig);
 			BenchmarkBase.PrintTotalSampleSize();
 		}
-/*		private static void Debug()
+
+		private static void Debug()
 		{
 			var benchmark = new BenchmarkMain();
 			benchmark.GlobalSetup();
 
-			var testCases = new (string desc, Func<int> test)[]
+			var testCases = typeof(BenchmarkMain)
+				.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+				.Where(
+					m => m.GetParameters().Length == 0
+					&& m.ReturnType == typeof(int)
+					&& m.GetCustomAttribute<BenchmarkAttribute>()?.Description != null
+					)
+				.Select(m =>
+				{
+					var desc = m.GetCustomAttribute<BenchmarkAttribute>().Description;
+					var func = m.CreateDelegate(typeof(Func<int>), benchmark);
+					return ValueTuple.Create<string, Delegate>(desc, func);
+				})
+				.ToArray();
+				;
+
+/*			var testCases = new (string desc, Func<int> test)[]
 			{
 				("Baseline", benchmark.BaseLine),
 				("Query with No Child", benchmark.QueryByEntityWithoutChild),
@@ -70,19 +87,20 @@ namespace AXAXL.DbEntity.Benchmarks
 				("Query on CLR User Session", benchmark.QueryByEntityOnCLRUserSession),
 				("SQL on CLR User Session", benchmark.DirectSQLOnCLRUserSession)
 			};
-
+*/
 			for(int i = 1; i <= testCases.Length; i++)
 			{
-				Console.WriteLine("{0,3} {1}", i, testCases[i - 1].desc);
+				Console.WriteLine("{0,3} {1}", i, testCases[i - 1].Item1);
 			}
 			var choice = ConsoleEnterInt(1, testCases.Length);
 			var loop = ConsoleEnterInt(1, 10);
 			for(int i = 1; i <= loop; i++)
 			{
-				Console.WriteLine("{0,30} = {1}", testCases[choice - 1].desc, testCases[choice - 1].test());
+				Console.WriteLine("{0,30} = {1}", testCases[choice - 1].Item1, testCases[choice - 1].Item2.DynamicInvoke());
 			}
 			Pause();
 		}
+/*
 		private static void Verify()
 		{
 			var benchmark = new BenchmarkMain();
