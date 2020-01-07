@@ -62,7 +62,8 @@ namespace AXAXL.DbEntity.Benchmarks
 		{
 			public Config()
 			{
-				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top200" }));
+				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top 200" }));
+				//this.Add(new AnyCategoriesFilter(new[] { "Top 200" }));
 			}
 		}
 
@@ -86,7 +87,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count();
 		}
 
-		[BenchmarkCategory("Full"), Benchmark(Baseline = false, Description = "Query by DbEntity without Optimization")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity without Optimization")]
 		public int QueryByEntityWithVMWithNoOptimization()
 		{
 			var resultSet = this.DbEntityQuery(RetrievalStrategies.OneEntityAtATimeInSequence, -1);
