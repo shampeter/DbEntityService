@@ -1,5 +1,18 @@
 ﻿# Benchmark Results and Notes
 
+Note that the database behind this benchmark is CLR.  The connection string can either be set in appsettings.json or in environment variable
+**ConnectionString__CLR**.  For example, on Windows 10 machine, I have
+
+```dos
+SET ConnectionString__CLR=Server=sql-destiny-dev.r02.xlgs.local,1436; User Id=CLRMainDev; Password=devma1nclr; Database=xlre_clr_copy1
+```
+
+and on Linux box, I have
+
+```bash
+export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User Id=CLRMainDev; Password=devma1nclr; Database=xlre_clr_copy1'
+```
+
 ## 2020-01-05
 
 |                                   Method | Categories |         Mean |     Error |    StdDev |    Ratio | RatioSD |
