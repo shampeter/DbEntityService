@@ -25,10 +25,12 @@ namespace AXAXL.DbEntity.MSSql
 
 		(string SelectedColumns, Func<SqlDataReader, dynamic> DataReaderToEntityFunc) CreateSelectComponent(string tableAlias, Node node);
 
+		(string SelectedColumns, Delegate DataReaderToEntityFunc) CreateSelectAndGroupKeysComponent(string tableAlias, Node node, NodeProperty[] groupingKeys);
+
 		IDictionary<string, SqlParameter> CreateSqlParameters(Node node, NodeProperty[] columns, string parameterPrefix = null);
 
 		IDictionary<string, SqlParameter> CreateSqlParametersForRawSqlParameters((string Name, object Value, ParameterDirection Direction)[] parameters);
-	
+
 		string CreateWhereClause(Node node, NodeProperty[] whereColumns, string parameterPrefix = null, string tableAlias = null);
 
 		(string OutputClause, Action<SqlDataReader, dynamic> EntityUpdateAction) CreateOutputComponent(Node node, bool IsInserting = true);
@@ -44,5 +46,7 @@ namespace AXAXL.DbEntity.MSSql
 		string CompileOrderByClause((NodeProperty Property, bool IsAscending)[] orderBy, string tableAlias = null);
 		
 		string FormatTableName(Node node, string tableAlias = null);
+
+		(string primaryWhereClause, SqlParameter[] primaryWhereParameters)[] CreateWhereClauseAndSqlParametersFromKeyValues(Node node, IDictionary<string, object[]> keyValues, out NodeProperty[] groupingKeys, string parameterPrefix = null, string tableAlias = null, int batchSize = 1800);
 	}
 }

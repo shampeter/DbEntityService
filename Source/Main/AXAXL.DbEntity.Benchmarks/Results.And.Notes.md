@@ -1,5 +1,41 @@
 ﻿# Benchmark Results and Notes
 
+## 2020-01-05
+
+|                                   Method | Categories |         Mean |     Error |    StdDev |    Ratio | RatioSD |
+|----------------------------------------- |----------- |-------------:|----------:|----------:|---------:|--------:|
+|          'Baseline. Query by direct SQL' |       Full |     20.09 ms |  0.374 ms |  0.312 ms |     1.00 |    0.00 |
+|         'Query by DbEntity Exec Command' |       Full |     42.46 ms |  0.844 ms |  0.972 ms |     2.14 |    0.06 |
+| 'Query by DbEntity without Optimization' |       Full | 23,914.09 ms | 82.503 ms | 77.173 ms | 1,190.94 |   17.50 |
+|  'Query by DbEntity with Optimization 1' |       Full |  6,822.02 ms | 52.633 ms | 49.233 ms |   339.55 |    5.56 |
+|  'Query by DbEntity with Optimization 2' |       Full |    349.16 ms |  5.372 ms |  5.025 ms |    17.37 |    0.40 |
+|                                          |            |              |           |           |          |         |
+|          'Baseline. Query by direct SQL' |    Top 200 |     13.23 ms |  0.109 ms |  0.091 ms |     1.00 |    0.00 |
+|         'Query by DbEntity Exec Command' |    Top 200 |     13.23 ms |  0.096 ms |  0.089 ms |     1.00 |    0.01 |
+| 'Query by DbEntity without Optimization' |    Top 200 |  1,003.28 ms | 19.180 ms | 18.837 ms |    75.89 |    1.17 |
+|  'Query by DbEntity with Optimization 1' |    Top 200 |    295.58 ms |  4.757 ms |  4.450 ms |    22.34 |    0.40 |
+|  'Query by DbEntity with Optimization 2' |    Top 200 |     21.87 ms |  0.434 ms |  1.204 ms |     1.64 |    0.06 |
+
+## 2020-01-03
+
+|                                              Method |            Mean |         Error |        StdDev |          Median |  Ratio | RatioSD |
+|---------------------------------------------------- |----------------:|--------------:|--------------:|----------------:|-------:|--------:|
+|                     'Baseline. Query by direct SQL' |     16,697.6 us |     329.20 us |     274.90 us |     16,636.6 us |   1.00 |    0.00 |
+|           'Query by direct SQL on CLR User Session' |        925.8 us |      18.23 us |      24.34 us |        929.6 us |   0.05 |    0.00 |
+|                   'Query by direct SQL for Top 200' |     12,067.1 us |     156.23 us |     146.14 us |     12,047.3 us |   0.72 |    0.01 |
+|           'Query by direct SQL in inner join query' |      1,270.3 us |      21.63 us |      19.18 us |      1,275.4 us |   0.08 |    0.00 |
+|                         'Query by DbEntity with VM' |    221,491.1 us |   4,352.17 us |   4,071.02 us |    222,477.8 us |  13.23 |    0.32 |
+|             'Query by DbEntity with VM for Top 200' |     18,532.6 us |     913.71 us |   2,650.83 us |     18,622.8 us |   1.18 |    0.18 |
+| 'Query by DbEntity without VM without Optimization' | 10,413,662.5 us | 166,654.66 us | 155,888.87 us | 10,489,346.6 us | 623.06 |   17.21 |
+|  'Query by DbEntity without VM with Optimization 1' |  2,323,780.1 us |  40,578.06 us |  37,956.74 us |  2,311,550.5 us | 138.65 |    3.42 |
+|  'Query by DbEntity without VM with Optimization 2' |    229,413.8 us |   5,562.13 us |  14,357.64 us |    224,949.8 us |  13.67 |    0.98 |
+|                'Query by DbEntity without Children' |     25,846.3 us |     961.95 us |   2,836.33 us |     26,165.2 us |   1.55 |    0.18 |
+|              'Query by DbEntity with only Mkt Loss' |    117,922.0 us |   2,316.28 us |   3,537.20 us |    118,370.5 us |   7.13 |    0.25 |
+|          'Query by DbEntity with only User Session' |    119,686.9 us |   2,325.58 us |   3,551.41 us |    120,035.7 us |   7.15 |    0.29 |
+|             'Query by DbEntity Exec Cmd Dyn Result' |     38,492.1 us |     655.07 us |     612.75 us |     38,598.7 us |   2.30 |    0.05 |
+|                 'Query by DbEntity with Inner Join' |    112,909.6 us |   4,305.26 us |  12,694.14 us |    111,878.0 us |   6.70 |    0.77 |
+|             'Query by DbEntity On CLR User Session' |    179,963.7 us |   3,549.93 us |   7,641.59 us |    181,392.3 us |  10.75 |    0.46 |
+
 ## 2019-12-09
 
 |                                     Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |

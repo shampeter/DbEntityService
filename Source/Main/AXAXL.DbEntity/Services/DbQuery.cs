@@ -84,14 +84,14 @@ namespace AXAXL.DbEntity.Services
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			return this;
 		}
-		public T[] ToArray(int maxNumOfRow = -1)
+		public T[] ToArray(int maxNumOfRow = -1, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce)
 		{
-			return this.ExecuteQuery(typeof(T), maxNumOfRow).ToArray();
+			return this.ExecuteQuery(typeof(T), maxNumOfRow, strategy).ToArray();
 		}
 
-		public IList<T> ToList(int maxNumOfRow = -1)
+		public IList<T> ToList(int maxNumOfRow = -1, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce)
 		{
-			return this.ExecuteQuery(typeof(T), maxNumOfRow).ToList();
+			return this.ExecuteQuery(typeof(T), maxNumOfRow, strategy).ToList();
 		}
 
 		public IQuery<T> Where(Expression<Func<T, bool>> whereClause)
@@ -164,11 +164,11 @@ namespace AXAXL.DbEntity.Services
 
 			return this;
 		}
-		private IEnumerable<T> ExecuteQuery(Type entityType, int maxNumOfRow)
+		private IEnumerable<T> ExecuteQuery(Type entityType, int maxNumOfRow, RetrievalStrategies strategy)
 		{
 			var node = this.NodeMap.GetNode(entityType);
 			var connection = string.IsNullOrEmpty(node.DbConnectionName) ? this.ServiceOption.GetDefaultConnectionString() : this.ServiceOption.GetConnectionString(node.DbConnectionName);
-			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion, this.ParallelRetrievalOptions, this.TimeoutDurationInSeconds);
+			var director = new Director(this.ServiceOption, this.NodeMap, this.Driver, this.Log, this.Exclusion, this.ParallelRetrievalOptions, this.TimeoutDurationInSeconds, strategy);
 			var innerJoinsWhereClauses = this.ComputeNodePath<Expression>(node, this.ChildInnerJoinWhereClauses);
 			var innerJoinOrClauses = this.ComputeNodePath<Expression[]>(node, this.ChildInnerJoinOrClausesGroup);
 			var queryResult = this.Driver.Select(
@@ -182,16 +182,27 @@ namespace AXAXL.DbEntity.Services
 										this.Ordering.ToArray(), 
 										this.TimeoutDurationInSeconds
 										);
-			Parallel.ForEach(
-				queryResult, 
-				this.ParallelRetrievalOptions,
-				(eachEntity) => {
-					director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
-				});
-			//foreach(var eachEntity in queryResult)
-			//{
-			//	director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
-			//}
+			switch(strategy)
+			{
+				case RetrievalStrategies.OneEntityAtATimeInParallel:
+					Parallel.ForEach(
+						queryResult,
+						this.ParallelRetrievalOptions,
+						(eachEntity) => {
+							director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+						});
+					break;
+				case RetrievalStrategies.OneEntityAtATimeInSequence:
+					foreach (var eachEntity in queryResult)
+					{
+						director.Build<T>(eachEntity, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+					}
+					break;
+				case RetrievalStrategies.AllEntitiesAtOnce:
+					director.Build<T>(new HashSet<NodeEdge>(), queryResult, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+					break;
+			}
+
 			return queryResult;
 		}
 		private void AddToExclusion<TObject>(params Expression<Func<TObject, dynamic>>[] exclusions) where TObject : class, new()

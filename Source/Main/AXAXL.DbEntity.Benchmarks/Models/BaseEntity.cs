@@ -11,12 +11,10 @@ namespace AXAXL.DbEntity.Benchmarks.Models
 		[Column("added_dt")]
 		public DateTime AddedDt { get; set; }
 
-		// TODO: Need to figure out a way to get the added_by later.
 		[ValueInjection(FunctionScript = @"() => ""CLR System""", When = InjectionOptions.WhenInserted)]
 		[Column("added_by")]
 		public string AddedBy { get; set; }
 
-		// TODO: Need to figure out a way to get the added_app later.
 		[ValueInjection(FunctionScript = @"() => ""CLR System""", When = InjectionOptions.WhenInserted)]
 		[Column("added_app")]
 		public string AddedApp { get; set; }

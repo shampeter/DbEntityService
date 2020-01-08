@@ -145,7 +145,11 @@ namespace AXAXL.DbEntity.EntityGraph
 		}
 		public NodeEdge CompileParentPrimaryKeyReaders(bool saveExpressionToStringForDebug = false)
 		{
-			var lambda = this.ParentNodePrimaryKeys
+
+		/* 2019-12-20 Moved primary key readers func from node edge to node itself because doesn't matter which child edge, the parent primary keys
+		 * are the same.
+		 *
+		 *	var lambda = this.ParentNodePrimaryKeys
 								.Select(p => this.ParentNode.CreatePropertyValueReaderFunc(p))
 								.ToArray();
 			if (saveExpressionToStringForDebug)
@@ -153,6 +157,9 @@ namespace AXAXL.DbEntity.EntityGraph
 				this.ParentPrimaryKeyReadersInString = lambda.Select(l => l.ToString("C#")).ToArray();
 			}
 			this.ParentPrimaryKeyReaders = lambda.Select(l => l.Compile()).ToArray();
+		*/
+
+			this.ParentPrimaryKeyReaders = this.ParentNode.PrimaryKeyReaders;
 
 			return this;
 		}

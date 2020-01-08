@@ -13,12 +13,14 @@ namespace AXAXL.DbEntity.Services
 		public int ProcessorCount { get; private set; }
 		public IsolationLevel RootDefaultIsolation { get; private set; }
 		public string NodeMapPrintFilename { get; private set; }
+		public int QueryBatchSize { get; private set; }
 		public DbServiceOption()
 		{
 			this.ConnectionMap = new Dictionary<string, string>();
 			this.RootDefaultTransactionScope = TransactionScopeOption.Required;
 			this.RootDefaultIsolation = IsolationLevel.ReadCommitted;
 			this.ProcessorCount = System.Environment.ProcessorCount;
+			this.QueryBatchSize = 1800;
 		}
 		public IDbServiceOption AddOrUpdateConnection(string connectionName, string connectionString)
 		{
@@ -74,6 +76,11 @@ namespace AXAXL.DbEntity.Services
 		public IDbServiceOption SetProcessorCount(int processorCount)
 		{
 			this.ProcessorCount = processorCount;
+			return this;
+		}
+		public IDbServiceOption SetQueryBatchSize(int queryBatchSize)
+		{
+			this.QueryBatchSize = queryBatchSize;
 			return this;
 		}
 		public int GetProcessorCount()

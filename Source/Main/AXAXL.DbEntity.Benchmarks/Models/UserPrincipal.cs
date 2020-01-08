@@ -9,13 +9,24 @@ namespace AXAXL.DbEntity.Benchmarks.Models
 	[Table("t_sec_principal")]
 	public class UserPrincipal
 	{
+		private string loginNameInLowerCase;
+
 		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]
 		[Column("user_guid")]
 		public int UserGuid { get; set; }
 
 		[Key]
 		[Column("login_name")]
-		public string LoginName { get; set; }
+		public string LoginName { 
+			get
+			{
+				return this.loginNameInLowerCase;
+			}
+			set
+			{
+				this.loginNameInLowerCase = value.ToUpper();
+			}
+		}
 
 		[Column("principal_type")]
 		public string PrincipalType { get; set; }

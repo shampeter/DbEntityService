@@ -137,6 +137,11 @@ namespace AXAXL.DbEntity.EntityGraph
 				}
 			}
 			newNode.PrimaryKeys = primaryKeys.ToDictionary(k => k.PropertyName, v => v);
+			newNode.PrimaryKeyReaders = primaryKeys
+							.OrderBy(p => p.Order)
+							.Select(p => newNode.CreatePropertyValueReaderFunc(p))
+							.Select(l => l.Compile())
+							.ToArray();
 			newNode.ConcurrencyControl = concurrency.FirstOrDefault();
 			newNode.DataColumns = dataColumns.ToDictionary(k => k.PropertyName, v => v);
 			newNode

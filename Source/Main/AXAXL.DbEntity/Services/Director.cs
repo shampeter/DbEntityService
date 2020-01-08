@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ namespace AXAXL.DbEntity.Services
 {
 	public class Director
 	{
+		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
 		private IDatabaseDriver Driver { get; set; }
 		private INodeMap NodeMap { get; set; }
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
@@ -21,8 +24,8 @@ namespace AXAXL.DbEntity.Services
 		private int TimeoutDurationInSeconds { get; set; }
 		private IList<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)> DeleteQueue { get; set; }
 		private ParallelOptions ParallelRetrievalOptions { get; set; }
-		//private ISet<string> PathWalked { get; set; }
-		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30)
+		private RetrievalStrategies Strategy { get; set; }
+		public Director(IDbServiceOption serviceOption, INodeMap nodeMap, IDatabaseDriver driver, ILogger log, IDictionary<Node, NodeProperty[]> exclusion, ParallelOptions parallelRetrievalOptions, int timeoutDurationInSeconds = 30, RetrievalStrategies strategy = RetrievalStrategies.AllEntitiesAtOnce)
 		{
 			this.NodeMap = nodeMap;
 			this.Driver = driver;
@@ -32,9 +35,320 @@ namespace AXAXL.DbEntity.Services
 			this.TimeoutDurationInSeconds = timeoutDurationInSeconds;
 			this.DeleteQueue = new List<(ITrackable ParentEntity, NodeEdge Edge, ITrackable ChildEntity, Node ChildNode)>();
 			this.ParallelRetrievalOptions = parallelRetrievalOptions;
-			//this.PathWalked = new HashSet<string>();
+			this.Strategy = strategy;
 		}
-		// TODO: Need to double check the build logic
+		
+		public IEnumerable<T> Build<T>(
+			ISet<NodeEdge> walkedPath,
+			IEnumerable<T> entities,
+			bool isMovingTowardsParent,
+			bool isMovingTowardsChild,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			) where T : class, new()
+		{
+			if (entities == null || entities.Count() <= 0) return entities;
+
+			Node node = this.NodeMap.GetNode(entities.FirstOrDefault()?.GetType() ?? typeof(T));
+
+			if (isMovingTowardsChild)
+			{
+				var entityIndexes = new Dictionary<object[], int>(new ObjectArrayComparer());
+				var primaryKeyCounts = node.PrimaryKeys.Keys.Count;
+				var primaryKeyValues = node.PrimaryKeys.Keys.Select(k => new List<object>()).ToArray();
+				for (int i = 0; i < entities.Count(); i++)
+				{
+					// read primary key values for each entity into an object array.
+					var keyValues = node.PrimaryKeyReaders.Select(r => r.Invoke(entities.ElementAt(i))).ToArray();
+					// use primary key values as dictionary key to lookup th entity in the entity list.
+					entityIndexes[keyValues] = i;
+					// pust primary key values into a list.  For example, if the primary key is a compound key with 2 columns, c1 and c2, and there are 10 entities, en1, en2 ... en10.
+					// we are here trying to create an arry of 2 list.  First list will be of values en1.c1, en2.c1, en3.c1 ... en10.c1 and second list will be en1.c2, en2.c2 ... en10.c2.
+					for(int k = 0; k < primaryKeyCounts; k++)
+					{
+						primaryKeyValues[k].Add(keyValues[k]);
+					}
+				}
+				foreach(var edge in node.AllChildEdges())
+				{
+					if (
+						(this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ChildReferenceOnParentNode))
+						||
+						walkedPath.Contains(edge)
+					)
+					{
+						continue;
+					}
+					else
+					{
+						walkedPath.Add(edge);
+					}
+					this.BuildByOneChildEdge<T>(walkedPath, entityIndexes, entities, node, primaryKeyCounts, primaryKeyValues, edge, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+				}
+			}
+			if (isMovingTowardsParent)
+			{
+				// TODO: Inner join failed in benchmark. Check it out.
+				foreach (var edge in node.AllParentEdges())
+				{
+					if (
+						(this.Exclusion.ContainsKey(node) && this.Exclusion[node].Contains(edge.ParentReferenceOnChildNode))
+						|| 
+						walkedPath.Contains(edge)
+					)
+					{
+						continue;
+					} 
+					//else 
+					//{
+					//	walkedPath.Add(edge);
+					//}
+						
+
+					this.BuildByOneParentEdge<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+				}               
+			}
+			return entities;
+		}
+		private void BuildByOneParentEdge<T>(
+			ISet<NodeEdge> walkedPath,
+			Node childNode,
+			NodeEdge childToParentEdge,
+			IEnumerable<T> children,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> childWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> childOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			)
+		{
+			var parentKeys = childToParentEdge.ParentNodePrimaryKeys;
+			var childFKeyReaders = childToParentEdge.ChildForeignKeyReaders.Take(parentKeys.Length);
+			var childFKeyToEnumLoc = new Dictionary<object[], List<int>>(new ObjectArrayComparer());
+			for (int idx = 0; idx < children.Count(); idx++)
+			{
+				var fKey = childFKeyReaders.Select(k => k.Invoke(children.ElementAt(idx))).ToArray();
+				if (childFKeyToEnumLoc.TryGetValue(fKey, out var locList))
+				{
+					locList.Add(idx);
+				}
+				else
+				{
+					childFKeyToEnumLoc.Add(fKey, new List<int> { idx });
+				}
+			}
+			var parentKeyParameters = new Dictionary<string, object[]>();
+			var consolidatedKeys = childFKeyToEnumLoc.Keys.ToList();
+			for (int kPos = 0; kPos < parentKeys.Length; kPos++)
+			{
+				parentKeyParameters.Add(parentKeys[kPos].PropertyName, consolidatedKeys.Select(v => v[kPos]).ToArray());
+			}
+			var actionType = typeof(Action<,,,,,,,,,>).MakeGenericType(
+				typeof(ISet<NodeEdge>),
+				typeof(IDictionary<object[], List<int>>),
+				typeof(IEnumerable<T>),
+				typeof(NodeEdge),
+				typeof(Node),
+				typeof(IDictionary<string, object[]>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+				);
+			buildAllParentInOneGoMethodInfo
+				.MakeGenericMethod(childToParentEdge.ChildNode.NodeType, childToParentEdge.ParentNode.NodeType)
+				.CreateDelegate(actionType, this)
+				.DynamicInvoke(
+					walkedPath,
+					childFKeyToEnumLoc,
+					children,
+					childToParentEdge,
+					childToParentEdge.ParentNode,
+					parentKeyParameters,
+					childWhereClauses,
+					childOrClausesGroup,
+					innerJoinWhere,
+					innerJoinOr
+					);
+			/*
+					private void BuildAllParentInOneGo<TChild, TParent>(
+						IDictionary<object[], List<int>> childFKeyToEnumLocs,
+						IEnumerable<TChild> children,
+						NodeEdge childToParentEdge,
+						Node parentNode,
+						IDictionary<string, object[]> parentKeys,
+						IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+						IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
+						IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+						IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+						)
+
+			 */
+		}
+		private void BuildByOneChildEdge<T>(
+			ISet<NodeEdge> walkedPath,
+			Dictionary<object[], int> parentKeyToEnumLoc,
+			IEnumerable<T> parents,
+			Node parentNode,
+			int primaryKeyCounts,
+			List<object>[] primaryKeyValues,
+			NodeEdge parentToChildEdge,
+			IEnumerable<(NodeEdge, Expression)> childWhereClauses, 
+			IEnumerable<(NodeEdge, Expression[])> childOrClausesGroup, 
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere, 
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			) where T : class, new()
+		{
+			var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == parentToChildEdge).Select(w => w.Item2).ToArray();
+			var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == parentToChildEdge).Select(o => o.Item2).ToList();
+
+			Debug.Assert(parentToChildEdge.ChildNodeForeignKeys.Length >= primaryKeyCounts, "Number of foreign keys is less than that of parent's primary keys.");
+			var childKeys = new Dictionary<string, object[]>();
+			int idx;
+			for (idx = 0; idx < primaryKeyCounts; idx++)
+			{
+				childKeys.Add(parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName, primaryKeyValues[idx].ToArray());
+
+			}
+			while (idx < parentToChildEdge.ChildNodeForeignKeys.Length)
+			{
+				Debug.Assert(parentToChildEdge.ChildNodeForeignKeys[idx].IsConstant == true, $"Found foreign key {parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName} on {parentToChildEdge.ChildNode.Name} has no given value from parent and it's not a constant.");
+				childKeys.Add(parentToChildEdge.ChildNodeForeignKeys[idx].PropertyName, null);
+				idx++;
+			}
+			var additionalWhere = ExpressionHelper.RestoreWhereClause(parentToChildEdge.ChildNode, additionalWhereClause, out Type restoredWhereType);
+			var additionalOr = ExpressionHelper.RestoreOrClauses(parentToChildEdge.ChildNode, additionalOrClauses, out Type restoredOrGrpType);
+			var parentEnumType = typeof(IEnumerable<>).MakeGenericType(parentNode.NodeType);
+			var actionType = typeof(Action<,,,,,,,,,,,>).MakeGenericType(
+				typeof(ISet<NodeEdge>),
+				typeof(IDictionary<object[], int>),
+				parentEnumType,
+				typeof(NodeEdge),
+				typeof(Node),
+				typeof(IDictionary<string, object[]>),
+				restoredWhereType,
+				restoredOrGrpType,
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+				);
+			Director.buildAllChildrenInOneGoMethodInfo
+				.MakeGenericMethod(parentNode.NodeType, parentToChildEdge.ChildNode.NodeType)
+				.CreateDelegate(actionType, this)
+				.DynamicInvoke(
+					walkedPath,
+					parentKeyToEnumLoc,
+					parents,
+					parentToChildEdge,
+					parentToChildEdge.ChildNode,
+					childKeys,
+					additionalWhere,
+					additionalOr,
+					childWhereClauses,
+					childOrClausesGroup,
+					innerJoinWhere,
+					innerJoinOr
+				);
+		}
+
+		private void BuildAllChildrenInOneGo<TParent, TChild>(
+			ISet<NodeEdge> walkedPath,
+			IDictionary<object[], int> parentPKeyToEnumLocIdx,
+			IEnumerable<TParent> parents,
+			NodeEdge parentToChildEdge,
+			Node childNode, 
+			IDictionary<string, object[]> childKeys,
+			IEnumerable<Expression<Func<TChild, bool>>> additionalWhereClause,
+			IEnumerable<Expression<Func<TChild, bool>>[]> additionalOrClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			) where TChild : class, new()
+		{
+			var connection = this.GetConnectionString(childNode);
+			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<TChild>(connection, childNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds, this.ServiceOption.QueryBatchSize);
+
+			foreach (var pKeys in childrenGrpByPKeys.Keys)
+			{
+				int entityIdx = -1;
+				if (parentPKeyToEnumLocIdx.TryGetValue(pKeys, out entityIdx))
+				{
+					parentToChildEdge.ChildAddingAction(parents.ElementAt(entityIdx), childrenGrpByPKeys[pKeys]);
+					foreach (var eachChild in childrenGrpByPKeys[pKeys])
+					{
+						parentToChildEdge.ParentSettingAction(eachChild, parents.ElementAt(entityIdx));
+					}
+				}
+				else
+				{
+					throw new InvalidOperationException(
+						string.Format(
+						"Failed to locate parent object among list of entites by key values {0}",
+						String.Join(", ", pKeys.Select(k => k?.ToString() ?? "null"))
+						));
+				}
+			}
+
+			this.Build<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+		}
+
+		private void BuildAllParentInOneGo<TChild, TParent>(
+			ISet<NodeEdge> walkedPath,
+			IDictionary<object[], List<int>> childFKeyToEnumLocs,
+			IEnumerable<TChild> children,
+			NodeEdge childToParentEdge,
+			Node parentNode,
+			IDictionary<string, object[]> parentKeys,
+			IEnumerable<ValueTuple<NodeEdge, Expression>> fullChildWhereClauses,
+			IEnumerable<ValueTuple<NodeEdge, Expression[]>> fullChildOrClausesGroup,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)> innerJoinWhere,
+			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
+			)
+			where TParent : class, new()
+		{
+			var connection = this.GetConnectionString(parentNode);
+			var parentGrpByFKeys = this.Driver.MultipleSelectCombined<TParent>(
+										connection,
+										parentNode,
+										parentKeys,
+										Array.Empty<Expression<Func<TParent, bool>>>(),
+										Array.Empty<Expression<Func<TParent, bool>>[]>(),
+										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
+										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
+										this.TimeoutDurationInSeconds,
+										this.ServiceOption.QueryBatchSize
+										);
+			foreach (var fKeys in parentGrpByFKeys.Keys)
+			{
+				foreach(var parent in parentGrpByFKeys[fKeys])
+				{
+					if (childFKeyToEnumLocs.TryGetValue(fKeys, out var entityIdxs))
+					{
+						var childrenList = new List<TChild>();
+						foreach (var entityIdx in entityIdxs)
+						{
+							childToParentEdge.ParentSettingAction(children.ElementAt(entityIdx), parent);
+							childrenList.Add(children.ElementAt(entityIdx));
+						}
+						childToParentEdge.ChildAddingAction(parent, (IEnumerable<object>)childrenList);
+					}
+					else
+					{
+						throw new InvalidOperationException(
+							string.Format(
+							"Failed to locate child object among list of entites by key values {0}",
+							String.Join(", ", fKeys.Select(k => k?.ToString() ?? "null"))
+							));
+					}
+				}
+			}
+
+			this.Build<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+		}
+
 		public T Build<T>(
 			T entity, 
 			bool isMovingTowardsParent, 
@@ -88,20 +402,26 @@ namespace AXAXL.DbEntity.Services
 					}
 					edge.ChildAddingAction(entity, children);
 
-					Parallel.ForEach(
-						children,
-						this.ParallelRetrievalOptions,
-						(eachChild) =>
-						{
-							edge.ParentSettingAction(eachChild, entity);
-							this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-						});
-
-					//foreach (var eachChild in children)
-					//{
-					//	edge.ParentSettingAction(eachChild, entity);
-					//	this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-					//}
+					switch(this.Strategy)
+					{
+						case RetrievalStrategies.OneEntityAtATimeInParallel:
+							Parallel.ForEach(
+								children,
+								this.ParallelRetrievalOptions,
+								(eachChild) =>
+								{
+									edge.ParentSettingAction(eachChild, entity);
+									this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+								});
+							break;
+						case RetrievalStrategies.OneEntityAtATimeInSequence:
+							foreach (var eachChild in children)
+							{
+								edge.ParentSettingAction(eachChild, entity);
+								this.Build(eachChild, true, true, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+							}
+							break;
+					}
 				}
 			}
 			if (isMovingTowardsParent)
