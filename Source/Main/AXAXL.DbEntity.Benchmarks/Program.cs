@@ -92,8 +92,8 @@ namespace AXAXL.DbEntity.Benchmarks
 			{
 				Console.WriteLine("{0,3} {1}", i, testCases[i - 1].Item1);
 			}
-			var choice = ConsoleEnterInt(1, testCases.Length);
-			var loop = ConsoleEnterInt(1, 10);
+			var choice = ConsoleEnterInt("Enter test case", 1, testCases.Length);
+			var loop = ConsoleEnterInt("Enter loop count", 1, 10);
 			for(int i = 1; i <= loop; i++)
 			{
 				Console.WriteLine("{0,30} = {1}", testCases[choice - 1].Item1, testCases[choice - 1].Item2.DynamicInvoke());
@@ -133,13 +133,13 @@ namespace AXAXL.DbEntity.Benchmarks
 			}
 		}
 */
-		private static int ConsoleEnterInt(int start, int end)
+		private static int ConsoleEnterInt(string prompt, int start, int end)
 		{
 			bool correct = false;
 			int choice = -1;
 			while (! correct)
 			{
-				Console.Write($"Enter choice between {start} and {end}: ");
+				Console.Write("{0}. Choice: {1} - {2}: ", prompt, start, end);
 				var entry = Console.ReadLine();
 				if (int.TryParse(entry, out choice) && start <= choice && choice <= end)
 				{

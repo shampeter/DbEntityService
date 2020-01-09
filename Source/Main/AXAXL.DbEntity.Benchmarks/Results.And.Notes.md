@@ -13,6 +13,19 @@ and on Linux box, I have
 export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User Id=CLRMainDev; Password=devma1nclr; Database=xlre_clr_copy1'
 ```
 
+## 2020-01-09
+
+Diagnostic run
+
+|                                                       Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|------------------------------------------------------------- |----------:|---------:|---------:|------:|--------:|
+|                                Baseline. Query by direct SQL |  50.25 ms | 1.004 ms | 1.784 ms |  1.00 |    0.00 |
+|                               Query by DbEntity Exec Command |  70.40 ms | 1.358 ms | 1.765 ms |  1.39 |    0.06 |
+|                        Query by DbEntity with Optimization 2 | 580.18 ms | 4.450 ms | 4.163 ms | 11.30 |    0.40 |
+|       Query by DbEntity without Children with Optimization 2 |  58.78 ms | 1.149 ms | 1.982 ms |  1.17 |    0.06 |
+|     Query by DbEntity with only Mkt Loss with Optimization 2 | 335.06 ms | 2.713 ms | 2.538 ms |  6.53 |    0.26 |
+| Query by DbEntity with only User Session with Optimization 2 | 333.85 ms | 4.728 ms | 3.691 ms |  6.43 |    0.21 |
+
 ## 2020-01-05
 
 |                                   Method | Categories |         Mean |     Error |    StdDev |    Ratio | RatioSD |

@@ -62,8 +62,8 @@ namespace AXAXL.DbEntity.Benchmarks
 		{
 			public Config()
 			{
-				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top 200" }));
-				//this.Add(new AnyCategoriesFilter(new[] { "Top 200" }));
+				//this.Add(new AnyCategoriesFilter(new[] { "Full", "Top 200" }));
+				this.Add(new AnyCategoriesFilter(new[] { "Full" }));
 			}
 		}
 
@@ -94,7 +94,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return resultSet.Count;
 		}
 
-		[BenchmarkCategory("Full"), Benchmark(Baseline = false, Description = "Query by DbEntity with Optimization 1")]
+		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with Optimization 1")]
 		public int QueryByEntityWithVMWithOptimization1()
 		{
 			var resultSet = this.DbEntityQuery(RetrievalStrategies.OneEntityAtATimeInParallel, -1);
@@ -144,7 +144,7 @@ namespace AXAXL.DbEntity.Benchmarks
 		}
 
 		#region Kept for later diagnostics
-		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity without Children with Optimization 2")]
+		[BenchmarkCategory("Full"), Benchmark(Baseline = false, Description = "Query by DbEntity without Children with Optimization 2")]
 		public int QueryByEntityWithoutChild()
 		{
 			var query = this.DbService
@@ -159,7 +159,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss with Optimization 2")]
+		[BenchmarkCategory("Full"), Benchmark(Baseline = false, Description = "Query by DbEntity with only Mkt Loss with Optimization 2")]
 		public int QueryByEntityWithOnlyMktLoss()
 		{
 			var query = this.DbService
@@ -174,7 +174,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			return eventList.Count;
 		}
 
-		[BenchmarkCategory("Diagnostics"), Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session with Optimization 2")]
+		[BenchmarkCategory("Full"), Benchmark(Baseline = false, Description = "Query by DbEntity with only User Session with Optimization 2")]
 		public int QueryByEntityWithOnlyUserSessn()
 		{
 			var query = this.DbService
