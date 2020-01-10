@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Linq.Expressions;
@@ -14,8 +15,10 @@ namespace AXAXL.DbEntity.Services
 {
 	public class Director
 	{
-		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
-		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGo), BindingFlags.NonPublic | BindingFlags.Instance);
+		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Static);
+		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGo), BindingFlags.NonPublic | BindingFlags.Static);
+		private static ConcurrentDictionary<NodeEdge, Delegate> buildAllChildrenInOneGoDelegateDict = new ConcurrentDictionary<NodeEdge, Delegate>();
+		private static ConcurrentDictionary<NodeEdge, Delegate> buildAllParentInOneGoDelegateDict = new ConcurrentDictionary<NodeEdge, Delegate>();
 		private IDatabaseDriver Driver { get; set; }
 		private INodeMap NodeMap { get; set; }
 		private IDictionary<Node, NodeProperty[]> Exclusion { get; set; }
@@ -144,22 +147,30 @@ namespace AXAXL.DbEntity.Services
 			{
 				parentKeyParameters.Add(parentKeys[kPos].PropertyName, consolidatedKeys.Select(v => v[kPos]).ToArray());
 			}
-			var actionType = typeof(Action<,,,,,,,,,>).MakeGenericType(
-				typeof(ISet<NodeEdge>),
-				typeof(IDictionary<object[], List<int>>),
-				typeof(IEnumerable<T>),
-				typeof(NodeEdge),
-				typeof(Node),
-				typeof(IDictionary<string, object[]>),
-				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
-				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
-				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
-				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
-				);
-			buildAllParentInOneGoMethodInfo
-				.MakeGenericMethod(childToParentEdge.ChildNode.NodeType, childToParentEdge.ParentNode.NodeType)
-				.CreateDelegate(actionType, this)
-				.DynamicInvoke(
+
+			var action = buildAllParentInOneGoDelegateDict.GetOrAdd(
+				childToParentEdge, 
+				(key) => {
+					var actionType = typeof(Action<,,,,,,,,,,>).MakeGenericType(
+						typeof(Director),
+						typeof(ISet<NodeEdge>),
+						typeof(IDictionary<object[], List<int>>),
+						typeof(IEnumerable<T>),
+						typeof(NodeEdge),
+						typeof(Node),
+						typeof(IDictionary<string, object[]>),
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+						);
+					return buildAllParentInOneGoMethodInfo
+						.MakeGenericMethod(key.ChildNode.NodeType, key.ParentNode.NodeType)
+						.CreateDelegate(actionType);
+				});
+
+			action.DynamicInvoke(
+					this,
 					walkedPath,
 					childFKeyToEnumLoc,
 					children,
@@ -219,25 +230,32 @@ namespace AXAXL.DbEntity.Services
 			}
 			var additionalWhere = ExpressionHelper.RestoreWhereClause(parentToChildEdge.ChildNode, additionalWhereClause, out Type restoredWhereType);
 			var additionalOr = ExpressionHelper.RestoreOrClauses(parentToChildEdge.ChildNode, additionalOrClauses, out Type restoredOrGrpType);
-			var parentEnumType = typeof(IEnumerable<>).MakeGenericType(parentNode.NodeType);
-			var actionType = typeof(Action<,,,,,,,,,,,>).MakeGenericType(
-				typeof(ISet<NodeEdge>),
-				typeof(IDictionary<object[], int>),
-				parentEnumType,
-				typeof(NodeEdge),
-				typeof(Node),
-				typeof(IDictionary<string, object[]>),
-				restoredWhereType,
-				restoredOrGrpType,
-				typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
-				typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
-				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
-				typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
-				);
-			Director.buildAllChildrenInOneGoMethodInfo
-				.MakeGenericMethod(parentNode.NodeType, parentToChildEdge.ChildNode.NodeType)
-				.CreateDelegate(actionType, this)
-				.DynamicInvoke(
+			var action = buildAllChildrenInOneGoDelegateDict.GetOrAdd(
+				parentToChildEdge,
+				(key) =>
+				{
+					var parentEnumType = typeof(IEnumerable<>).MakeGenericType(parentNode.NodeType);
+					var actionType = typeof(Action<,,,,,,,,,,,,>).MakeGenericType(
+						typeof(Director),
+						typeof(ISet<NodeEdge>),
+						typeof(IDictionary<object[], int>),
+						parentEnumType,
+						typeof(NodeEdge),
+						typeof(Node),
+						typeof(IDictionary<string, object[]>),
+						restoredWhereType,
+						restoredOrGrpType,
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
+						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+						);
+					return Director.buildAllChildrenInOneGoMethodInfo
+						.MakeGenericMethod(parentToChildEdge.ParentNode.NodeType, parentToChildEdge.ChildNode.NodeType)
+						.CreateDelegate(actionType);
+				});
+			action.DynamicInvoke(
+					this,
 					walkedPath,
 					parentKeyToEnumLoc,
 					parents,
@@ -253,7 +271,8 @@ namespace AXAXL.DbEntity.Services
 				);
 		}
 
-		private void BuildAllChildrenInOneGo<TParent, TChild>(
+		private static void BuildAllChildrenInOneGo<TParent, TChild>(
+			Director director,
 			ISet<NodeEdge> walkedPath,
 			IDictionary<object[], int> parentPKeyToEnumLocIdx,
 			IEnumerable<TParent> parents,
@@ -268,9 +287,18 @@ namespace AXAXL.DbEntity.Services
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
 			) where TChild : class, new()
 		{
-			var connection = this.GetConnectionString(childNode);
-			var childrenGrpByPKeys = this.Driver.MultipleSelectCombined<TChild>(connection, childNode, childKeys, additionalWhereClause, additionalOrClauses, innerJoinWhere, innerJoinOr, this.TimeoutDurationInSeconds, this.ServiceOption.QueryBatchSize);
-
+			var connection = director.GetConnectionString(childNode);
+			var childrenGrpByPKeys = director.Driver.MultipleSelectCombined<TChild>(
+										connection, 
+										childNode, 
+										childKeys, 
+										additionalWhereClause, 
+										additionalOrClauses, 
+										innerJoinWhere, 
+										innerJoinOr, 
+										director.TimeoutDurationInSeconds, 
+										director.ServiceOption.QueryBatchSize
+										);
 			foreach (var pKeys in childrenGrpByPKeys.Keys)
 			{
 				int entityIdx = -1;
@@ -292,10 +320,11 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			this.Build<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+			director.Build<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
-		private void BuildAllParentInOneGo<TChild, TParent>(
+		private static void BuildAllParentInOneGo<TChild, TParent>(
+			Director director,
 			ISet<NodeEdge> walkedPath,
 			IDictionary<object[], List<int>> childFKeyToEnumLocs,
 			IEnumerable<TChild> children,
@@ -309,8 +338,8 @@ namespace AXAXL.DbEntity.Services
 			)
 			where TParent : class, new()
 		{
-			var connection = this.GetConnectionString(parentNode);
-			var parentGrpByFKeys = this.Driver.MultipleSelectCombined<TParent>(
+			var connection = director.GetConnectionString(parentNode);
+			var parentGrpByFKeys = director.Driver.MultipleSelectCombined<TParent>(
 										connection,
 										parentNode,
 										parentKeys,
@@ -318,8 +347,8 @@ namespace AXAXL.DbEntity.Services
 										Array.Empty<Expression<Func<TParent, bool>>[]>(),
 										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> Expressions)>(),
 										Array.Empty<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> Expressions)>(),
-										this.TimeoutDurationInSeconds,
-										this.ServiceOption.QueryBatchSize
+										director.TimeoutDurationInSeconds,
+										director.ServiceOption.QueryBatchSize
 										);
 			foreach (var fKeys in parentGrpByFKeys.Keys)
 			{
@@ -346,7 +375,7 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			this.Build<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+			director.Build<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
 		public T Build<T>(

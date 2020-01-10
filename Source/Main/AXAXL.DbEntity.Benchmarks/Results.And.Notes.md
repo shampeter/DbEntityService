@@ -13,6 +13,19 @@ and on Linux box, I have
 export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User Id=CLRMainDev; Password=devma1nclr; Database=xlre_clr_copy1'
 ```
 
+## 2020-01-10
+
+Delegate was changed to be on static method and cached.
+
+|                                                         Method |     Mean |    Error |    StdDev | Ratio | RatioSD |
+|--------------------------------------------------------------- |---------:|---------:|----------:|------:|--------:|
+|                                'Baseline. Query by direct SQL' | 110.0 ms | 11.69 ms |  33.15 ms |  1.00 |    0.00 |
+|                               'Query by DbEntity Exec Command' | 116.2 ms | 13.00 ms |  36.66 ms |  1.12 |    0.43 |
+|                        'Query by DbEntity with Optimization 2' | 929.3 ms | 54.36 ms | 155.08 ms |  9.11 |    2.75 |
+|       'Query by DbEntity without Children with Optimization 2' | 179.6 ms | 22.83 ms |  66.22 ms |  1.78 |    0.83 |
+|     'Query by DbEntity with only Mkt Loss with Optimization 2' | 549.9 ms | 32.06 ms |  93.03 ms |  5.52 |    2.04 |
+| 'Query by DbEntity with only User Session with Optimization 2' | 598.6 ms | 38.13 ms | 106.91 ms |  5.93 |    1.99 |
+
 ## 2020-01-09
 
 By caching the delegates on walking all children and all parent, there was a little benefit on performances.
