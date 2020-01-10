@@ -15,9 +15,21 @@ export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User I
 
 ## 2020-01-10
 
-From Home
-
 Async Build method
+
+From Office
+
+|                                  Method | Categories |      Mean |     Error |    StdDev | Ratio | RatioSD |
+|---------------------------------------- |----------- |----------:|----------:|----------:|------:|--------:|
+|         'Baseline. Query by direct SQL' |       Full |  59.93 ms |  1.940 ms |  5.660 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |       Full |  68.15 ms |  1.349 ms |  3.602 ms |  1.16 |    0.13 |
+| 'Query by DbEntity with Optimization 2' |       Full | 754.61 ms | 14.844 ms | 32.583 ms | 12.63 |    1.33 |
+|                                         |            |           |           |           |       |         |
+|         'Baseline. Query by direct SQL' |    Top 200 |  26.15 ms |  0.521 ms |  1.249 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |    Top 200 |  27.52 ms |  0.570 ms |  1.673 ms |  1.06 |    0.08 |
+| 'Query by DbEntity with Optimization 2' |    Top 200 |  71.35 ms |  1.403 ms |  2.959 ms |  2.74 |    0.13 |
+
+From Home
 
 |                                                         Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
 |--------------------------------------------------------------- |----------:|---------:|---------:|------:|--------:|
