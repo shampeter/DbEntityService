@@ -15,6 +15,32 @@ export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User I
 
 ## 2020-01-09
 
+By caching the delegates on walking all children and all parent, there was a little benefit on performances.
+
+__With Caching__
+
+|                                                         Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|--------------------------------------------------------------- |----------:|---------:|---------:|------:|--------:|
+|                                'Baseline. Query by direct SQL' |  19.61 ms | 0.232 ms | 0.217 ms |  1.00 |    0.00 |
+|                               'Query by DbEntity Exec Command' |  42.65 ms | 0.420 ms | 0.393 ms |  2.18 |    0.03 |
+|                        'Query by DbEntity with Optimization 2' | 358.32 ms | 5.647 ms | 5.282 ms | 18.27 |    0.37 |
+|       'Query by DbEntity without Children with Optimization 2' |  27.56 ms | 0.842 ms | 2.482 ms |  1.39 |    0.14 |
+|     'Query by DbEntity with only Mkt Loss with Optimization 2' | 193.07 ms | 3.700 ms | 4.544 ms |  9.84 |    0.26 |
+| 'Query by DbEntity with only User Session with Optimization 2' | 188.56 ms | 3.396 ms | 4.978 ms |  9.68 |    0.35 |
+
+__Without Caching__
+
+|                                                         Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|--------------------------------------------------------------- |----------:|---------:|---------:|------:|--------:|
+|                                'Baseline. Query by direct SQL' |  17.44 ms | 0.270 ms | 0.252 ms |  1.00 |    0.00 |
+|                               'Query by DbEntity Exec Command' |  40.49 ms | 0.494 ms | 0.462 ms |  2.32 |    0.04 |
+|                        'Query by DbEntity with Optimization 2' | 350.14 ms | 5.717 ms | 5.348 ms | 20.08 |    0.47 |
+|       'Query by DbEntity without Children with Optimization 2' |  27.75 ms | 0.757 ms | 2.233 ms |  1.57 |    0.13 |
+|     'Query by DbEntity with only Mkt Loss with Optimization 2' | 193.62 ms | 3.787 ms | 5.896 ms | 11.16 |    0.39 |
+| 'Query by DbEntity with only User Session with Optimization 2' | 193.59 ms | 3.814 ms | 5.220 ms | 11.05 |    0.39 |
+
+## 2020-01-09
+
 Diagnostic run
 
 |                                                       Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
