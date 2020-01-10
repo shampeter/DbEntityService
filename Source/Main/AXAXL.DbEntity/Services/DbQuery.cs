@@ -199,7 +199,18 @@ namespace AXAXL.DbEntity.Services
 					}
 					break;
 				case RetrievalStrategies.AllEntitiesAtOnce:
-					director.Build<T>(new HashSet<NodeEdge>(), queryResult, true, true, this.ChildOuterJoinWhereClauses, this.ChildOuterJoinOrClausesGroup, innerJoinsWhereClauses, innerJoinOrClauses);
+					queryResult = director.BuildAsync<T>(
+						new HashSet<NodeEdge>(), 
+						queryResult, 
+						true, 
+						true, 
+						this.ChildOuterJoinWhereClauses, 
+						this.ChildOuterJoinOrClausesGroup, 
+						innerJoinsWhereClauses, 
+						innerJoinOrClauses
+						)
+						.GetAwaiter()
+						.GetResult();
 					break;
 			}
 

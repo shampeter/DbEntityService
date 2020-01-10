@@ -15,8 +15,8 @@ namespace AXAXL.DbEntity.Services
 {
 	public class Director
 	{
-		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGo), BindingFlags.NonPublic | BindingFlags.Static);
-		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGo), BindingFlags.NonPublic | BindingFlags.Static);
+		private static MethodInfo buildAllChildrenInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllChildrenInOneGoAsync), BindingFlags.NonPublic | BindingFlags.Static);
+		private static MethodInfo buildAllParentInOneGoMethodInfo = typeof(Director).GetMethod(nameof(BuildAllParentInOneGoAsync), BindingFlags.NonPublic | BindingFlags.Static);
 		private static ConcurrentDictionary<NodeEdge, Delegate> buildAllChildrenInOneGoDelegateDict = new ConcurrentDictionary<NodeEdge, Delegate>();
 		private static ConcurrentDictionary<NodeEdge, Delegate> buildAllParentInOneGoDelegateDict = new ConcurrentDictionary<NodeEdge, Delegate>();
 		private IDatabaseDriver Driver { get; set; }
@@ -41,7 +41,7 @@ namespace AXAXL.DbEntity.Services
 			this.Strategy = strategy;
 		}
 		
-		public IEnumerable<T> Build<T>(
+		public async Task<IEnumerable<T>> BuildAsync<T>(
 			ISet<NodeEdge> walkedPath,
 			IEnumerable<T> entities,
 			bool isMovingTowardsParent,
@@ -74,6 +74,7 @@ namespace AXAXL.DbEntity.Services
 						primaryKeyValues[k].Add(keyValues[k]);
 					}
 				}
+				var tasks = new List<Task>();
 				foreach(var edge in node.AllChildEdges())
 				{
 					if (
@@ -88,11 +89,14 @@ namespace AXAXL.DbEntity.Services
 					{
 						walkedPath.Add(edge);
 					}
-					this.BuildByOneChildEdge<T>(walkedPath, entityIndexes, entities, node, primaryKeyCounts, primaryKeyValues, edge, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					var task = this.BuildByOneChildEdgeAsync<T>(walkedPath, entityIndexes, entities, node, primaryKeyCounts, primaryKeyValues, edge, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					tasks.Add(task);
 				}
+				await Task.WhenAll(tasks.ToArray());
 			}
 			if (isMovingTowardsParent)
 			{
+				var tasks = new List<Task>();
 				// TODO: Inner join failed in benchmark. Check it out.
 				foreach (var edge in node.AllParentEdges())
 				{
@@ -108,14 +112,14 @@ namespace AXAXL.DbEntity.Services
 					//{
 					//	walkedPath.Add(edge);
 					//}
-						
-
-					this.BuildByOneParentEdge<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
-				}               
+					var task = this.BuildByOneParentEdgeAsync<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
+					tasks.Add(task);
+				}
+				await Task.WhenAll(tasks.ToArray());
 			}
 			return entities;
 		}
-		private void BuildByOneParentEdge<T>(
+		private async Task BuildByOneParentEdgeAsync<T>(
 			ISet<NodeEdge> walkedPath,
 			Node childNode,
 			NodeEdge childToParentEdge,
@@ -151,7 +155,7 @@ namespace AXAXL.DbEntity.Services
 			var action = buildAllParentInOneGoDelegateDict.GetOrAdd(
 				childToParentEdge, 
 				(key) => {
-					var actionType = typeof(Action<,,,,,,,,,,>).MakeGenericType(
+					var actionType = typeof(Func<,,,,,,,,,,,>).MakeGenericType(
 						typeof(Director),
 						typeof(ISet<NodeEdge>),
 						typeof(IDictionary<object[], List<int>>),
@@ -162,14 +166,15 @@ namespace AXAXL.DbEntity.Services
 						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
 						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
 						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
-						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>),
+						typeof(Task)
 						);
 					return buildAllParentInOneGoMethodInfo
 						.MakeGenericMethod(key.ChildNode.NodeType, key.ParentNode.NodeType)
 						.CreateDelegate(actionType);
 				});
 
-			action.DynamicInvoke(
+			var task = (Task)action.DynamicInvoke(
 					this,
 					walkedPath,
 					childFKeyToEnumLoc,
@@ -182,6 +187,7 @@ namespace AXAXL.DbEntity.Services
 					innerJoinWhere,
 					innerJoinOr
 					);
+			await task;
 			/*
 					private void BuildAllParentInOneGo<TChild, TParent>(
 						IDictionary<object[], List<int>> childFKeyToEnumLocs,
@@ -197,7 +203,7 @@ namespace AXAXL.DbEntity.Services
 
 			 */
 		}
-		private void BuildByOneChildEdge<T>(
+		private async Task BuildByOneChildEdgeAsync<T>(
 			ISet<NodeEdge> walkedPath,
 			Dictionary<object[], int> parentKeyToEnumLoc,
 			IEnumerable<T> parents,
@@ -235,7 +241,7 @@ namespace AXAXL.DbEntity.Services
 				(key) =>
 				{
 					var parentEnumType = typeof(IEnumerable<>).MakeGenericType(parentNode.NodeType);
-					var actionType = typeof(Action<,,,,,,,,,,,,>).MakeGenericType(
+					var actionType = typeof(Func<,,,,,,,,,,,,,>).MakeGenericType(
 						typeof(Director),
 						typeof(ISet<NodeEdge>),
 						typeof(IDictionary<object[], int>),
@@ -248,13 +254,14 @@ namespace AXAXL.DbEntity.Services
 						typeof(IEnumerable<ValueTuple<NodeEdge, Expression>>),
 						typeof(IEnumerable<ValueTuple<NodeEdge, Expression[]>>),
 						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression> expressions)>),
-						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>)
+						typeof(IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)>),
+						typeof(Task)
 						);
 					return Director.buildAllChildrenInOneGoMethodInfo
 						.MakeGenericMethod(parentToChildEdge.ParentNode.NodeType, parentToChildEdge.ChildNode.NodeType)
 						.CreateDelegate(actionType);
 				});
-			action.DynamicInvoke(
+			var task = (Task)action.DynamicInvoke(
 					this,
 					walkedPath,
 					parentKeyToEnumLoc,
@@ -269,9 +276,10 @@ namespace AXAXL.DbEntity.Services
 					innerJoinWhere,
 					innerJoinOr
 				);
+			await task;
 		}
 
-		private static void BuildAllChildrenInOneGo<TParent, TChild>(
+		private static async Task BuildAllChildrenInOneGoAsync<TParent, TChild>(
 			Director director,
 			ISet<NodeEdge> walkedPath,
 			IDictionary<object[], int> parentPKeyToEnumLocIdx,
@@ -320,10 +328,10 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			director.Build<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+			await director.BuildAsync<TChild>(walkedPath, childrenGrpByPKeys.Values.SelectMany(p => p).ToList(), true, true, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
-		private static void BuildAllParentInOneGo<TChild, TParent>(
+		private static async Task BuildAllParentInOneGoAsync<TChild, TParent>(
 			Director director,
 			ISet<NodeEdge> walkedPath,
 			IDictionary<object[], List<int>> childFKeyToEnumLocs,
@@ -375,7 +383,7 @@ namespace AXAXL.DbEntity.Services
 				}
 			}
 
-			director.Build<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
+			await director.BuildAsync<TParent>(walkedPath, parentGrpByFKeys.Values.SelectMany(p => p).ToList(), true, false, fullChildWhereClauses, fullChildOrClausesGroup, innerJoinWhere, innerJoinOr);
 		}
 
 		public T Build<T>(

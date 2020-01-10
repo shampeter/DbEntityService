@@ -15,7 +15,34 @@ export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User I
 
 ## 2020-01-10
 
+From Home
+
+Async Build method
+
+|                                                         Method |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|--------------------------------------------------------------- |----------:|---------:|---------:|------:|--------:|
+|                                'Baseline. Query by direct SQL' |  19.51 ms | 0.387 ms | 0.414 ms |  1.00 |    0.00 |
+|                               'Query by DbEntity Exec Command' |  41.60 ms | 0.685 ms | 0.640 ms |  2.13 |    0.05 |
+|                        'Query by DbEntity with Optimization 2' | 329.94 ms | 4.542 ms | 3.546 ms | 16.86 |    0.34 |
+|       'Query by DbEntity without Children with Optimization 2' |  25.23 ms | 0.502 ms | 1.357 ms |  1.27 |    0.08 |
+|     'Query by DbEntity with only Mkt Loss with Optimization 2' | 182.54 ms | 4.144 ms | 7.258 ms |  9.43 |    0.45 |
+| 'Query by DbEntity with only User Session with Optimization 2' | 180.08 ms | 2.214 ms | 1.963 ms |  9.21 |    0.28 |
+
+
 Delegate was changed to be on static method and cached.
+
+From Home
+
+|                                                         Method |      Mean |     Error |    StdDev | Ratio | RatioSD |
+|--------------------------------------------------------------- |----------:|----------:|----------:|------:|--------:|
+|                                'Baseline. Query by direct SQL' |  19.46 ms |  0.258 ms |  0.242 ms |  1.00 |    0.00 |
+|                               'Query by DbEntity Exec Command' |  42.57 ms |  0.673 ms |  0.629 ms |  2.19 |    0.04 |
+|                        'Query by DbEntity with Optimization 2' | 367.53 ms | 10.947 ms | 31.233 ms | 18.56 |    1.13 |
+|       'Query by DbEntity without Children with Optimization 2' |  27.58 ms |  0.824 ms |  2.428 ms |  1.32 |    0.15 |
+|     'Query by DbEntity with only Mkt Loss with Optimization 2' | 207.12 ms |  4.740 ms | 13.677 ms | 10.50 |    0.59 |
+| 'Query by DbEntity with only User Session with Optimization 2' | 208.09 ms |  5.737 ms | 16.460 ms | 10.73 |    0.43 |
+
+From Office
 
 |                                                         Method |     Mean |    Error |    StdDev | Ratio | RatioSD |
 |--------------------------------------------------------------- |---------:|---------:|----------:|------:|--------:|
