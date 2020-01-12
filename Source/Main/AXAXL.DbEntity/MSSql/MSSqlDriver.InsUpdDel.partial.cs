@@ -21,39 +21,48 @@ namespace AXAXL.DbEntity.MSSql
 		public IEnumerable<dynamic> ExecuteCommand(string connectionString, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30)
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
-
-			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
-
-			this.LogSql("Execute command", null, cmd);
-			IEnumerable<dynamic> result = null;
-			using (var connection = new SqlConnection(connectionString))
+			Debug.Assert(string.IsNullOrEmpty(rawSqlCommand) == false, "Sql command is blank");
+			try
 			{
-				connection.Open();
-				cmd.Connection = connection;
-				using (var reader = cmd.ExecuteReader())
+				var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
+
+				this.LogSql("Execute command", null, cmd);
+				IEnumerable<dynamic> result = null;
+				using (var connection = new SqlConnection(connectionString))
 				{
-					var idx2Name = reader.GetColumnSchema().ToDictionary(k => k.ColumnOrdinal.Value, v => v.ColumnName);
-					result = reader
-								.Cast<IDataRecord>()
-								.Select(p => {
-									return idx2Name
-											.ToDictionary(k => k.Value, v => p[v.Key])
-											.ToDynamic();
-								})
-								.ToArray();
+					connection.Open();
+					cmd.Connection = connection;
+					using (var reader = cmd.ExecuteReader())
+					{
+						var idx2Name = reader.GetColumnSchema().ToDictionary(k => k.ColumnOrdinal.Value, v => v.ColumnName);
+						result = reader
+									.Cast<IDataRecord>()
+									.Select(p =>
+									{
+										return idx2Name
+												.ToDictionary(k => k.Value, v => p[v.Key])
+												.ToDynamic();
+									})
+									.ToArray();
+					}
 				}
+				outputParameters = cmdParameters
+									.Where(kv => kv.Value.Direction != ParameterDirection.Input)
+									.ToDictionary(
+										k => k.Key,
+										v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
+									);
+				return result;
 			}
-			outputParameters = cmdParameters
-								.Where(kv => kv.Value.Direction != ParameterDirection.Input)
-								.ToDictionary(
-									k => k.Key,
-									v => v.Value.SqlValue == DBNull.Value ? null : v.Value.Value
-								);
-			return result;
+			catch (SqlException ex)
+			{
+				throw new InvalidOperationException($"Failed to execute Raw Sql {rawSqlCommand}", ex);
+			}
 		}
 		public IEnumerable<T> ExecuteCommand<T>(string connectionString, Node node, bool isStoredProcedure, string rawSqlCommand, (string Name, object Value, ParameterDirection Direction)[] parameters, out IDictionary<string, object> outputParameters, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
 			Debug.Assert(string.IsNullOrEmpty(connectionString) == false, "Connection string has not been setup yet");
+			Debug.Assert(string.IsNullOrEmpty(rawSqlCommand) == false, "Sql command is blank");
 
 			var cmd = this.PrepareCommandFromRawSql(isStoredProcedure, rawSqlCommand, parameters, out IDictionary<string, SqlParameter> cmdParameters);
 			// Note that the SelectClause variable is not used.  We are just borrowing the call to create the data reader fetching func.

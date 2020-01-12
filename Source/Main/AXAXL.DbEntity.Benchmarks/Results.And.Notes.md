@@ -1,5 +1,7 @@
 ﻿# Benchmark Results and Notes
 
+## Setting up connection string environment variable
+
 Note that the database behind this benchmark is CLR.  The connection string can either be set in appsettings.json or in environment variable
 **ConnectionString__CLR**.  For example, on Windows 10 machine, I have
 
@@ -12,6 +14,47 @@ and on Linux box, I have
 ```bash
 export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User Id=CLRMainDev; Password=devma1nclr; Database=xlre_clr_copy1'
 ```
+
+## PerfView on Windows
+
+Starting from v1.4.1, benchmark included `EtwProfiler` from `BenchmarkDotNet` to collect performance trace.  Detailed description of `EtwProfiler` is here in [this blog](https://adamsitnik.com/ETW-Profiler/).
+To view the trace file, download of `PerfView` [here](https://github.com/Microsoft/perfview/releases).  For using `PerfView`, see [this tutorial](https://channel9.msdn.com/Series/PerfView-Tutorial). 
+
+## 2020-01-11
+
+At Home.  Using ArrayPool
+
+|                                  Method | Categories |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|---------------------------------------- |----------- |----------:|---------:|---------:|------:|--------:|
+|         'Baseline. Query by direct SQL' |       Full |  18.91 ms | 0.232 ms | 0.205 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |       Full |  40.59 ms | 0.443 ms | 0.415 ms |  2.15 |    0.02 |
+| 'Query by DbEntity with Optimization 2' |       Full | 351.39 ms | 6.990 ms | 7.479 ms | 18.56 |    0.41 |
+|                                         |            |           |          |          |       |         |
+|         'Baseline. Query by direct SQL' |    Top 200 |  12.26 ms | 0.115 ms | 0.108 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |    Top 200 |  12.49 ms | 0.086 ms | 0.081 ms |  1.02 |    0.01 |
+| 'Query by DbEntity with Optimization 2' |    Top 200 |  22.20 ms | 0.654 ms | 1.907 ms |  1.86 |    0.14 |
+
+At Home.  Original with no ArrayPool.  Inclusive of impact.
+
+|                                  Method | Categories |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|---------------------------------------- |----------- |----------:|---------:|---------:|------:|--------:|
+|         'Baseline. Query by direct SQL' |       Full |  19.06 ms | 0.091 ms | 0.081 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |       Full |  40.62 ms | 0.441 ms | 0.413 ms |  2.13 |    0.02 |
+| 'Query by DbEntity with Optimization 2' |       Full | 341.52 ms | 6.617 ms | 6.795 ms | 17.91 |    0.42 |
+|                                         |            |           |          |          |       |         |
+|         'Baseline. Query by direct SQL' |    Top 200 |  12.16 ms | 0.085 ms | 0.075 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |    Top 200 |  13.04 ms | 0.261 ms | 0.483 ms |  1.10 |    0.03 |
+| 'Query by DbEntity with Optimization 2' |    Top 200 |  21.92 ms | 0.610 ms | 1.770 ms |  1.79 |    0.14 |
+
+|                                  Method | Categories |      Mean |    Error |   StdDev | Ratio | RatioSD |
+|---------------------------------------- |----------- |----------:|---------:|---------:|------:|--------:|
+|         'Baseline. Query by direct SQL' |       Full |  18.83 ms | 0.101 ms | 0.095 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |       Full |  40.65 ms | 0.385 ms | 0.360 ms |  2.16 |    0.02 |
+| 'Query by DbEntity with Optimization 2' |       Full | 348.88 ms | 4.023 ms | 3.566 ms | 18.52 |    0.22 |
+|                                         |            |           |          |          |       |         |
+|         'Baseline. Query by direct SQL' |    Top 200 |  12.20 ms | 0.144 ms | 0.127 ms |  1.00 |    0.00 |
+|        'Query by DbEntity Exec Command' |    Top 200 |  12.48 ms | 0.111 ms | 0.104 ms |  1.02 |    0.01 |
+| 'Query by DbEntity with Optimization 2' |    Top 200 |  20.48 ms | 0.632 ms | 1.824 ms |  1.67 |    0.16 |
 
 ## 2020-01-10
 

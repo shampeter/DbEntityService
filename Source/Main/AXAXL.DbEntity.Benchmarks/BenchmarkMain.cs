@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-
+using System.Runtime.InteropServices;
 using System.Data.SqlClient;
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Filters;
+using BenchmarkDotNet.Diagnostics.Windows;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Toolchains.DotNetCli;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 using AXAXL.DbEntity.Interfaces;
 using AXAXL.DbEntity.Benchmarks.Models;
@@ -16,6 +21,7 @@ namespace AXAXL.DbEntity.Benchmarks
 	[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 	[CategoriesColumn]
 	[Config(typeof(Config))]
+	[MemoryDiagnoser]
 	public class BenchmarkMain : BenchmarkBase
 	{
 
@@ -64,6 +70,25 @@ namespace AXAXL.DbEntity.Benchmarks
 			{
 				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top 200" }));
 				//this.Add(new AnyCategoriesFilter(new[] { "Full" }));
+
+/*				
+ *				Not working.  Don't know why but PerfView said that the trace file was 30% broken due to 64 bit runtime but
+ *				the benchmark was certainly running in x86 target.
+ *				if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+				{
+					// 2020-01-11. EtwProfiler (analyze performance using PerfView) is only available on Windows for the time being.
+					this.Add(new EtwProfiler());
+					var dotnetCli32bit = NetCoreAppSettings
+								.NetCoreApp31
+								.WithCustomDotNetCliPath(@"C:\Program Files (x86)\dotnet\dotnet.exe", "32 bit cli");
+
+					this.Add(Job.Default
+						.With(Platform.X86)
+						.With(CsProjCoreToolchain.From(dotnetCli32bit))
+						.WithId("32 bit cli")
+						);
+				}
+*/			
 			}
 		}
 

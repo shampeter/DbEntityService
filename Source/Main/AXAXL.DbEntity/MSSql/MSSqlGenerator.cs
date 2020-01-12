@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Linq;
 using System.Collections.Generic;
@@ -279,6 +280,7 @@ namespace AXAXL.DbEntity.MSSql
 			Debug.Assert(keyValues != null && keyValues.Count > 0, "No key-values provided to create where clause and sql parameters.");
 			Debug.Assert(node != null);
 
+			var sharedStringPool = ArrayPool<string>.Shared;
 			var resultBuffer = new List<(string primaryWhereClause, SqlParameter[])>();
 
 			var alias = tableAlias == null ? string.Empty : $"{tableAlias}.";
@@ -305,7 +307,8 @@ namespace AXAXL.DbEntity.MSSql
 				for(int i = 0; i <= numOfBatches; i++)
 				{
 					var size = i == numOfBatches ? remains : batchSize;
-					var names = new string[size];
+					//var names = new string[size];
+					var names = sharedStringPool.Rent(size);
 					var parameters = new SqlParameter[size];
 					for (int j = 0; j < size; j++)
 					{
@@ -314,9 +317,10 @@ namespace AXAXL.DbEntity.MSSql
 						parameters[j] = parameter;
 						names[j] = name;
 					}
-					var where = new string[]{ string.Format(template, string.Join(",", names)) };
+					var where = new string[]{ string.Format(template, string.Join(",", names, 0, size)) };
 					var whereClause = String.Join(" AND ", where.Concat(constantKeys));
 					resultBuffer.Add((whereClause, parameters));
+					sharedStringPool.Return(names);
 				}
 			}
 			else if (nonConstantKeys.Length > 1)
@@ -333,20 +337,24 @@ namespace AXAXL.DbEntity.MSSql
 				var maxValuePerBatch = (int)(batchSize / keySize);
 				var numOfBatches = (int)(valueLength / maxValuePerBatch);
 				var remains = valueLength % maxValuePerBatch;
-				var conditions = new string[keySize]; 
-				for(var i = 0; i < keySize; i++)
+				//var conditions = new string[keySize];
+				var conditions = sharedStringPool.Rent(keySize);
+				for (var i = 0; i < keySize; i++)
 				{
 					conditions[i] = string.Format("{0} = {{{1}}}", $"{alias}{nonConstantKeys[i].Key.DbColumnName}", i);
 				}
-				var template = String.Format("( {0} )", string.Join(" AND ", conditions));
+				var template = String.Format("( {0} )", string.Join(" AND ", conditions, 0, keySize));
+				sharedStringPool.Return(conditions);
 				for (int i = 0; i <= numOfBatches; i++)
 				{
 					var size = i == numOfBatches ? remains : maxValuePerBatch;
-					var whereConditions = new string[size];
+					//var whereConditions = new string[size];
+					var whereConditions = sharedStringPool.Rent(size);
 					var parameters = new List<SqlParameter>();
 					for (int j = 0; j < size; j++)
 					{
-						var perKeysCondition = new string[keySize];
+						//var perKeysCondition = new string[keySize];
+						var perKeysCondition = sharedStringPool.Rent(keySize);
 						for (int k = 0; k < keySize; k++)
 						{
 							var (name, parameter) = this.NewSqlParameterByPropertyName(nonConstantKeys[k].Key, parameterPrefix, j * keySize + k);
@@ -355,9 +363,11 @@ namespace AXAXL.DbEntity.MSSql
 							parameters.Add(parameter);
 						}
 						whereConditions[j] = string.Format(template, perKeysCondition);
+						sharedStringPool.Return(perKeysCondition);
 					}
-					var whereConditionsJoinedInOr = new string[] { string.Format("( {0} )", string.Join(" OR ", whereConditions)) };
+					var whereConditionsJoinedInOr = new string[] { string.Format("( {0} )", string.Join(" OR ", whereConditions, 0, size)) };
 					var whereCombined = string.Join(" AND ", whereConditionsJoinedInOr.Concat(constantKeys));
+					sharedStringPool.Return(whereConditions);
 					resultBuffer.Add((whereCombined, parameters.ToArray()));
 				}
 			}

@@ -686,46 +686,62 @@ namespace AXAXL.DbEntity.MSSql
 
 		private IEnumerable<T> ExecuteQuery<T>(string connectionString, Func<SqlDataReader, dynamic> fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
-			var resultSet = new List<T>();
-			using (var connection = new SqlConnection(connectionString))
+			try
 			{
-				connection.Open();
-				cmd.CommandTimeout = timeoutDurationInSeconds;
-				cmd.Connection = connection;
-				using (var reader = cmd.ExecuteReader())
+				var resultSet = new List<T>();
+				using (var connection = new SqlConnection(connectionString))
 				{
-					while (reader.Read())
+					connection.Open();
+					cmd.CommandTimeout = timeoutDurationInSeconds;
+					cmd.Connection = connection;
+					using (var reader = cmd.ExecuteReader())
 					{
-						var entity = fetcher(reader);
-						resultSet.Add(entity);
+						while (reader.Read())
+						{
+							var entity = fetcher(reader);
+							resultSet.Add(entity);
+						}
 					}
 				}
+				return resultSet;
 			}
-			return resultSet;
+			catch (SqlException ex)
+			{
+				var sql = cmd?.CommandText ?? "Unknown";
+				throw new InvalidOperationException("Failed to execute Sql {sql}", ex);
+			}
 		}
 
 		private void ExecuteQuery<T>(IDictionary<object[], List<T>> resultSet, string connectionString, Delegate fetcher, SqlCommand cmd, int timeoutDurationInSeconds = 30) where T : class, new()
 		{
-			using (var connection = new SqlConnection(connectionString))
+			try
 			{
-				connection.Open();
-				cmd.CommandTimeout = timeoutDurationInSeconds;
-				cmd.Connection = connection;
-				using (var reader = cmd.ExecuteReader())
+				using (var connection = new SqlConnection(connectionString))
 				{
-					while (reader.Read())
+					connection.Open();
+					cmd.CommandTimeout = timeoutDurationInSeconds;
+					cmd.Connection = connection;
+					using (var reader = cmd.ExecuteReader())
 					{
-						var (groupKeys, entity) = (ValueTuple<object[], T>)fetcher.DynamicInvoke(reader);
-						if (resultSet.TryGetValue(groupKeys, out List<T> entities))
+						while (reader.Read())
 						{
-							entities.Add(entity);
-						}
-						else
-						{
-							resultSet.Add(groupKeys, new List<T> { entity });
+							var (groupKeys, entity) = (ValueTuple<object[], T>)fetcher.DynamicInvoke(reader);
+							if (resultSet.TryGetValue(groupKeys, out List<T> entities))
+							{
+								entities.Add(entity);
+							}
+							else
+							{
+								resultSet.Add(groupKeys, new List<T> { entity });
+							}
 						}
 					}
 				}
+			}
+			catch (SqlException ex)
+			{
+				var sql = cmd?.CommandText ?? @"Unknown";
+				throw new InvalidOperationException($"Failed to execute SQL: {sql}", ex);
 			}
 		}
 
@@ -740,8 +756,12 @@ namespace AXAXL.DbEntity.MSSql
 					cmdParameters[input.Name].Value = input.Value ?? DBNull.Value;
 				}
 			}
-			var cmd = new SqlCommand(rawSqlCommand);
-			cmd.CommandType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+#pragma warning disable CA2100 // TODO: Review SQL queries for security vulnerabilities
+			var cmd = new SqlCommand(rawSqlCommand)
+			{
+				CommandType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text
+			};
+#pragma warning restore CA2100
 			cmd.Parameters.AddRange(cmdParameters.Values.ToArray());
 
 			return cmd;

@@ -55,7 +55,7 @@ namespace AXAXL.DbEntity.Services
 			if (entities == null || entities.Count() <= 0) return entities;
 
 			Node node = this.NodeMap.GetNode(entities.FirstOrDefault()?.GetType() ?? typeof(T));
-
+			var tasks = new List<Task>();
 			if (isMovingTowardsChild)
 			{
 				var entityIndexes = new Dictionary<object[], int>(new ObjectArrayComparer());
@@ -74,7 +74,7 @@ namespace AXAXL.DbEntity.Services
 						primaryKeyValues[k].Add(keyValues[k]);
 					}
 				}
-				var tasks = new List<Task>();
+
 				foreach(var edge in node.AllChildEdges())
 				{
 					if (
@@ -92,11 +92,9 @@ namespace AXAXL.DbEntity.Services
 					var task = this.BuildByOneChildEdgeAsync<T>(walkedPath, entityIndexes, entities, node, primaryKeyCounts, primaryKeyValues, edge, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 					tasks.Add(task);
 				}
-				await Task.WhenAll(tasks.ToArray());
 			}
 			if (isMovingTowardsParent)
 			{
-				var tasks = new List<Task>();
 				// TODO: Inner join failed in benchmark. Check it out.
 				foreach (var edge in node.AllParentEdges())
 				{
@@ -115,8 +113,8 @@ namespace AXAXL.DbEntity.Services
 					var task = this.BuildByOneParentEdgeAsync<T>(walkedPath, node, edge, entities, childWhereClauses, childOrClausesGroup, innerJoinWhere, innerJoinOr);
 					tasks.Add(task);
 				}
-				await Task.WhenAll(tasks.ToArray());
 			}
+			await Task.WhenAll(tasks.ToArray());
 			return entities;
 		}
 		private async Task BuildByOneParentEdgeAsync<T>(
@@ -130,6 +128,7 @@ namespace AXAXL.DbEntity.Services
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
 			)
 		{
+			//this.Log.LogInformation("{0}: {1} / {2} => {3}", nameof(BuildByOneParentEdgeAsync), DateTime.Now.ToString("HH:mm:ss.fff"), childToParentEdge.ChildNode.Name, childToParentEdge.ParentNode.Name);
 			var parentKeys = childToParentEdge.ParentNodePrimaryKeys;
 			var childFKeyReaders = childToParentEdge.ChildForeignKeyReaders.Take(parentKeys.Length);
 			var childFKeyToEnumLoc = new Dictionary<object[], List<int>>(new ObjectArrayComparer());
@@ -217,6 +216,8 @@ namespace AXAXL.DbEntity.Services
 			IList<(IList<NodeEdge> Path, Node TargetChild, IEnumerable<Expression[]> expressions)> innerJoinOr
 			) where T : class, new()
 		{
+			//this.Log.LogInformation("{0}: {1} / {2} => {3}", nameof(BuildByOneChildEdgeAsync), DateTime.Now.ToString("HH:mm:ss.fff"), parentToChildEdge.ParentNode.Name, parentToChildEdge.ChildNode.Name);
+
 			var additionalWhereClause = childWhereClauses?.Where(w => w.Item1 == parentToChildEdge).Select(w => w.Item2).ToArray();
 			var additionalOrClauses = childOrClausesGroup?.Where(o => o.Item1 == parentToChildEdge).Select(o => o.Item2).ToList();
 
