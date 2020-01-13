@@ -72,13 +72,23 @@ namespace AXAXL.DbEntity.Benchmarks
 				//this.Add(new AnyCategoriesFilter(new[] { "Full" }));
 
 				#region EtwProfiler
-				/*				
-				 *	Not working.  Don't know why but PerfView said that the trace file was 30% broken due to 64 bit runtime but
-				 *	the benchmark was certainly running in x86 target.
-
-				if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+				var etwProfiler = Environment.GetEnvironmentVariable(@"DbEntity_Benchmark_EtwProfiler") ?? @"false";
+				if (
+					RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && 
+					etwProfiler.Equals(@"true", StringComparison.CurrentCultureIgnoreCase)
+				)
 				{
-					// 2020-01-11. EtwProfiler (analyze performance using PerfView) is only available on Windows for the time being.
+					/* 2020-01-11. EtwProfiler (analyze performance using PerfView) is only available on Windows for the time being.
+					 * And benchmark must be run in administrator mode.
+					 * --> create and set environment variable DbEntity_Benchmark_EtwProfiler to TRUE to enable EtwProfiler <--
+					 * Project file has also been modified in adding the following.
+					 * Machine should have 32 bit version of dotnet because, so far, I found EtwProfiler and PerfView worked well in 32 bit process.
+					 * 		<DebugType>pdbonly</DebugType>
+					 * 		<DebugSymbols>true</DebugSymbols>
+					 * Detailed description of `EtwProfiler` is here in https://adamsitnik.com/ETW-Profiler/.
+					 * To view the trace file, download of `PerfView` from https://github.com/Microsoft/perfview/releases.
+					 * For using `PerfView`, see this tutorial, https://channel9.msdn.com/Series/PerfView-Tutorial.
+					 */
 					this.Add(new EtwProfiler());
 					var dotnetCli32bit = NetCoreAppSettings
 								.NetCoreApp31
@@ -90,7 +100,7 @@ namespace AXAXL.DbEntity.Benchmarks
 						.WithId("32 bit cli")
 						);
 				}
-				 */
+
 				#endregion
 			}
 		}

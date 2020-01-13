@@ -20,6 +20,14 @@ export ConnectionString__CLR='Server=sql-destiny-dev.r02.xlgs.local,1436; User I
 Starting from v1.4.1, benchmark included `EtwProfiler` from `BenchmarkDotNet` to collect performance trace.  Detailed description of `EtwProfiler` is here in [this blog](https://adamsitnik.com/ETW-Profiler/).
 To view the trace file, download of `PerfView` [here](https://github.com/Microsoft/perfview/releases).  For using `PerfView`, see [this tutorial](https://channel9.msdn.com/Series/PerfView-Tutorial). 
 
+Be sure to choose the process with command line starting with `32-bit dotnet` as I have, so far, only produced successfully diagnostics in 32-bit process.
+
+## 2020-01-13
+
+Haven't really walk down the stack trace but from the `metric/interval` ratio shown on top of `CPU Stack` screens. Both base-line and
+optimization-2 benchmark were having similiar ratio, i.e. baseline 0.42 vs optimization-2 0.44.  These ratios, according to tutorial, may imply 
+that the bottleneck may not be CPU bound.
+
 ## 2020-01-11
 
 At Home.  Using ArrayPool

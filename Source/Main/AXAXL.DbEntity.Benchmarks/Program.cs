@@ -51,7 +51,7 @@ namespace AXAXL.DbEntity.Benchmarks
 			//BenchmarkSwitcher
 			//	.FromAssembly(typeof(Program).Assembly)
 			//	.Run(args, benchmarkConfig);
-			BenchmarkBase.PrintTotalSampleSize();
+			//BenchmarkBase.PrintTotalSampleSize();
 		}
 
 		private static void Debug()
