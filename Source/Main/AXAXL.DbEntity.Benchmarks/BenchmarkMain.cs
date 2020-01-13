@@ -71,10 +71,12 @@ namespace AXAXL.DbEntity.Benchmarks
 				this.Add(new AnyCategoriesFilter(new[] { "Full", "Top 200" }));
 				//this.Add(new AnyCategoriesFilter(new[] { "Full" }));
 
-/*				
- *				Not working.  Don't know why but PerfView said that the trace file was 30% broken due to 64 bit runtime but
- *				the benchmark was certainly running in x86 target.
- *				if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+				#region EtwProfiler
+				/*				
+				 *	Not working.  Don't know why but PerfView said that the trace file was 30% broken due to 64 bit runtime but
+				 *	the benchmark was certainly running in x86 target.
+
+				if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 				{
 					// 2020-01-11. EtwProfiler (analyze performance using PerfView) is only available on Windows for the time being.
 					this.Add(new EtwProfiler());
@@ -88,7 +90,8 @@ namespace AXAXL.DbEntity.Benchmarks
 						.WithId("32 bit cli")
 						);
 				}
-*/			
+				 */
+				#endregion
 			}
 		}
 
