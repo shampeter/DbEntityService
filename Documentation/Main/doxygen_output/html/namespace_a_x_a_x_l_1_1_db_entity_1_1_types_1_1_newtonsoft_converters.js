@@ -1,4 +1,0 @@
-var namespace_a_x_a_x_l_1_1_db_entity_1_1_types_1_1_newtonsoft_converters =
-[
-    [ "RowVersionConverter", "class_a_x_a_x_l_1_1_db_entity_1_1_types_1_1_newtonsoft_converters_1_1_row_version_converter.html", "class_a_x_a_x_l_1_1_db_entity_1_1_types_1_1_newtonsoft_converters_1_1_row_version_converter" ]
-];
